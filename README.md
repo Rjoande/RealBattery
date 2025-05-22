@@ -18,13 +18,13 @@ The new system rewards thoughtful planning, buffering for peak loads, and progre
 - A range of battery chemistries inspired by real-world technologies
 - Tech-tree progression with unlockable battery upgrades per part
 - Seamless integration with B9PartSwitch and localization support
-- Optional language to rename `ElectricCharge` and `StoredCharge`
+- Optional language to rename ElectricCharge and StoredCharge
 
 ### Extras
 Optional patches are included in the release to enhance immersion and realism. Extra patches are modular and can be removed or disabled if undesired:
 
 - **Alternator Fix**: disables alternators on most rocket engines (for realism), but enables them on multi-mode engines like the *RAPIER*.
-- **EC-to-amp** or **EC-to-kW** localization files: renames *Electric Charge* to *Electric Current*, or *Electric Charge* and *Stored Charge* to *Electric Power* (EP) and *Stored Energy* (SE), respectively. Install only one! See the [wiki](https://github.com/Rjoande/RealBattery/wiki/Understanding-EC-and-SC-Units) for more.
+- **EC-to-amp** or **EC-to-kW** localization files: renames *Electric Charge* to *Electric Current*, or *Electric Charge* and *Stored Charge* to *Electric Power* (EP) and *Stored Energy* (SE), respectively. **Install only one!** See the [wiki](https://github.com/Rjoande/RealBattery/wiki/Understanding-EC-and-SC-Units) for more.
 - **Electric-pump-fed Engines**: the *Goldfish* and *Angora* engines from [Near Future Launch Vehicles](https://github.com/post-kerbin-mining-corporation/NearFutureLaunchVehicles/releases) now require electric charge to operate.
 - **Fuel Cell Output**: fuel cells internal buffer aligns with actual electrical output.
 
@@ -34,12 +34,12 @@ To install an extra, simply place the corresponding patch into your `GameData` f
 
 Several improvements and expansions are planned for future updates:
 
-- Adjustable settings in the difficulty menu
-- Ability to manually enable/disable individual batteries
-- Background simulation support for unloaded vessels
-- Battery obsolescence system (degradation over time)
-- Self-discharge for inactive batteries
-- Thermal behavior integration (heat production and limits)
+- [ ] Adjustable settings in the difficulty menu
+- [ ] Ability to manually enable/disable individual batteries
+- [ ] Background simulation support for unloaded vessels
+- [ ] Battery obsolescence system (degradation over time)
+- [ ] Self-discharge for inactive batteries
+- [ ] Thermal behavior (heat production and damage, [SystemHeat](https://github.com/post-kerbin-mining-corporation/SystemHeat) integration)
 
 Suggestions and contributions are welcome — see the [Contributing](#contributing) section below.
 
