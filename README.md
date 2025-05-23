@@ -39,7 +39,8 @@ Several improvements and expansions are planned for future updates:
 - [ ] Background simulation support for unloaded vessels
 - [ ] Battery obsolescence system (degradation over time)
 - [ ] Self-discharge for inactive batteries
-- [ ] Thermal behavior (heat production and damage, [SystemHeat](https://github.com/post-kerbin-mining-corporation/SystemHeat) integration)
+- [ ] Thermal behavior (heat production and damage with [SystemHeat](https://github.com/post-kerbin-mining-corporation/SystemHeat) compatibility)
+- [ ] Regenerative braking for rovers
 
 Suggestions and contributions are welcome — see the [Contributing](#contributing) section below.
 
@@ -65,7 +66,7 @@ Suggestions and contributions are welcome — see the [Contributing](#contributi
 4. Ensure [dependencies](#dependencies) are installed.
 5. (Optional) Install the [extras](#extras) as you like.
 
-> Starting a new save is recommended to enjoy the full tech progression. Installing mid-career is possible, but may affect in-flight vessels' power balance.
+> Starting a new save is recommended to enjoy the full tech progression. Installing mid-career is possible, but may affect in-flight vessels' power and mass balance.
 
 ## External Mod Compatibility
 
@@ -91,13 +92,13 @@ Known compatibility or special support includes:
 - Tundra Exploration 
 - Universal Storage II
 
-> Parts from mods not listed above still benefit from RealBattery’s automatic patching system. These will receive a default, generic set of subtypes 
+> Parts from mods not listed above still benefit from RealBattery’s automatic patching system. These will receive a default, generic set of subtypes.
 
 ## Contributing
 
 Pull requests, translations, and feedback are welcome!  
 Please fork the repository and submit a PR against the `master` branch.  
-To report bugs or suggest features, open an issue or post in the [KSP Forum Thread](#).
+To report bugs or suggest features, open an issue or post in the [KSP Forum Thread](https://forum.kerbalspaceprogram.com/topic/227955-112x-realbattery-recharged-v2-realistic-battery-simulation/).
 
 ## Translations
 
