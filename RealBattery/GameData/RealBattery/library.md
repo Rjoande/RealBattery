@@ -96,7 +96,8 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_PbAc
-            SelfDischargeRate = 0.15
+            Crate = 0.2
+            SelfDischargeRate = 0.045
             CycleDurability = 75
             ThermalLoss = 0.3
             ChargeEfficiencyCurve
@@ -133,8 +134,9 @@ SUBTYPE
         {
             BatteryTypeDisplayName = #LOC_RB_short_AgOx
             HighEClevel = 2
-            SelfDischargeRate = 0.075
-            CycleDurability = 100
+            Crate = 1
+            SelfDischargeRate = 0.025
+            CycleDurability = 1
             ThermalLoss = 0.3
             ChargeEfficiencyCurve
             {
@@ -166,7 +168,8 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_AgZn
-            SelfDischargeRate = 0.075
+            Crate = 1.5
+            SelfDischargeRate = 0.025
             CycleDurability = 50
             ThermalLoss = 0.3
             ChargeEfficiencyCurve
@@ -202,7 +205,8 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_NiZn
-            SelfDischargeRate = 0.13
+            Crate = 0.7
+            SelfDischargeRate = 0.04
             CycleDurability = 800
             ThermalLoss = 0.15
             ChargeEfficiencyCurve
@@ -238,7 +242,8 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_NiCd
-            SelfDischargeRate = 0.1
+            Crate = 0.5
+            SelfDischargeRate = 0.03
             CycleDurability = 500
             ThermalLoss = 0.2
             ChargeEfficiencyCurve
@@ -273,7 +278,8 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_NiH2
-            SelfDischargeRate = 0.5
+            Crate = 0.3
+            SelfDischargeRate = 0.15
             CycleDurability = 20000
             ThermalLoss = 0.15
             ChargeEfficiencyCurve
@@ -308,7 +314,8 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_Li_ion
-            SelfDischargeRate = 0.03
+            Crate = 1
+            SelfDischargeRate = 0.01
             CycleDurability = 1000
             ThermalLoss = 0.15
             ChargeEfficiencyCurve
@@ -344,7 +351,8 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_Li_poly
-            SelfDischargeRate = 0.05
+            Crate = 3
+            SelfDischargeRate = 0.015
             CycleDurability = 500
             ThermalLoss = 0.25
             ChargeEfficiencyCurve
@@ -379,7 +387,8 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_title_Graphene
-            SelfDischargeRate = 0.009
+            Crate = 5
+            SelfDischargeRate = 0.002
             CycleDurability = 2500
             ThermalLoss = 0.03
             ChargeEfficiencyCurve
@@ -415,7 +424,8 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_SSB
-            SelfDischargeRate = 0.01
+            Crate = 2
+            SelfDischargeRate = 0.003
             CycleDurability = 10000
             ThermalLoss = 0.05
             ChargeEfficiencyCurve
@@ -449,9 +459,44 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_TBat
+            HighEClevel = 2
+            Crate = 20
             SelfDischargeRate = 0
-            CycleDurability = 100
+            CycleDurability = 1
             ThermalLoss = 0.6
+            ChargeEfficiencyCurve
+            {
+                key = 0.0 0.0
+                key = 1.0 0.0
+            }
+        }
+    }
+}
+```
+### Nuclear battery (non-rechargeable)
+```
+SUBTYPE
+{
+    name = NukeCell
+    title = #LOC_RB_short_Nuke
+    descriptionSummary = #LOC_RB_descSum_Nuke
+    descriptionDetail = #LOC_RB_descDet_Nuke
+    tankType = NukeCell
+    upgradeRequired = RB_UpgradeNuke
+    defaultSubtypePriority = 0
+    MODULE
+    {
+        IDENTIFIER
+        {
+            name = RealBattery
+        }
+        DATA
+        {
+            BatteryTypeDisplayName = #LOC_RB_short_Nuke
+            Crate = 0.001
+            SelfDischargeRate = 0.0001            
+            CycleDurability = 1
+            ThermalLoss = 0.4
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.0

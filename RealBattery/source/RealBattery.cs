@@ -12,17 +12,24 @@ namespace RealBattery
 {
     public class RealBattery : PartModule
     {
+        [KSPField(isPersistant = false)]
+        public bool moduleActive = true;
+
         // defines the battery characteristics, e.g. Lead_Acid
-        [KSPField(isPersistant = true)]
-        public string BatteryTypeDisplayName;
+        //[KSPField(isPersistant = true)]
+        //public string BatteryTypeDisplayName;
 
         // Only charge if total EC is higher than this, eg 0.95
         [KSPField(isPersistant = false)]
-        public float HighEClevel;
+        public float HighEClevel = 0.95f;
 
         // Only discharge if total EC is lower than this, eg 0.9
         [KSPField(isPersistant = false)]
-        public float LowEClevel;
+        public float LowEClevel = 0.90f;
+
+        // discharge rate based on StoredCharge amount
+        [KSPField(isPersistant = false)]
+        public float Crate = 1.0f;
 
         // chargin efficiency based on SOC, eg. to slow down charging on a full battery
         [KSPField(isPersistant = false)]
@@ -40,23 +47,44 @@ namespace RealBattery
         //------GUI
 
         // Battery charge Status string
-        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_Status")]
+        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_Status", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public string BatteryChargeStatus;
 
         // Battery tech string for Editor
-        [KSPField(isPersistant = false, guiActive = true, guiActiveEditor = true, guiName = "#LOC_RB_Tech")]
-        public string BatteryTech;
+        [KSPField(isPersistant = false, guiActive = true, guiActiveEditor = true, guiName = "#LOC_RB_Tech", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
+        public string BatteryTypeDisplayName;
+        //public string BatteryTech;
 
         // discharge string for Editor
-        [KSPField(isPersistant = false, guiActive = false, guiActiveEditor = true, guiName = "#LOC_RB_DischargeRate", guiUnits = "#LOC_RB_guiUnitsECs")]
+        [KSPField(isPersistant = false, guiActive = false, guiActiveEditor = true, guiName = "#LOC_RB_DischargeRate", guiUnits = "#LOC_RB_guiUnitsECs", groupName = "RealBatteryInfo")]
         public string DischargeInfoEditor;
 
         // charge string for Editor
-        [KSPField(isPersistant = false, guiActive = false, guiActiveEditor = true, guiName = "#LOC_RB_ChargeRate", guiUnits = "#LOC_RB_guiUnitsECs")]
+        [KSPField(isPersistant = false, guiActive = false, guiActiveEditor = true, guiName = "#LOC_RB_ChargeRate", guiUnits = "#LOC_RB_guiUnitsECs", groupName = "RealBatteryInfo")]
         public string ChargeInfoEditor;
 
         // Amount of Ec per storedCharge; 3600 EC = 1SC = 3600kWs = 1kWh
         public const double EC2SCratio = 3600;
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);  // opzionale ma buona pratica
+
+            if (!moduleActive)
+            {
+                foreach (BaseField f in Fields)
+                {
+                    f.guiActive = false;
+                    f.guiActiveEditor = false;
+                }
+
+                foreach (BaseEvent e in Events)
+                {
+                    e.guiActive = false;
+                    e.guiActiveEditor = false;
+                }
+            }
+        }
 
         private void LoadConfig(ConfigNode node = null)
         {
@@ -79,6 +107,9 @@ namespace RealBattery
                 if (config.HasValue("LowEClevel"))
                     LowEClevel = float.Parse(config.GetValue("LowEClevel"));
 
+                if (config.HasValue("Crate"))
+                    Crate = float.Parse(config.GetValue("Crate"));
+
                 if (config.HasNode("ChargeEfficiencyCurve"))
                 {
                     ChargeEfficiencyCurve = new FloatCurve();
@@ -86,12 +117,24 @@ namespace RealBattery
                 }
             }
 
-            BatteryTech = BatteryTypeDisplayName;
+            //BatteryTech = BatteryTypeDisplayName;
 
             PartResource ElectricCharge = part.Resources.Get("ElectricCharge");
             PartResource StoredCharge = part.Resources.Get("StoredCharge");
 
-            double DischargeRate = ElectricCharge.maxAmount; //kW
+            if (ElectricCharge == null)
+            {
+                RBlog("ElectricCharge not found, creating fallback...");
+                ElectricCharge = part.Resources.Add("ElectricCharge", 0.1, 0.1, true, true, true, true, PartResource.FlowMode.Both);
+            }
+
+            if (StoredCharge == null)
+            {
+                RBlog("StoredCharge not found, creating fallback...");
+                StoredCharge = part.Resources.Add("StoredCharge", 0, 0, true, true, true, true, PartResource.FlowMode.Both);
+            }
+
+            double DischargeRate = StoredCharge.maxAmount * Crate; //kW
 
             DischargeInfoEditor = String.Format("{0:F2}", DischargeRate);
             ChargeInfoEditor = String.Format("{0:F2}", DischargeRate * ChargeEfficiencyCurve.Evaluate(0f));
@@ -103,6 +146,8 @@ namespace RealBattery
             {
                 partWin.displayDirty = true;
             }
+
+            Fields["ChargeInfoEditor"].guiActiveEditor = (DischargeRate * ChargeEfficiencyCurve.Evaluate(0f) > 0);
         }
 
         public override void OnStart(StartState state)
@@ -136,8 +181,8 @@ namespace RealBattery
 
             LoadConfig();
 
-            PartResource ElectricCharge = part.Resources.Get("ElectricCharge");
-            double DischargeRate = ElectricCharge.maxAmount;            
+            PartResource StoredCharge = part.Resources.Get("StoredCharge");
+            double DischargeRate = StoredCharge.maxAmount * Crate;            
 
             return Localizer.Format("#LOC_RB_VAB_Info", BatteryTypeDisplayName, DischargeRate.ToString("F2"), (DischargeRate * ChargeEfficiencyCurve.Evaluate(0f)).ToString("F2"));
         }
@@ -150,8 +195,6 @@ namespace RealBattery
                 return;
 
             RBlog("RealBattery: INF OnUpdate");
-
-
 
             // for slowing down the charge/discharge status
             double statusLowPassTauRatio = 0.01;
@@ -172,7 +215,6 @@ namespace RealBattery
                 part.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double EC_amount, out double EC_maxAmount);
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_INF_idle", (EC_amount / EC_maxAmount * 100).ToString("F1"));
             }
-
         }
 
         private bool doLogDebugStuff = false;
@@ -192,25 +234,24 @@ namespace RealBattery
             double SC_delta = 0;
             double EC_power = 0;
 
-            PartResource ElectricCharge = part.Resources.Get("ElectricCharge");
+            PartResource StoredCharge = part.Resources.Get("StoredCharge");
 
             // maximum discharge rate EC/s or kW
-            double DischargeRate = ElectricCharge.maxAmount;
-            
+            double DischargeRate = StoredCharge.maxAmount * Crate;
             if (amount > 0 && SC_SOC < 1) // Charge battery
             {
                 double SOC_ChargeEfficiency = ChargeEfficiencyCurve.Evaluate((float)SC_SOC);
                 int SC_id = PartResourceLibrary.Instance.GetDefinition("StoredCharge").id;
 
                 EC_delta = TimeWarp.fixedDeltaTime * DischargeRate * SOC_ChargeEfficiency;  // maximum amount of EC the battery can convert to SC, limited by current charge capacity
-                
+
                 EC_delta = part.RequestResource(PartResourceLibrary.ElectricityHashcode, Math.Min(EC_delta, amount));
 
                 EC_power = EC_delta / TimeWarp.fixedDeltaTime;
 
                 SC_delta = -EC_delta / EC2SCratio;          // SC_delta = -1EC / 10EC/SC * 0.9 = -0.09SC
                 SC_delta = part.RequestResource(SC_id, SC_delta);   //issue: we might "overfill" the battery and should give back some EC
-                               
+
 
                 RBlog("RealBattery: INF charged");
             }
@@ -219,7 +260,7 @@ namespace RealBattery
                 int SC_id = PartResourceLibrary.Instance.GetDefinition("StoredCharge").id;
 
                 SC_delta = TimeWarp.fixedDeltaTime * DischargeRate / EC2SCratio;      // maximum amount of SC the battery can convert to EC
-                
+
                 SC_delta = part.RequestResource(SC_id, Math.Min(SC_delta, -amount / EC2SCratio)); //requesting SC from storage, so SC_delta will be positive
 
                 EC_delta = -SC_delta * EC2SCratio;         // EC_delta = -0.1SC * 10EC/SC = 1EC
