@@ -1,4 +1,4 @@
-# Changelog v 2.0.1
+# Changelog v 2.1.0
 
 ## Major
 - Added C-rate as upper limit of charge/discharge rate (see the Wiki for details)
