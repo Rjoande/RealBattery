@@ -1,4 +1,0 @@
-HOT TO INSTALL AN EXTRA:
-
-Just open the folder of the extra feature you like, and copy-paste it to your /GameData folder.
-NOTE: use only one between EC-to-amp and EC-to-kW
