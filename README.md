@@ -1,6 +1,6 @@
 # RealBattery Recharged
 
-**RealBattery Recharged** is a complete overhaul of the stock electric system in Kerbal Space Program.  
+**RealBattery Recharged** is a complete overhaul of the stock electric system in Kerbal Space Program, originally designed by Blackliner. 
 It brings a more realistic and engaging battery simulation, adding depth to spacecraft design and power management without overcomplicating gameplay.
 
 ## Features
@@ -8,7 +8,7 @@ It brings a more realistic and engaging battery simulation, adding depth to spac
 *RealBattery Recharged* replaces the simplistic stock EC storage system with a more nuanced model: batteries **store energy** (StoredCharge) and **supply power** (ElectricCharge) up to their rated capacity.  
 Discharge and recharge occur dynamically based on system demand, charge level, and efficiency.
 
-Each battery reports its energy/power density, charge/discharge efficiency, and current state (Idle / Charging / Discharging).  
+Each battery reports its energy/power density, charge/discharge efficiency, current state (Idle / Charging / Discharging), and more.  
 The new system rewards thoughtful planning, buffering for peak loads, and progressive tech improvements.
 
 ### This mod includes:
@@ -18,13 +18,13 @@ The new system rewards thoughtful planning, buffering for peak loads, and progre
 - A range of battery chemistries inspired by real-world technologies
 - Tech-tree progression with unlockable battery upgrades per part
 - Seamless integration with B9PartSwitch and localization support
-- Optional language to rename ElectricCharge and StoredCharge
+- Optional language files to rename ElectricCharge and StoredCharge
 
 ### Extras
 Optional patches are included in the release to enhance immersion and realism. Extra patches are modular and can be removed or disabled if undesired:
 
 - **Alternator Fix**: disables alternators on most rocket engines (for realism), but enables them on multi-mode engines like the *RAPIER*.
-- **EC-to-amp** or **EC-to-kW** localization files: renames *Electric Charge* to *Electric Current*, or *Electric Charge* and *Stored Charge* to *Electric Power* (EP) and *Stored Energy* (SE), respectively. **Install only one!** See the [wiki](https://github.com/Rjoande/RealBattery/wiki/Understanding-EC-and-SC-Units) for more.
+- **EC-to-current** and **EC-to-kW** localization packs: rename *Electric Charge* to *Electric Current*, or alternatively to *kW/kWh* (replacing EC/SC with power units). **Only install one at a time!** See the [wiki](https://github.com/Rjoande/RealBattery/wiki/Understanding-EC-and-SC-Units) for details.
 - **Electric-pump-fed Engines**: the *Goldfish* and *Angora* engines from [Near Future Launch Vehicles](https://github.com/post-kerbin-mining-corporation/NearFutureLaunchVehicles/releases) now require electric charge to operate.
 - **Fuel Cell Output**: fuel cells internal buffer aligns with actual electrical output.
 
@@ -34,15 +34,17 @@ To install an extra, simply place the corresponding patch into your `GameData` f
 
 Several improvements and expansions are planned for future updates:
 
-- [ ] Adjustable settings in the difficulty menu
-- [ ] Ability to manually enable/disable individual batteries
-- [ ] Background simulation support for unloaded vessels
-- [ ] Battery obsolescence system (degradation over time)
-- [ ] Self-discharge for inactive batteries
-- [ ] Thermal behavior (heat production and damage with [SystemHeat](https://github.com/post-kerbin-mining-corporation/SystemHeat) compatibility)
-- [ ] Regenerative braking for rovers
+- [x] Adjustable settings in the difficulty menu
+- [x] Ability to manually enable/disable individual batteries
+- [x] Background simulation support for unloaded vessels
+- [x] Battery obsolescence system (degradation over time)
+- [x] Self-discharge for inactive batteries
+- [x] Thermal behavior (heat production and damage with [SystemHeat](https://github.com/post-kerbin-mining-corporation/SystemHeat) compatibility)
+- [ ] Refine background simulation for improved accuracy and broader compatibility with third-party modules  
+- [ ] Add texture switching support for stock and stockalike battery parts  
+- [ ] Create a custom KSPedia page for in-game documentation
 
-Suggestions and contributions are welcome — see the [Contributing](#contributing) section below.
+Suggestions and contributions are welcome! See the [Contributing](#contributing) section below.
 
 ## Dependencies
 
@@ -50,11 +52,11 @@ Suggestions and contributions are welcome — see the [Contributing](#contributi
 - [Module Manager](https://github.com/sarbian/ModuleManager/releases)
 - [B9PartSwitch](https://github.com/blowfishpro/B9PartSwitch/releases)
 - [Community Resource Pack](https://github.com/UmbraSpaceIndustries/CommunityResourcePack/releases)
+- [SystemHeat](https://github.com/post-kerbin-mining-corporation/SystemHeat/releases)
 
 ### Suggested:
 - [Community Tech Tree](https://github.com/post-kerbin-mining-corporation/CommunityTechTree/releases)
 - [System Monitor (Dynamic Battery Storage)](https://github.com/post-kerbin-mining-corporation/DynamicBatteryStorage/releases)
-- [SystemHeat](https://github.com/post-kerbin-mining-corporation/SystemHeat/releases)
 - [DangIt! Continued](https://github.com/linuxgurugamer/DangIt/releases)
 
 
