@@ -40,6 +40,7 @@ Several improvements and expansions are planned for future updates:
 - [x] Battery obsolescence system (degradation over time)
 - [x] Self-discharge for inactive batteries
 - [x] Thermal behavior (heat production and damage with [SystemHeat](https://github.com/post-kerbin-mining-corporation/SystemHeat) compatibility)
+- [ ] Fix battery stats not updating correctly when switching subtypes in the editor
 - [ ] Refine background simulation for improved accuracy and broader compatibility with third-party modules  
 - [ ] Add texture switching support for stock and stockalike battery parts  
 - [ ] Create a custom KSPedia page for in-game documentation
