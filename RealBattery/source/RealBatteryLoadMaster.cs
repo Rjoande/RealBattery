@@ -1,4 +1,5 @@
-﻿using System;
+﻿using RealBattery;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,7 +8,7 @@ using UnityEngine;
 
 namespace RealBattery
 {
-    class RealBatteryLoadMaster : VesselModule
+    class RealBatteryLoadMaster : global::VesselModule
     {
         protected override void OnStart()
         {
@@ -30,7 +31,7 @@ namespace RealBattery
         private List<RealBattery> rbList = new List<RealBattery>();
         public void ReadAllRealBatteryModules(Vessel gameEventVessel = null)
         {
-            //RBlog("RealBatteryLoadMaster: INF ReadAllRealBatteryModules");
+            RBlog("RealBatteryLoadMaster: INF ReadAllRealBatteryModules");
             RBlog("RealBatteryLoadMaster: INF ReadAllRealBatteryModules vesselName: " + vessel.GetDisplayName());
 
             if (vessel == null || vessel.Parts == null)
@@ -47,7 +48,7 @@ namespace RealBattery
 
             rbList = vessel.FindPartModulesImplementing<RealBattery>();
             
-            Debug.Log("RealBattery: INF ReadAllRealBatteryModules for " + vessel.vesselName + "; rblist entries: " + rbList.Count);
+            //Debug.Log("RealBattery: INF ReadAllRealBatteryModules for " + vessel.vesselName + "; rblist entries: " + rbList.Count);
         }           
 
         public void FixedUpdate()
@@ -132,12 +133,10 @@ namespace RealBattery
 
         }
 
-        private bool doLogDebugStuff = false;
         private void RBlog(string message)
         {
-            if (doLogDebugStuff) // just for debugging
-                Debug.Log(message);
+            if (RealBatterySettings.Instance?.enableVerboseLoadLogs == true)
+                Debug.Log("[RealBattery:LoadMaster] " + message);
         }
-
     }
 }

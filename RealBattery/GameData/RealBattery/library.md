@@ -49,12 +49,14 @@ This is the same structure used by the patches included with RealBattery. It is 
 ```
 
 ## Main RealBattery module
-This will be the baseline of you module. If you only want one tipe of battery in you part, just populate this module with the values from `MODULE:DATA` listed in the `SUBTYPES` section (shown below). Remember to specify `BatteryTypeDisplayName` (can be copied from the subtype's `title`).
+This will be the baseline of you module. If you only want one tipe of battery in you part, just populate this module with the values from `MODULE:DATA` listed in the `SUBTYPES` section (shown below). Remember to specify `BatteryTypeDisplayName` (can be copied from the subtype's `title`). `BatteryTypeDisplayName` and `Crate` are optional with B9PartSwitch, but are encouraged for consistency in the editor tooltip.
 
 ```
 MODULE
 {
     name = RealBattery
+    BatteryTypeDisplayName = Default //optional
+    Crate = 1 //optional
     HighEClevel = 0.95
     LowEClevel = 0.90
 }
@@ -96,10 +98,16 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_PbAc
+
             Crate = 0.2
+
             SelfDischargeRate = 0.045
             CycleDurability = 75
+
             ThermalLoss = 0.3
+            TempOverheat = 390
+            TempRunaway = 490
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.55
@@ -133,11 +141,17 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_AgOx
+
             HighEClevel = 2
             Crate = 1
+
             SelfDischargeRate = 0.025
             CycleDurability = 1
+
             ThermalLoss = 0.3
+            TempOverheat = 370
+            TempRunaway = 470
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.0
@@ -168,10 +182,16 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_AgZn
+
             Crate = 1.5
+
             SelfDischargeRate = 0.025
             CycleDurability = 50
+
             ThermalLoss = 0.3
+            TempOverheat = 370
+            TempRunaway = 470
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.60
@@ -205,10 +225,16 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_NiZn
+
             Crate = 0.7
+
             SelfDischargeRate = 0.04
             CycleDurability = 800
+
             ThermalLoss = 0.15
+            TempOverheat = 340
+            TempRunaway = 440
+
             ChargeEfficiencyCurve
             {
                 key = 0.0  1.0
@@ -242,10 +268,16 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_NiCd
+
             Crate = 0.5
+
             SelfDischargeRate = 0.03
             CycleDurability = 500
+
             ThermalLoss = 0.2
+            TempOverheat = 340
+            TempRunaway = 440
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.70
@@ -278,10 +310,16 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_NiH2
+
             Crate = 0.3
+
             SelfDischargeRate = 0.15
             CycleDurability = 20000
+
             ThermalLoss = 0.15
+            TempOverheat = 360
+            TempRunaway = 460
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.80
@@ -314,10 +352,16 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_Li_ion
+
             Crate = 1
+
             SelfDischargeRate = 0.01
             CycleDurability = 1000
+
             ThermalLoss = 0.15
+            TempOverheat = 435
+            TempRunaway = 535
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.80
@@ -351,10 +395,16 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_Li_poly
+
             Crate = 3
+
             SelfDischargeRate = 0.015
             CycleDurability = 500
+
             ThermalLoss = 0.25
+            TempOverheat = 420
+            TempRunaway = 470
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.90
@@ -387,10 +437,16 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_title_Graphene
+
             Crate = 5
+
             SelfDischargeRate = 0.002
             CycleDurability = 2500
+
             ThermalLoss = 0.03
+            TempOverheat = 450
+            TempRunaway = 550
+
             ChargeEfficiencyCurve
             {
                 key = 0.0   0.90
@@ -424,10 +480,16 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_SSB
+
             Crate = 2
+
             SelfDischargeRate = 0.003
             CycleDurability = 10000
+
             ThermalLoss = 0.05
+            TempOverheat = 470
+            TempRunaway = 570
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.90
@@ -459,11 +521,17 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_TBat
+            
             HighEClevel = 2
             Crate = 20
+
             SelfDischargeRate = 0
             CycleDurability = 1
+
             ThermalLoss = 0.6
+            TempOverheat = 900
+            TempRunaway = 1150
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.0
@@ -493,10 +561,17 @@ SUBTYPE
         DATA
         {
             BatteryTypeDisplayName = #LOC_RB_short_Nuke
+
+            HighEClevel = 2
             Crate = 0.001
+
             SelfDischargeRate = 0.0001            
             CycleDurability = 1
+
             ThermalLoss = 0.4
+            TempOverheat = 1000
+            TempRunaway = 1200
+
             ChargeEfficiencyCurve
             {
                 key = 0.0 0.0

@@ -47,6 +47,9 @@
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="SystemHeat">
+      <HintPath>G:\SteamLibrary\steamapps\common\Kerbal Space Program\GameData\SystemHeat\Plugin\SystemHeat.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>G:\SteamLibrary\steamapps\common\Kerbal Space Program\KSP_x64_Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
@@ -56,9 +59,14 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="source\BackgroundSimulator.cs" />
+    <Compile Include="source\ModuleEnergyEstimator.cs" />
     <Compile Include="source\RealBattery.cs" />
     <Compile Include="source\AssemblyInfo.cs" />
     <Compile Include="source\RealBatteryLoadMaster.cs" />
+    <Compile Include="source\RealBatterySettings.cs" />
+    <Compile Include="source\RealBatterySnapshotManager.cs" />
+    <Compile Include="source\RealBatteryVesselModule.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="GameData\RealBattery\RealBattery_mm.cfg" />
