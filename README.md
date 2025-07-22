@@ -20,6 +20,8 @@ The new system rewards thoughtful planning, buffering for peak loads, and progre
 - Seamless integration with B9PartSwitch and localization support
 - Optional language files to rename ElectricCharge and StoredCharge
 
+> See also the [Changelog](https://github.com/Rjoande/RealBattery/blob/master/RealBattery/Changelog.md) for a list of newly-released features.
+
 ### Extras
 Optional patches are included in the release to enhance immersion and realism. Extra patches are modular and can be removed or disabled if undesired:
 
@@ -95,7 +97,7 @@ Known compatibility or special support includes:
 - Tundra Exploration 
 - Universal Storage II
 
-> Parts from mods not listed above still benefit from RealBattery’s automatic patching system. These will receive a default, generic set of subtypes.
+> Parts from mods not listed above still benefit from RealBattery’s automatic patching system. These will receive a default, generic set of subtypes. A number of third-party modules is also supported for background simulation. This includes *SystemHeat, CryoTanks, Near Future Tech, SpaceDust, SCANsat, Snacks*. Future updates will include more mods and modules.
 
 ## Contributing
 
