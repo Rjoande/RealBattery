@@ -2,9 +2,14 @@
 
 ## v2.2.1
 
-### Minor fix
-- Fixed a bug causing **Battery Health** to drop at 0% just after launch
-- Improved general code performance and reliability
+### Minor Fixes
+- Fixed a bug causing Battery Health to drop to 0% if the vessel had been tested in the editor before launch.
+- Battery Wear no longer applies in the editor.
+- Self-discharge in runtme now only applies to disabled batteries.
+- Batteries are now properly reset at launch (WearCounter and Health).
+- SimulationMode now defaults to "Idle" instead of showing *NotFound* in the editor PAW.
+- Improved runtime logging and code reliability.
+- Fixed broken strings and improved localization
 
 ---
 
