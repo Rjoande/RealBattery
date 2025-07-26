@@ -31,44 +31,44 @@ namespace RealBattery
         private List<RealBattery> rbList = new List<RealBattery>();
         public void ReadAllRealBatteryModules(Vessel gameEventVessel = null)
         {
-            RBlog("RealBatteryLoadMaster: INF ReadAllRealBatteryModules");
-            RBlog("RealBatteryLoadMaster: INF ReadAllRealBatteryModules vesselName: " + vessel.GetDisplayName());
+            RBLog.Verbose("[LoadMaster] INF ReadAllRealBatteryModules");
+            RBLog.Verbose("[LoadMaster] INF ReadAllRealBatteryModules vesselName: " + vessel.GetDisplayName());
 
             if (vessel == null || vessel.Parts == null)
             {
                 //nothing to do
-                //Debug.Log("RealBattery: INF ReadAllRealBatteryModules nothing to do");
+                //Debug.Log("INF ReadAllRealBatteryModules nothing to do");
                 return;
             }
 
             if (!vessel.loaded)
                 return;
 
-            //Debug.Log("RealBattery: INF ReadAllRealBatteryModules populating rbList");
+            //Debug.Log("INF ReadAllRealBatteryModules populating rbList");
 
             rbList = vessel.FindPartModulesImplementing<RealBattery>();
             
-            //Debug.Log("RealBattery: INF ReadAllRealBatteryModules for " + vessel.vesselName + "; rblist entries: " + rbList.Count);
+            //Debug.Log("INF ReadAllRealBatteryModules for " + vessel.vesselName + "; rblist entries: " + rbList.Count);
         }           
 
         public void FixedUpdate()
         {
-            RBlog("RealBatteryLoadMaster: INF FixedUpdate vesselName: " + vessel.GetDisplayName());
+            RBLog.Verbose("[LoadMaster] INF FixedUpdate vesselName: " + vessel.GetDisplayName());
             if (!HighLogic.LoadedSceneIsFlight)
             {
-                RBlog("RealBatteryLoadMaster: INF return because LoadedSceneIsFlight");
+                RBLog.Verbose("[LoadMaster] INF return because LoadedSceneIsFlight");
                 return;
             }
             
             if (vessel == null)
             {
-                RBlog("RealBatteryLoadMaster: INF return because vessel == null");
+                RBLog.Verbose("[LoadMaster] INF return because vessel == null");
                 return;
             }
 
             if (!vessel.loaded)
             {
-                RBlog("RealBatteryLoadMaster: INF return because loaded");
+                RBLog.Verbose("[LoadMaster] INF return because loaded");
                 return;
             }
 
@@ -76,9 +76,9 @@ namespace RealBattery
             vessel.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double EC_amount, out double EC_maxAmount);
 
             
-            RBlog("RealBatteryLoadMaster: INF FixedUpdate EC_maxAmount: " + EC_maxAmount);
-            RBlog("RealBatteryLoadMaster: INF FixedUpdate EC_amount: " + EC_amount);
-            RBlog("RealBatteryLoadMaster: INF FixedUpdate rbList.Count: " + rbList.Count);
+            RBLog.Verbose("[LoadMaster] INF FixedUpdate EC_maxAmount: " + EC_maxAmount);
+            RBLog.Verbose("[LoadMaster] INF FixedUpdate EC_amount: " + EC_amount);
+            RBLog.Verbose("[LoadMaster] INF FixedUpdate rbList.Count: " + rbList.Count);
 
             if (EC_maxAmount > 0 && rbList.Count != 0)
             {
@@ -96,11 +96,11 @@ namespace RealBattery
 
                     foreach (RealBattery rb in rbList)
                     {
-                        RBlog("RealBatteryLoadMaster: INF EC_delta_lowLevel < 0");
-                        RBlog(String.Format("{0:F1} - {1:F1} - {2:F1} - {3:F1}", EC_delta_highLevel, EC_delta_lowLevel, EC_amount, EC_maxAmount));
+                        RBLog.Verbose("[LoadMaster] INF EC_delta_lowLevel < 0");
+                        RBLog.Verbose(String.Format("{0:F1} - {1:F1} - {2:F1} - {3:F1}", EC_delta_highLevel, EC_delta_lowLevel, EC_amount, EC_maxAmount));
                         double deltaSucked = rb.XferECtoRealBattery(EC_delta_lowLevel);
 
-                        RBlog("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
+                        RBLog.Verbose("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
 
                         EC_delta_lowLevel -= deltaSucked;
                     } 
@@ -112,18 +112,18 @@ namespace RealBattery
 
                     foreach (RealBattery rb in rbList)
                     {
-                        RBlog("RealBatteryLoadMaster: INF EC_delta_highLevel > 0");
-                        RBlog(String.Format("{0:F1} - {1:F1} - {2:F1} - {3:F1}", EC_delta_highLevel, EC_delta_lowLevel, EC_amount, EC_maxAmount));
+                        RBLog.Verbose("[LoadMaster] INF EC_delta_highLevel > 0");
+                        RBLog.Verbose(String.Format("{0:F1} - {1:F1} - {2:F1} - {3:F1}", EC_delta_highLevel, EC_delta_lowLevel, EC_amount, EC_maxAmount));
                         double deltaSucked = rb.XferECtoRealBattery(EC_delta_highLevel);
 
-                        RBlog("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
+                        RBLog.Verbose("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
 
                         EC_delta_highLevel -= deltaSucked;
                     }
                 }
                 else
                 {
-                    RBlog("RealBatteryLoadMaster: nothing to do in the else path");
+                    RBLog.Verbose("RealBatteryLoadMaster: nothing to do in the else path");
                 }
 
             }
@@ -131,12 +131,6 @@ namespace RealBattery
             // legacy but cool
             //rbList.ForEach(rb => rb.FixedUpdate());                    
 
-        }
-
-        private void RBlog(string message)
-        {
-            if (RealBatterySettings.Instance?.enableVerboseLoadLogs == true)
-                Debug.Log("[RealBattery:LoadMaster] " + message);
         }
     }
 }

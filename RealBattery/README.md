@@ -96,7 +96,7 @@ Known compatibility or special support includes:
 - Tundra Exploration 
 - Universal Storage II
 
-> Parts from mods not listed above still benefit from RealBattery's automatic patching system. These will receive a default, generic set of subtypes. A number of third-party modules is also supported for background simulation. This includes *SystemHeat, CryoTanks, Near Future Tech, SpaceDust, SCANsat, Snacks*. Future updates will include more mods and modules.
+> Parts from mods not listed above still benefit from RealBattery's automatic patching system. These will receive a default, generic set of subtypes. A number of third-party modules is also supported for background simulation. This includes *SystemHeat, CryoTanks, Near Future Tech, SpaceDust, SCANsat, Snacks*.
 
 ## Contributing
 
