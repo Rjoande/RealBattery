@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.1
+
+### Minor fix
+- Fixed a bug causing **Battery Health** to drop at 0% just after launch
+- Improved general code performance and reliability
+
+---
+
 ## v2.2.0
 
 ### Major Changes
@@ -16,7 +24,6 @@
 - Improved localization and corrected language strings.
 - In the VAB/SPH, batteries now simulate their expected input/output based on selected Simulation Mode. This improves compatibility with *DynamicBatteryStorage* and *SystemHeat*.
 - The PAW now shows additional data: estimated time to full charge/discharge, battery health and state of charge
-
 
 ---
 
