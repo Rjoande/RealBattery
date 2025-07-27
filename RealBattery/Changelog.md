@@ -1,8 +1,13 @@
 # Changelog
 
+## v2.2.2
+
+- Fixed a bug that caused errors in Module Manager when adding SystemHeat support to certain third-party batteries (notably BDB, OPT, HabTech, and US2)
+
+---
+
 ## v2.2.1
 
-### Minor Fixes
 - Fixed a bug causing Battery Health to drop to 0% if the vessel had been tested in the editor before launch.
 - Battery Wear no longer applies in the editor.
 - Self-discharge in runtme now only applies to disabled batteries.
