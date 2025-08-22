@@ -7,7 +7,7 @@ This is the same structure used by the patches included with RealBattery. It is 
 
 ### Generic patch structure
 ```
-@PART[]
+@PART
 {
     RBbaseVolume = #$/RESOURCE[ElectricCharge]/maxAmount$
     @RBbaseVolume *= 0.3
