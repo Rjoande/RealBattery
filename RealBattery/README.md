@@ -111,6 +111,7 @@ Localization is supported. If you'd like to help translate RealBattery into your
 Current languages:
 - English (`en-us`)
 - Italian (`it-it`)
+- Chinese (`zh-cn`) by **Aebestach**
 
 ## Licensing
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.3
+
+- Fixed poor synthax for Module Manager patches, for enhanced compatibility with other mods (thanks to **JadeOfMaar**).
+- Added **Simplified Chinese** localization (thanks to **Aebestach**).
+
+---
+
 ## v2.2.2
 
 - Fixed a bug that caused errors in Module Manager when adding SystemHeat support to certain third-party batteries (notably BDB, OPT, HabTech, and US2)
