@@ -1,10 +1,11 @@
 ﻿using KSP;
-using UnityEngine;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace RealBattery
 {
@@ -19,17 +20,67 @@ namespace RealBattery
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_SelfDischarge", toolTip = "#LOC_RB_Settings_SelfDischarge_desc")]
         public bool enableSelfDischarge = true;
 
-        [GameParameters.CustomFloatParameterUI("#LOC_RB_DayLenght", toolTip = "#LOC_RB_DayLenght_desc", minValue = 6f, maxValue = 24f, stepCount = 2)]
+        [GameParameters.CustomFloatParameterUI("#LOC_RB_DayLenght", toolTip = "#LOC_RB_DayLenght_desc", minValue = 6f, maxValue = 24f, displayFormat = "F0", stepCount = 2)]
         public float DayLengthHours = 6f;
-
-        //[GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_DischargeInterval", toolTip = "#LOC_RB_Settings_DischargeInterval_desc", minValue = 1f, maxValue = 60f, stepCount = 60, displayFormat = "F0")]
-        //public float selfDischargeIntervalMin = 60f;
 
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_BatteryWear", toolTip = "#LOC_RB_Settings_BatteryWear_desc")]
         public bool enableBatteryWear = true;
 
+        // === LEGACY | Will be removed in v2.3 ===
+
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_HeatSimulation", toolTip = "#LOC_RB_Settings_HeatSimulation_desc")]
         public bool enableHeatSimulation = true;
+
+        // === READY FOR v2.3 ===
+
+        // UI: "Heat Production"
+        /*[GameParameters.CustomParameterUI("#LOC_RB_Settings_HeatProduction", toolTip = "#LOC_RB_Settings_HeatProduction_tip")]
+        public bool enableHeatSimulation = true;
+
+        // UI: "Use SystemHeat"
+        [GameParameters.CustomParameterUI("#LOC_RB_Settings_UseSystemHeat", toolTip = "#LOC_RB_Settings_UseSystemHeat_tip")]
+        public bool useSystemHeat = true;
+
+        // Helper: detect SystemHeat presence at runtime
+        internal static bool SystemHeatAvailable =>
+            AssemblyLoader.loadedAssemblies.Any(a => a.assembly.GetName().Name == "SystemHeat");
+
+        // Enable/disable fields dynamically
+        public override bool Enabled(MemberInfo member, GameParameters parameters)
+        {
+            if (member.Name == nameof(useSystemHeat))
+                return enableHeatSimulation && SystemHeatAvailable; // hide/disable when not applicable
+            return true;
+        }
+
+        public override bool Interactible(MemberInfo member, GameParameters parameters)
+        {
+            if (member.Name == nameof(useSystemHeat))
+                return enableHeatSimulation && SystemHeatAvailable; // greyed out if parent OFF or SH missing
+            return true;
+        }
+
+        // --- Polar surface simplification (configurable in difficulty menu) ---
+
+        [GameParameters.CustomFloatParameterUI(
+            "#LOC_RB_Settings_PolarThreshold",   // localized title
+            minValue = 0f,
+            maxValue = 90f,
+            displayFormat = "F0",
+            stepCount = 90,
+            toolTip = "#LOC_RB_Settings_PolarThreshold_tip"
+        )]
+        public float PolarLatitudeThresholdDeg = 66f;
+
+        [GameParameters.CustomFloatParameterUI(
+            "#LOC_RB_Settings_PolarFrac",       // localized title
+            minValue = 0f,
+            maxValue = 1f,
+            displayFormat = "F2",
+            stepCount = 100,
+            toolTip = "#LOC_RB_Settings_PolarFrac_tip"
+        )]
+        public float PolarConstantLitFrac = 0.35f;*/
 
         public override string Title => "RealBattery";
         public override string Section => "RealBattery";
@@ -43,7 +94,7 @@ namespace RealBattery
         public static bool UseSelfDischarge => Instance?.enableSelfDischarge ?? true;
         public static bool UseBatteryWear => Instance?.enableBatteryWear ?? true;
         public static bool UseHeatSimulation => Instance?.enableHeatSimulation ?? true;
-        //public static double SelfDischargeInterval => (Instance?.selfDischargeIntervalMin ?? 10.0) * 60.0;
+        //public static bool UseSystemHeat => Instance?.useSystemHeat ?? true;
         public double GetHoursPerDay()
         {
             return DayLengthHours;

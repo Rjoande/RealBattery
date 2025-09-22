@@ -529,8 +529,8 @@ SUBTYPE
             CycleDurability = 1
 
             ThermalLoss = 0.6
-            TempOverheat = 900
-            TempRunaway = 1150
+            TempOverheat = 1000
+            TempRunaway = 1500
 
             ChargeEfficiencyCurve
             {
@@ -541,6 +541,50 @@ SUBTYPE
     }
 }
 ```
+
+### ZEBRA battery
+```
+SUBTYPE
+{
+    name = RBZebra
+    title = #LOC_RB_title_Zebra
+    descriptionSummary = #LOC_RB_descSum_Zebra
+    descriptionDetail = #LOC_RB_descDet_Zebra
+    tankType = RBZebra
+    upgradeRequired = RB_UpgradeZebra
+    defaultSubtypePriority = 5
+    MODULE
+    {
+        IDENTIFIER
+        {
+            name = RealBattery
+        }
+        DATA
+        {
+            BatteryTypeDisplayName = #LOC_RB_short_Zebra
+            
+            Crate = 1
+
+            SelfDischargeRate = 0
+            CycleDurability = 4500
+
+            ThermalLoss = 0.1
+            TempOverheat = 1000
+            TempRunaway = 1500
+
+            ChargeEfficiencyCurve
+            {
+                    key = 0.0 0.85
+                    key = 0.3 0.90
+                    key = 0.5 0.90
+                    key = 0.8 0.85
+                    key = 1.0 0.80
+            }
+        }
+    }
+}
+```
+
 ### Nuclear battery (non-rechargeable)
 ```
 SUBTYPE

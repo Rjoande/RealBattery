@@ -21,7 +21,12 @@ namespace RealBattery
                     if (snap != null)
                     {
                         BackgroundSimulator.RestoreEnergySnapshot(snap);
-                        Debug.Log($"[RealBattery][OnLoad] Restored snapshot: NetEC={snap.netECProductionRate:F3}");
+                        Debug.Log
+                        (
+                            $"[RealBattery][OnLoad] Restored snapshot: " +
+                            $"netEC_Gross={snap.netEC_Gross:F3} EC/s, " +
+                            $"netEC_True={snap.netEC_True:F3} EC/s"
+                        );
                     }
                 }
             }

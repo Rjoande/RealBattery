@@ -42,10 +42,9 @@ namespace RealBattery
         [KSPField(isPersistant = true)]
         public double CycleDurability = 1;
 
-        // % of SOC lost in 24 hrs
+        // % of SOC lost in 1 day
         [KSPField(isPersistant = true)]
         public double SelfDischargeRate = 1;
-        private double selfDischargeTimer = 0.0;
 
 
         // === Thermal simulation ===
@@ -452,37 +451,19 @@ namespace RealBattery
 
             if (SC_SOC <= 0) return;
 
-            /*if (Math.Abs(lastECpower) > 0.01)
-            {
-                selfDischargeTimer = 0;  // activity detected, reset countdown
-                return;
-            }
-
-            selfDischargeTimer += TimeWarp.fixedDeltaTime;
-            if (selfDischargeTimer < RealBatterySettings.SelfDischargeInterval)
-                return;
-
-            selfDischargeTimer = 0;*/
-
             double socLossPerDay = SelfDischargeRate / (BatteryLife > 0 ? BatteryLife : 1.0);
             double hoursPerDay = RealBatterySettings.Instance?.GetHoursPerDay() ?? 6.0;
             double socLossPerSecond = socLossPerDay / (hoursPerDay * 3600.0);
-            //double socLoss = socLossPerSecond * RealBatterySettings.SelfDischargeInterval;
 
             double SC_loss = socLossPerSecond * part.Resources["StoredCharge"].maxAmount;
             double actualLoss = part.RequestResource("StoredCharge", SC_loss);
 
-            /*if (actualLoss > 0.00001)
-            {
-                WearCounter += actualLoss;
-                UpdateBatteryLife();
-                SC_SOC = part.Resources["StoredCharge"].amount / part.Resources["StoredCharge"].maxAmount;
-                
-            }*/
             RBLog.Verbose($"[ApplySelfDischarge] Self-discharge of {actualLoss:F9} kWh applied to {part.partInfo.title}");
         }
 
         private float smoothFlux = 0f;
+
+        // === LEGACY | Will be removed in v2.3 ===
 
         private void ApplyThermalEffects(double EC_power)
         {
@@ -516,7 +497,7 @@ namespace RealBattery
                 flux *= 0.01f; // Reduces heat flux by 100× for balancing
 
                 // Apply low-pass filter
-                
+
                 float tau = 0.01f;  // same as statusLowPassTauRatio
                 smoothFlux += tau * (flux - smoothFlux);
 
@@ -546,7 +527,7 @@ namespace RealBattery
                 float severity = (t - TempOverheat) / (TempRunaway - TempOverheat);
                 severity = Mathf.Clamp01(severity);
                 float thermalFactor = Mathf.Exp(severity * 4.0f) - 1.0f;
-                
+
                 float deltaWear = thermalFactor * TimeWarp.fixedDeltaTime * (float)(StoredCharge.maxAmount);
 
                 WearCounter += deltaWear;
@@ -555,6 +536,79 @@ namespace RealBattery
             }
         }
 
+        // === READY FOR v2.3 ===
+        /*private void ApplyThermalEffects(double EC_power)
+        {
+            if (!RealBatterySettings.UseHeatSimulation) return;
+            //RBLog.Verbose($"[ApplyThermalEffects] UseHeatSimulation is ON");
+
+            if (BatteryDisabled) return;
+            //RBLog.Verbose($"[ApplyThermalEffects] Battery is ON");
+
+            // Protection to avoid division by zero
+            double safeBatteryLife = BatteryLife > 0.001 ? BatteryLife : 0.001;
+            double ineff = Math.Max(SOC_ChargeEfficiency, 0.001); // avoid division by 0
+            float flux = 0f;
+            float temp = 0f;
+
+            bool useSH = RealBatterySettings.UseSystemHeat && systemHeat != null && systemHeat.moduleUsed;
+
+            temp = useSH ? systemHeat.currentLoopTemperature : (float)part.temperature;
+
+            if (Math.Abs(EC_power) > 0.0001)
+            {
+                if (EC_power < 0) // Discharge
+                {
+                    flux = (float)(Math.Abs(EC_power) * ThermalLoss / safeBatteryLife);
+                }
+                else // Charge
+                {
+
+                    flux = (float)(EC_power * ThermalLoss / ineff / safeBatteryLife);
+                }
+
+                flux *= 0.01f; // Reduces heat flux by 100× for balancing
+
+                if (useSH)
+                {
+                    float tau = 0.01f;  // Low-pass filter for smoother SystemHeat flux
+                    smoothFlux += tau * (flux - smoothFlux);
+                    systemHeat.AddFlux("RealBattery", (float)TempOverheat, smoothFlux, true);
+                    RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux ACTIVE (SystemHeat): {smoothFlux:F2} W @ {TempOverheat:F0} K (loop={temp:F1} K)");
+                }
+                else
+                {
+                    part.AddThermalFlux(flux);
+                    RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux ACTIVE (stock): {flux:F2} W @ {TempOverheat:F0} K (part={temp:F1} K)");
+                }
+            }
+            else if (RealBatterySettings.UseSystemHeat)
+            {
+                // decay to 0 smoothly
+                float tau = 0.01f;
+                smoothFlux += tau * (0f - smoothFlux);
+                systemHeat.AddFlux("RealBattery", 0f, smoothFlux, true);
+
+                RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux IDLE: {smoothFlux:F2} W → no EC transfer, loop={temp:F1} K");
+            }
+
+            // --- Thermal wear (flight only) ---
+
+            if (!RealBatterySettings.UseBatteryWear) return;
+            if (!HighLogic.LoadedSceneIsFlight) return;
+
+            var sc = part.Resources.Get("StoredCharge");
+            if (sc != null && temp > TempOverheat)
+            {
+                float severity = Mathf.Clamp01((temp - TempOverheat) / Mathf.Max(TempRunaway - TempOverheat, 1e-3f));
+                float thermalFactor = Mathf.Exp(severity * 4.0f) - 1.0f;                
+                float deltaWear = thermalFactor * TimeWarp.fixedDeltaTime * (float)(sc.maxAmount);
+
+                WearCounter += deltaWear;
+                RBLog.Verbose($"[ApplyThermalEffects] Thermal wear: Δ={deltaWear:F5}, T={temp:F1} K");
+            }            
+        }*/
+
         public void UpdateBatteryLife()
         {
             if (!HighLogic.LoadedSceneIsFlight) return;
@@ -562,12 +616,6 @@ namespace RealBattery
 
             if (!RealBatterySettings.UseBatteryWear) return;
             RBLog.Verbose($"[UpdateBatteryLife] UseBatteryWear is ON");
-
-            // Stack trace solo per debugging
-            /*System.Diagnostics.StackTrace st = new System.Diagnostics.StackTrace(true);
-            string trace = st.ToString();
-
-            RBLog.Verbose($"[BatteryLife] Called by:\n{trace}");*/
 
             double capacity = part.Resources["StoredCharge"]?.maxAmount ?? 0.0;
             if (capacity <= 0 || CycleDurability <= 0)

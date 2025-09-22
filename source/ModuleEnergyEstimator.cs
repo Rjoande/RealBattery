@@ -12,11 +12,25 @@ using KSP;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using static VehiclePhysics.EnergyProvider;
 
 namespace RealBattery
 {
     public static class ModuleEnergyEstimator
     {
+        // Comments in English, as requested
+        private static bool TryGetField<T>(PartModule m, string name, out T value)
+        {
+            var f = m.GetType().GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (f != null && f.FieldType == typeof(T))
+            {
+                value = (T)f.GetValue(m);
+                return true;
+            }
+            value = default;
+            return false;
+        }
+
         public static void EstimateECUsage(Part part, ref double partECproduced, ref double partECconsumed, int maxSpecialistLevel)
         {
             foreach (var module in part.Modules)
@@ -50,7 +64,7 @@ namespace RealBattery
                 // ResourceConverter
                 if (module is ModuleResourceConverter converter && converter.IsActivated)
                 {
-                    Debug.Log($"[RealBattery] ResourceConverter su '{part.partInfo.title}' — Active: {converter.IsActivated}, UseSpecialistBonus: {converter.UseSpecialistBonus}");
+                    Debug.Log($"[RealBattery] ResourceConverter on '{part.partInfo.title}' — Active: {converter.IsActivated}, UseSpecialistBonus: {converter.UseSpecialistBonus}");
 
                     double factor = 1.0;
                     if (converter.UseSpecialistBonus)
@@ -61,86 +75,95 @@ namespace RealBattery
                         Debug.Log($"[RealBattery] Specialist bonus factor calculated ({trait}, level {maxLevel}): {factor:F3}");
                     }
 
+                    double eff = 1.0;
+                    if (!TryGetField<double>(converter, "ThermalEfficiency", out eff))
+                        if (!TryGetField<float>(converter, "EfficiencyBonus", out var effF)) eff = 1.0; else eff = effF;
+                    eff = Math.Max(0.0, Math.Min(1.0, eff));
+
                     foreach (var input in converter.inputList)
                     {
                         if (input.ResourceName == "ElectricCharge")
                         {
-                            double rate = input.Ratio * factor;
+                            double rate = input.Ratio * factor * eff;
                             partECconsumed += rate;
-                            Debug.Log($"[RealBattery] INPUT EC: -{rate:F3} EC/s");
+                            Debug.Log($"[RealBattery] Converter '{part.partInfo.title}' — EC: -{rate:F3} EC/s (eff={eff:F2})");
                         }
                     }
-
                     foreach (var output in converter.outputList)
                     {
                         if (output.ResourceName == "ElectricCharge")
                         {
-                            double rate = output.Ratio * factor;
+                            double rate = output.Ratio * factor * eff;
                             partECproduced += rate;
-                            Debug.Log($"[RealBattery] OUTPUT EC: +{rate:F3} EC/s");
                         }
                     }
                 }
 
                 // ResourceHarvester
-                if (module is ModuleResourceHarvester harvester /*&& harvester.IsActivated*/)
+                if (module is ModuleResourceHarvester harvester && harvester.IsActivated)
                 {
                     Debug.Log($"[RealBattery] Found ModuleResourceHarvester on '{part.partInfo.title}' — Active: {harvester.IsActivated}, status: {harvester.status}, UseSpecialistBonus: {harvester.UseSpecialistBonus}");
-
-                    if (harvester.IsActivated)
+                                        
+                    double factor = 1.0;
+                    if (harvester.UseSpecialistBonus)
                     {
-                        double factor = 1.0;
-                        if (harvester.UseSpecialistBonus)
-                        {
-                            int maxLevel = ModuleEnergyEstimator.GetMaxSpecialistLevel(part.vessel, "Engineer") + 1;
-                            factor = harvester.SpecialistEfficiencyFactor * maxLevel + harvester.SpecialistBonusBase;
-                            Debug.Log($"[RealBattery] Specialist bonus factor calculated (Engineer, level {maxLevel-1}): {factor:F3}");
-                        }
-
-                        foreach (var input in harvester.inputList)
-                        {
-                            if (input.ResourceName == "ElectricCharge")
-                            {
-                                double rate = input.Ratio * factor;
-                                partECconsumed += rate;
-                                Debug.Log($"[RealBattery] INPUT EC: -{rate:F3} EC/s");
-                            }
-                        }
-
-                        if (harvester.outputList != null)
-                        {
-                            foreach (var output in harvester.outputList)
-                            {
-                                if (output.ResourceName == "ElectricCharge")
-                                {
-                                    double rate = output.Ratio * factor;
-                                    partECproduced += rate;
-                                    Debug.Log($"[RealBattery] OUTPUT EC: +{rate:F3} EC/s");
-                                }
-                            }
-                        }
+                        int maxLevel = ModuleEnergyEstimator.GetMaxSpecialistLevel(part.vessel, "Engineer") + 1;
+                        factor = harvester.SpecialistEfficiencyFactor * maxLevel + harvester.SpecialistBonusBase;
+                        Debug.Log($"[RealBattery] Specialist bonus factor calculated (Engineer, level {maxLevel-1}): {factor:F3}");
                     }
+
+                    double eff = 1.0;
+                    // Some builds expose "EfficiencyBonus" or "ThermalEfficiency"
+                    if (!TryGetField<float>(harvester, "EfficiencyBonus", out var effF))
+                        eff = 1.0;
+                    else eff = Mathf.Clamp01(effF);
+
+                    foreach (var input in harvester.inputList)
+                        if (input.ResourceName == "ElectricCharge")
+                            partECconsumed += input.Ratio * factor * eff;
                 }
 
                 // Radiator
-                if (module is ModuleActiveRadiator radiator && radiator.IsCooling)
+                if (module is ModuleActiveRadiator radiator)
                 {
-                    foreach (var res in radiator.resHandler.inputResources)
+                    // Only if actually cooling
+                    if (radiator.IsCooling && radiator.resHandler?.inputResources != null)
                     {
-                        if (res.name == "ElectricCharge" && res.rate > 0)
+                        double maxRate = 0;
+                        foreach (var r in radiator.resHandler.inputResources)
+                            if (r.name == "ElectricCharge") maxRate = Math.Max(maxRate, r.rate);
+
+                        double frac = 0.5; // conservative fallback
+                                           // Known internal names seen across KSP versions:
+                        if (TryGetField<double>(radiator, "currentCooling", out var currentCooling) &&
+                            TryGetField<float>(radiator, "maxEnergyTransfer", out var maxEnergyTransfer) &&
+                            maxEnergyTransfer > 0f)
                         {
-                            //double rate = res.rate * 0.5; // consumo stimato medio
-                            partECconsumed += res.rate;
-                            Debug.Log($"[RealBattery] Radiator '{part.partInfo.title}' is cooling — estimated EC input: -{res.rate:F3} EC/s");
+                            frac = Mathf.Clamp01((float)(currentCooling / (double)maxEnergyTransfer));
                         }
+                        else if (TryGetField<float>(radiator, "currentRadiatorNormalized", out var norm))
+                        {
+                            frac = Mathf.Clamp01(norm);
+                        }
+
+                        double rate = maxRate * frac;
+                        partECconsumed += rate;
+                        Debug.Log($"[RealBattery] Radiator '{part.partInfo.title}' — EC: -{rate:F3} EC/s (frac={frac:F2})");
                     }
                 }
 
                 // Science Converter (Lab)
-                if (module is ModuleScienceConverter lab && lab.IsActivated)
+                if (module is ModuleScienceConverter lab)
                 {
-                    partECconsumed += lab.powerRequirement;
-                    Debug.Log($"[RealBattery] ScienceLab '{part.partInfo.title}' is running — EC: -{lab.powerRequirement:F3} EC/s");
+                    bool running = lab.IsActivated;
+                    // Optional: read private flags when available to confirm activity
+                    if (TryGetField<bool>(lab, "isOperational", out var op)) running &= op;
+
+                    if (running)
+                    {
+                        partECconsumed += lab.powerRequirement;
+                        Debug.Log($"[RealBattery] ScienceLab '{part.partInfo.title}' — EC: -{lab.powerRequirement:F3} EC/s");
+                    }
                 }
 
                 // Light
@@ -154,61 +177,6 @@ namespace RealBattery
                             Debug.Log($"[RealBattery] ModuleLight (ON): -{res.rate:F3} EC/s from '{part.partInfo.title}'");
                         }
                     }
-                }
-
-                // SolarPanel
-                if (module is ModuleDeployableSolarPanel panel && panel.deployState == ModuleDeployablePart.DeployState.EXTENDED)
-                {
-                    double output = panel.chargeRate;
-                    string type = panel.isTracking ? "Tracking" : "Static";
-
-                    if (!panel.isTracking) output *= 0.5;
-
-                    // Distance from the Sun (in meters)
-                    double referenceDistance = FlightGlobals.GetBodyByName("Kerbin")?.orbit?.semiMajorAxis ?? 13599840256.0;
-
-                    Vector3d sunPosition = Planetarium.fetch.Sun.position;
-                    Vector3d vesselPosition = part.vessel.GetWorldPos3D();
-
-                    double currentDistance = (vesselPosition - sunPosition).magnitude;
-                    double distanceEfficiency = Math.Pow(referenceDistance / currentDistance, 2.0);
-
-                    // Calculate fraction of time in the Sun
-                    double exposureFactor = 1.0;
-
-                    if (FlightGlobals.currentMainBody != Planetarium.fetch.Sun)
-                    {
-                        if (part.vessel.Landed || part.vessel.Splashed)
-                        {
-                            // On the ground --> estimates a long-term average (inaccurate if deltaTime < planet rotation period)
-                            exposureFactor = 0.5;
-                        }
-                        else
-                        {
-                            // Circular orbit --> geometric shadow fraction
-                            double altitude = part.vessel.altitude;
-                            double semiMajorAxis = part.vessel.orbit.semiMajorAxis;
-
-                            if (altitude >= 0 && semiMajorAxis > 0 && (1.0 - altitude / semiMajorAxis) <= 1.0)
-                            {
-                                double eclipseAngle = Math.Asin(1.0 - (altitude / semiMajorAxis));
-                                double f_sun = 1.0 - eclipseAngle / Math.PI;
-                                exposureFactor = Math.Max(0.0, Math.Min(1.0, f_sun));
-                            }
-                            else
-                            {
-                                Debug.LogWarning("[RealBattery] Invalid orbit parameters for solar exposure calculation.");
-                            }
-                        }
-                    }
-
-                    double totalEfficiency = distanceEfficiency * exposureFactor;
-                    output *= totalEfficiency;
-
-                    Debug.Log($"[RealBattery] SolarPanel '{part.partInfo.title}' — Type: {type}, eff_dist={(distanceEfficiency * 100.0):F1}%, eff_sun={(exposureFactor * 100.0):F1}%, total_eff={(totalEfficiency * 100.0):F1}%");
-
-                    partECproduced += output;
-                    Debug.Log($"[RealBattery] SolarPanel '{part.partInfo.title}' — chargeRate: +{output:F3} EC/s");
                 }
 
                 // Generator
@@ -387,38 +355,6 @@ namespace RealBattery
                     }
                 }
 
-                // Near Future Techs
-                if (module.moduleName == "DischargeCapacitor")
-                {
-                    bool enabled = false;
-                    bool discharging = false;
-                    double dischargeRate = 0;
-                    double chargeRate = 0;
-
-                    try
-                    {
-                        bool.TryParse(module.Fields.GetValue("Enabled")?.ToString(), out enabled);
-                        bool.TryParse(module.Fields.GetValue("IsDischarging")?.ToString(), out discharging);
-                        double.TryParse(module.Fields.GetValue("DischargeRate")?.ToString(), out dischargeRate);
-                        double.TryParse(module.Fields.GetValue("ChargeRate")?.ToString(), out chargeRate);
-                    }
-                    catch { }
-
-                    if (enabled)
-                    {
-                        if (discharging && dischargeRate > 0)
-                        {
-                            partECproduced += dischargeRate;
-                            Debug.Log($"[RealBattery] DischargeCapacitor '{part.partInfo.title}' — discharging +{dischargeRate:F3} EC/s");
-                        }
-                        else if (chargeRate > 0)
-                        {
-                            partECconsumed += chargeRate;
-                            Debug.Log($"[RealBattery] DischargeCapacitor '{part.partInfo.title}' — charging -{chargeRate:F3} EC/s");
-                        }
-                    }
-                }
-
                 if (module.moduleName == "ModuleSystemHeatFissionReactor")
                 {
                     bool enabled = false;
@@ -481,98 +417,70 @@ namespace RealBattery
                         Debug.Log($"[RealBattery] PETTurbine '{part.partInfo.title}' — EC production: +{chargeRate:F3} EC/s");
                     }
                 }
-
-                /*/ Snacks!
-                if (module.moduleName == "SnackProcessor")
-                {
-                    bool isActivated = false;
-                    try
-                    {
-                        bool.TryParse(module.Fields.GetValue("IsActivated")?.ToString(), out isActivated);
-                    }
-                    catch { }
-
-                    if (isActivated)
-                    {
-                        double factor = 1.0;
-                        double baseBonus = 0, efficiency = 0;
-
-                        if (module.Fields.GetValue("UseSpecialistBonus")?.ToString() == "True")
-                        {
-                            double.TryParse(module.Fields.GetValue("SpecialistBonus")?.ToString(), out baseBonus);
-                            double.TryParse(module.Fields.GetValue("SpecialistEfficiencyFactor")?.ToString(), out efficiency);
-
-                            factor = baseBonus + efficiency * (GetMaxSpecialistLevel(part.vessel, "Scientist")+1);
-                        }
-
-                        var config = part.partInfo?.partConfig;
-                        if (config != null)
-                        {
-                            foreach (var modNode in config.GetNodes("MODULE"))
-                            {
-                                if (modNode.GetValue("name") == "SnackProcessor")
-                                {
-                                    foreach (var inputNode in modNode.GetNodes("INPUT_RESOURCE"))
-                                    {
-                                        if (inputNode.HasValue("ResourceName") && inputNode.GetValue("ResourceName") == "ElectricCharge" &&
-                                            inputNode.HasValue("Ratio") && double.TryParse(inputNode.GetValue("Ratio"), out double ratio))
-                                        {
-                                            double rate = ratio * factor;
-                                            partECconsumed += rate;
-                                            Debug.Log($"[RealBattery] SnackProcessor '{part.partInfo.title}' — EC input: -{rate:F3} EC/s");
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (module.moduleName == "SoilRecycler")
-                {
-                    bool isActivated = false;
-                    try
-                    {
-                        bool.TryParse(module.Fields.GetValue("IsActivated")?.ToString(), out isActivated);
-                    }
-                    catch { }
-
-                    if (isActivated)
-                    {
-                        double factor = 1.0;
-                        double baseBonus = 0, efficiency = 0;
-
-                        if (module.Fields.GetValue("UseSpecialistBonus")?.ToString() == "True")
-                        {
-                            double.TryParse(module.Fields.GetValue("SpecialistBonus")?.ToString(), out baseBonus);
-                            double.TryParse(module.Fields.GetValue("SpecialistEfficiencyFactor")?.ToString(), out efficiency);
-
-                            factor = baseBonus + efficiency * (GetMaxSpecialistLevel(part.vessel, "Engineer") + 1);
-                        }
-
-                        var config = part.partInfo?.partConfig;
-                        if (config != null)
-                        {
-                            foreach (var modNode in config.GetNodes("MODULE"))
-                            {
-                                if (modNode.GetValue("name") == "SoilRecycler")
-                                {
-                                    foreach (var inputNode in modNode.GetNodes("INPUT_RESOURCE"))
-                                    {
-                                        if (inputNode.HasValue("ResourceName") && inputNode.GetValue("ResourceName") == "ElectricCharge" &&
-                                            inputNode.HasValue("Ratio") && double.TryParse(inputNode.GetValue("Ratio"), out double ratio))
-                                        {
-                                            double rate = ratio * factor;
-                                            partECconsumed += rate;
-                                            Debug.Log($"[RealBattery] SoilRecycler '{part.partInfo.title}' — EC input: -{rate:F3} EC/s");
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }*/
             }
+        }
+
+        // Returns rough total EC/s from all *active* vessel solar panels.
+        // Rules: only panels that are extended (or static) count; non-tracking panels get a 0.5 penalty.
+        // No distance scaling here.
+        public static double SolarPanelsBaseOutput(Vessel vessel)
+        {
+            if (vessel == null) return 0.0;
+
+            // 1/r^2 w.r.t Kerbin SMA as reference (same as current estimator)
+            double refDist = FlightGlobals.GetBodyByName("Kerbin")?.orbit?.semiMajorAxis ?? 13599840256.0;
+            double currDist = vessel.distanceToSun;
+            double invSqrScale = Math.Pow(refDist / Math.Max(currDist, 1.0), 2.0);
+
+            double totalPVECps = 0.0;
+            int ecId = PartResourceLibrary.ElectricityHashcode;
+
+            foreach (var part in vessel.parts)
+            {
+                var panels = part.FindModulesImplementing<ModuleDeployableSolarPanel>();
+                if (panels == null || panels.Count == 0) continue;
+
+                foreach (var panel in panels)
+                {
+                    if (panel == null) continue;
+
+                    // Consider active if extended; static panels (non-breakable) count as always-extended
+                    bool isExtended = (panel.deployState == ModuleDeployablePart.DeployState.EXTENDED) || !panel.isBreakable;
+                    if (!isExtended) continue;
+
+                    double rate = 0.0;
+
+                    // Prefer the EC output defined in resHandler (when available)
+                    var outs = panel.resHandler?.outputResources;
+                    if (outs != null && outs.Count > 0)
+                    {
+                        for (int i = 0; i < outs.Count; i++)
+                        {
+                            if (outs[i].id == ecId && outs[i].rate > 0)
+                            {
+                                rate = outs[i].rate;
+                                break; // first EC output found is enough
+                            }
+                        }
+                    }
+
+                    // Fallback: use the module's chargeRate
+                    if (rate <= 0.0) rate = Math.Max(0.0, panel.chargeRate);
+
+                    // Simple incidence penalty for non-tracking panels
+                    if (!panel.isTracking) rate *= 0.5;
+                                        
+                    Debug.Log($"[RealBattery] SolarPanel '{part.partInfo.title}' rough prod: +{rate:F3} EC/s");
+
+                    totalPVECps += rate;
+                }
+            }
+
+            totalPVECps *= invSqrScale;
+
+            Debug.Log($"[RealBattery] SolarPanelsBaseOutput for '{vessel.vesselName}': {totalPVECps:F3} EC/s");
+
+            return totalPVECps;
         }
 
         public static int GetMaxSpecialistLevel(Vessel vessel, string trait)

@@ -37,18 +37,13 @@ namespace RealBattery
             if (vessel == null || vessel.Parts == null)
             {
                 //nothing to do
-                //Debug.Log("INF ReadAllRealBatteryModules nothing to do");
                 return;
             }
 
             if (!vessel.loaded)
                 return;
 
-            //Debug.Log("INF ReadAllRealBatteryModules populating rbList");
-
             rbList = vessel.FindPartModulesImplementing<RealBattery>();
-            
-            //Debug.Log("INF ReadAllRealBatteryModules for " + vessel.vesselName + "; rblist entries: " + rbList.Count);
         }           
 
         public void FixedUpdate()
@@ -127,10 +122,6 @@ namespace RealBattery
                 }
 
             }
-
-            // legacy but cool
-            //rbList.ForEach(rb => rb.FixedUpdate());                    
-
         }
     }
 }
