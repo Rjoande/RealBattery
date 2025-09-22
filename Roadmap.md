@@ -1,6 +1,6 @@
 # Roadmap & Future Ideas
 
-## Fix
+## Fixes
 - [x] Apply battery consumption/wear in the background based on discharge/recharge when the ship is **grounded** or in **orbital shadow**.
 - [x] Correct the "Day" and "Night" labels in the SolarSim log in the background.
 - [ ] Display correct `Discharge Rate` in the PAW editor.
@@ -15,7 +15,7 @@
 - [ ] Engineer Bonus: Improves thermal performance and slows degradation (`ThermalLoss`, `WearCounter`).
 - [ ] **BonVoyage Compatibility**: Mod helper temporarily converts **SC → EC** to allow BonVoyage to correctly estimate battery life.
 
-##Thermals and Failure
+## Thermals and Failure
 - [ ] Automatic battery shutdown in case of overheating/out of control. Global setting.
 - [ ] In the event of a runaway, the battery either **shuts down** or generates **heat every frame** until disabled.
 - [ ] Thermal batteries: produce heat but do not runaway (very high `TempRunaway` or thermal wear exclusion).
@@ -35,4 +35,5 @@
 
 ## Aesthetics
 - [ ] Battery texture change, only with ReStock/Restock+/NFE (via B9PartSwitch or `ModulePartVariants`).
+
 
