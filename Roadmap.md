@@ -1,4 +1,4 @@
-# Roadmap – Future Ideas RealBattery Recharged
+# Roadmap & Future Ideas
 
 ## Fix
 - [x] Apply battery consumption/wear in the background based on discharge/recharge when the ship is **grounded** or in **orbital shadow**.
@@ -35,3 +35,4 @@
 
 ## Aesthetics
 - [ ] Battery texture change, only with ReStock/Restock+/NFE (via B9PartSwitch or `ModulePartVariants`).
+
