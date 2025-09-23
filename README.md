@@ -41,7 +41,7 @@ Several improvements and expansions are planned for future updates:
 - [x] Self-discharge for inactive batteries
 - [x] Thermal behavior (heat production and damage, SystemHeat integration)
 - [ ] Fix battery stats not updating correctly when switching subtypes in the editor
-- [ ] Refine background simulation for improved accuracy and broader compatibility with third-party modules  
+- [x] Refine background simulation for improved accuracy and broader compatibility with third-party modules  
 - [ ] Add texture switching support for stock and stockalike battery parts  
 - [ ] Create a custom KSPedia page for in-game documentation
 
