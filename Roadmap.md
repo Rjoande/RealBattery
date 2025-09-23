@@ -21,8 +21,8 @@
 - [ ] Thermal batteries: produce heat but do not runaway (very high `TempRunaway` or thermal wear exclusion).
 
 ## New Battery Types
-- [ ] Hf-178m2 (inspired by the _Hafnium controversy_): replaces NukeCell.
-- [ ] KERBA (inspired by ZEBRA): rechargeable, high C-rate, low efficiency >60% SOC, 5–10 cycle life.
+- [ ] Hf-178m2 (inspired from the [_Hafnium controversy_](https://en.m.wikipedia.org/wiki/Hafnium_controversy)): replaces NukeCell.
+- [ ] KERBA (inspired from [ZEBRA](https://en.m.wikipedia.org/wiki/ZEBRA_battery)): rechargeable, high C-rate, low efficiency (>60% SOC), 5–10 cycle life.
 - [ ] TBat: Cannot be disabled, fixed discharge every cycle (`BatteryDisabled = false` + override `FixedUpdate`).
 - [ ] Battery activation via staging (dedicated `KSPAction`, `activateOnStaging` field).
 
@@ -35,5 +35,6 @@
 
 ## Aesthetics
 - [ ] Battery texture change, only with ReStock/Restock+/NFE (via B9PartSwitch or `ModulePartVariants`).
+
 
 
