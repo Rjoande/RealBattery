@@ -1,39 +1,39 @@
-# Roadmap – Idee Future RealBattery Recharged
+# Roadmap – Future Ideas RealBattery Recharged
 
 ## Fix
-- [x] In background applicare consumo/usura batteria anche in base a scarica/ricarica quando la nave è **atterrata** o in **ombra orbitale**.
-- [x] In background, correggere etichette "Day" e "Night" nel log di SolarSim.
-- [ ] ~~Stato di carica (**SOC**) in background pesato sul **parziale di orbita** (fasi luce/ombra), non applicato in blocco.~~
-- [ ] **Verificare/mostrare Discharge Rate** corretto nel PAW in editor.
-- [x] Usare **un unico flow** coerente in `ApplyThermalEffects` (carica e scarica trattate nello stesso percorso logico).
+- [x] Apply battery consumption/wear in the background based on discharge/recharge when the ship is **landed** or in **orbital shadow**.
+- [x] Correct "Day" and "Night" labels in the SolarSim log.
+- [ ] ~~State of Charge (**SOC**) in the background weighted on **partial orbit** (light/shadow phases), not applied in bulk.~~
+- [ ] **Verify/display correct Discharge Rate** in the PAW editor.
+- [x] Use a single consistent flow in `ApplyThermalEffects` (charge and discharge processed in the same logical path).
 
-## Miglioramenti simulazione e calcolo
-- [x] `ModuleEnergyEstimator` più preciso: output pannelli in base a posizione, rotazione, angolo di incidenza; distinzione tracking/static; su superficie.
-- [x] Rilevamento automatico durata del giorno su Kerbin. Lo slider nelle impostazioni permette override con valori 0-24, dove 0 attiva il rilevamento automatico.
-- [x] Avviso batterie scariche dopo uscita scena, con annullamento se si rientra prima della scadenza. Opzione in impostazioni.
-- [ ] Campi PAW visibili solo se tecnologia/upgrade sbloccati (`PartTechAvailable`).
-- [ ] Nascondere gruppo PAW se `moduleActive = false` (non-batteria).
-- [ ] Bonus Ingegnere: migliora performance termica e rallenta degrado (`ThermalLoss`, `WearCounter`).
-- [ ] **Compatibilità BonVoyage**: Mod helper converte temporaneamente **SC → EC** per permettere a BonVoyage di stimare correttamente l’autonomia.
+## Simulation and calculation improvements
+- [x] More precise `ModuleEnergyEstimator`: panel output based on position, rotation, angle of incidence; tracking/static distinction; on surface.
+- [x] Automatic day length detection on Kerbin. The slider in the settings allows override with values ​​from 0 to 24, where 0 activates automatic detection.
+- [x] Low battery warning after exiting the scene, canceled if re-entered before the timeout. Option in settings.
+- [ ] PAW fields visible only if technology/upgrades are unlocked (`PartTechAvailable`).
+- [ ] Hide PAW group if `moduleActive = false` (non-battery).
+- [ ] Engineer Bonus: Improves thermal performance and slows degradation (`ThermalLoss`, `WearCounter`).
+- [ ] **BonVoyage Compatibility**: Mod helper temporarily converts **SC → EC** to allow BonVoyage to correctly estimate battery life.
 
-## Termiche e failure
-- [ ] Disattivazione automatica batteria in overheat/runaway. Impostazione globale.
-- [ ] In caso di runaway la batteria o si **spegne**, oppure genera **calore ad ogni frame** finché non viene disabilitata.
-- [x] Batterie termiche: producono calore ma non vanno in runaway (TempRunaway altissimo o esclusione dal wear termico).
+## Thermals and Failures
+- [ ] Automatic battery deactivation in overheat/runaway. Global setting.
+- [ ] In the event of runaway, the battery either **turns off** or generates **heat every frame** until disabled.
+- [x] Thermal batteries: produce heat but do not runaway (very high TempRunaway or thermal wear exclusion).
 
-## Nuovi tipi di batterie
-- [x] Hf-178m2 (ispirata alla _Hafnium controversy_): sostituisce le NukeCell.
-- [x] KERBA (ispirata a ZEBRA): ricaricabile, C-rate alto, bassa efficienza >60% SOC, durata cicli 5–10.
-- [ ] TBat: non disattivabile, drain fisso ogni ciclo (`BatteryDisabled = false` + override `FixedUpdate`).
-- [ ] Attivazione batteria tramite staging (`KSPAction` dedicata, campo `activateOnStaging`).
+## New battery types
+- [x] Hf-178m2 (inspired by the _Hafnium controversy_): replaces NukeCell.
+- [x] KERBA (inspired by ZEBRA): rechargeable, high C-rate, low efficiency >60% SOC, 5–10 cycle life.
+- [ ] TBat: cannot be disabled, fixed drain every cycle (`BatteryDisabled = false` + override `FixedUpdate`).
+- [ ] Battery activation via staging (dedicated `KSPAction`, `activateOnStaging` field).
 
-## UI e interfaccia
-- [ ] Switch in PAW tra `BatteryHealth` e `CyclesLeft` (toggle o `UI_ChooseOption`). Formattazione decimali (<1) con `F1` o `F2`.
-- [x] Meccaniche SystemHeat opzionali: fallback a calore stock o disattivazione totale.
+## UI & Interface
+- [ ] Switch in PAW between `BatteryHealth` and `CyclesLeft` (toggle or `UI_ChooseOption`). Decimal formatting (<1) with `F1` or `F2`.
+- [x] Optional SystemHeat mechanics: fallback to stock heat or completely disable it.
 
-## Documentazione e supporto
-- [ ] KSPedia: panoramica sistema SC/EC, tipi batterie, uso in volo, simulazione in background, integrazione mod terze, icone/texture per chimiche.
+## Documentation & Support
+- [ ] KSPedia: SC/EC system overview, battery types, flight usage, background simulation, third-party mod integration, icons/textures for chemistries.
 
-## Estetica
-- [ ] Texture switch per batterie, solo con ReStock/Restock+/NFE (via B9PartSwitch o `ModulePartVariants`).
-
+## Aesthetics
+- [ ] Texture switch for batteries, only with ReStock/Restock+/NFE (via B9PartSwitch or `ModulePartVariants`).
+- [ ] *Conformal Decals* stickers?
