@@ -13,7 +13,7 @@
 - [ ] PAW fields visible only if technology/upgrades are unlocked (`PartTechAvailable`).
 - [ ] Hide PAW group if `moduleActive = false` (non-battery).
 - [ ] Engineer Bonus: Improves thermal performance and slows degradation (`ThermalLoss`, `WearCounter`).
-- [ ] **BonVoyage Compatibility**: Mod helper temporarily converts **SC → EC** to allow BonVoyage to correctly estimate battery life.
+- [ ] **BonVoyage Compatibility**: wrapper `otherPower += DischargeRate`
 
 ## Thermals and Failures
 - [ ] Automatic battery deactivation in overheat/runaway. Global setting.
