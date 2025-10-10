@@ -3,7 +3,6 @@
 ## Fix
 - [x] Apply battery consumption/wear in the background based on discharge/recharge when the ship is **landed** or in **orbital shadow**.
 - [x] Correct "Day" and "Night" labels in the SolarSim log.
-- [ ] ~~State of Charge (**SOC**) in the background weighted on **partial orbit** (light/shadow phases), not applied in bulk.~~
 - [ ] **Verify/display correct Discharge Rate** in the PAW editor.
 - [x] Use a single consistent flow in `ApplyThermalEffects` (charge and discharge processed in the same logical path).
 
@@ -24,8 +23,8 @@
 ## New battery types
 - [x] Hf-178m2 (inspired by the _Hafnium controversy_): replaces NukeCell.
 - [x] KERBA (inspired by ZEBRA): rechargeable, high C-rate, low efficiency >60% SOC, 5–10 cycle life.
-- [ ] TBat: cannot be disabled, fixed drain every cycle (`BatteryDisabled = false` + override `FixedUpdate`).
-- [ ] Battery activation via staging (dedicated `KSPAction`, `activateOnStaging` field).
+- [x] TBat: cannot be disabled, fixed drain every cycle (`BatteryDisabled = false` + override `FixedUpdate`).
+- [x] Battery activation via staging (dedicated `KSPAction`, `activateOnStaging` field).
 
 ## UI & Interface
 - [ ] Switch in PAW between `BatteryHealth` and `CyclesLeft` (toggle or `UI_ChooseOption`). Decimal formatting (<1) with `F1` or `F2`.
@@ -35,5 +34,5 @@
 - [ ] KSPedia: SC/EC system overview, battery types, flight usage, background simulation, third-party mod integration, icons/textures for chemistries.
 
 ## Aesthetics
-- [ ] Texture switch for batteries, only with ReStock/Restock+/NFE (via B9PartSwitch or `ModulePartVariants`).
-- [ ] *Conformal Decals* stickers?
+- ~~[ ] Texture switch for batteries, only with ReStock/Restock+/NFE (via B9PartSwitch or `ModulePartVariants`).~~
+- [ ] *Conformal Decals* stickers
