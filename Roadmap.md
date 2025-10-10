@@ -34,5 +34,5 @@
 - [ ] KSPedia: SC/EC system overview, battery types, flight usage, background simulation, third-party mod integration, icons/textures for chemistries.
 
 ## Aesthetics
-- ~~[ ] Texture switch for batteries, only with ReStock/Restock+/NFE (via B9PartSwitch or `ModulePartVariants`).~~
+- [ ] ~~Texture switch for batteries, only with ReStock/Restock+/NFE (via B9PartSwitch or `ModulePartVariants`).~~
 - [ ] *Conformal Decals* stickers
