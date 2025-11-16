@@ -37,15 +37,13 @@ To install an extra, simply place the corresponding patch into your `GameData` f
 - B9PartSwitch
 - Community Resource Pack
 
-### Suggested:
+### Suggested/Recommended:
 - SystemHeat
 - Community Tech Tree
 - System Monitor (Dynamic Battery Storage)
 - DangIt! Continued
 - Bon Voyage
 - Conformal Decals
-
-
 
 ## Installation
 
@@ -62,6 +60,7 @@ To install an extra, simply place the corresponding patch into your `GameData` f
 RealBattery Recharged dynamically applies to any part with ElectricCharge, including most modded parts.  
 Known compatibility or special support includes:
 
+- Bon Voyage
 - Airplane Plus
 - Planetside Exploration Technologies
 - Artemis Construction Kit
@@ -105,4 +104,5 @@ Current languages:
 Original mod by **Blackliner**, expanded and maintained by **Rjoande**.
 
 Licensed under the **MIT licence**.
+
 
