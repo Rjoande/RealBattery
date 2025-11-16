@@ -30,36 +30,21 @@ Optional patches are included in the release to enhance immersion and realism. E
 
 To install an extra, simply place the corresponding patch into your `GameData` folder. See the `Extras/` folder in the release package for details.
 
-## Planned Features
-
-Several improvements and expansions are planned for future updates:
-
-- [x] Adjustable settings in the difficulty menu
-- [x] Ability to manually enable/disable individual batteries
-- [x] Background simulation support for unloaded vessels
-- [x] Battery obsolescence system (degradation over time)
-- [x] Self-discharge for inactive batteries
-- [x] Thermal behavior (heat production and damage, SystemHeat integration)
-- [ ] Fix battery stats not updating correctly when switching subtypes in the editor
-- [ ] Refine background simulation for improved accuracy and broader compatibility with third-party modules  
-- [ ] Add texture switching support for stock and stockalike battery parts  
-- [ ] Create a custom KSPedia page for in-game documentation
-
-
-Suggestions and contributions are welcome — see the Contributing section below.
-
 ## Dependencies
 
 ### Required:
 - Module Manager
 - B9PartSwitch
 - Community Resource Pack
-- SystemHeat
 
 ### Suggested:
+- SystemHeat
 - Community Tech Tree
 - System Monitor (Dynamic Battery Storage)
 - DangIt! Continued
+- Bon Voyage
+- Conformal Decals
+
 
 
 ## Installation
@@ -111,6 +96,8 @@ Localization is supported. If you'd like to help translate RealBattery into your
 Current languages:
 - English (`en-us`)
 - Italian (`it-it`)
+- Spanish (`en-es`)
+- French (`fr-fr`)
 - Simplified Chinese (`zh-cn`) by **Aebestach**
 
 ## Licensing
@@ -118,3 +105,4 @@ Current languages:
 Original mod by **Blackliner**, expanded and maintained by **Rjoande**.
 
 Licensed under the **MIT licence**.
+
