@@ -77,551 +77,650 @@ MODULE
 ## B9 Subtypes
 You can also copy the values from the `DATA` node to the main RealBattery module (shown above), if you want to use just one chemistry in your part. Remember to remove (or comment with `//`) the value `upgradeRequired = ...` from the first subtype!
 
-### Lead-acid
-
-```
-SUBTYPE
-{
-    name = PbAc
-    title = #LOC_RB_title_PbAc
-    descriptionSummary = #LOC_RB_descSum_PbAc
-    descriptionDetail = #LOC_RB_descDet_PbAc
-    tankType = PbAc
-    defaultSubtypePriority = 1
-
-    MODULE
-    {
-        IDENTIFIER
+        ### Thermal battery (non-rechargeable)
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_PbAc
-
-            Crate = 0.2
-
-            SelfDischargeRate = 0.045
-            CycleDurability = 75
-
-            ThermalLoss = 0.3
-            TempOverheat = 390
-            TempRunaway = 490
-
-            ChargeEfficiencyCurve
+            name = TBat
+            title = #LOC_RB_title_TBat
+            descriptionSummary = #LOC_RB_descSum_TBat
+            descriptionDetail = #LOC_RB_descDet_TBat
+            tankType = TBat
+            defaultSubtypePriority = 2
+            MODULE
             {
-                key = 0.0 0.55
-                key = 0.3 0.65
-                key = 0.5 0.70
-                key = 0.8 0.60
-                key = 1.0 0.50
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_TBat
+
+                    FixedOutput = true
+                    KeepWarm = false
+                    SelfRunaway = false
+                    
+                    HighEClevel = 2
+                    Crate = 6
+
+                    SelfDischargeRate = 0
+                    CycleDurability = 1
+                    EvaRefurbishEnabled = false
+                    SparePartsPerKWh = 4
+
+                    ThermalLoss = 0.6
+                    TempOverheat = 1300
+                    TempRunaway = 9999
+                    RunawayHeatFactor = 0
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.0
+                        key = 1.0 0.0
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Silver-oxide (non-rechargeable)
-```
-SUBTYPE
-{
-    name = AgOx
-    title = #LOC_RB_title_AgOx
-    descriptionSummary = #LOC_RB_descSum_AgOx
-    descriptionDetail = #LOC_RB_descDet_AgOx
-    tankType = AgOx
-    upgradeRequired = RB_UpgradeAgZn
-    defaultSubtypePriority = 2
-    MODULE
-    {
-        IDENTIFIER
+        ### Lead-acid
+
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_AgOx
+            name = PbAc
+            title = #LOC_RB_title_PbAc
+            descriptionSummary = #LOC_RB_descSum_PbAc
+            descriptionDetail = #LOC_RB_descDet_PbAc
+            tankType = PbAc
+            defaultSubtypePriority = 3
 
-            HighEClevel = 2
-            Crate = 1
-
-            SelfDischargeRate = 0.025
-            CycleDurability = 1
-
-            ThermalLoss = 0.3
-            TempOverheat = 370
-            TempRunaway = 470
-
-            ChargeEfficiencyCurve
+            MODULE
             {
-                key = 0.0 0.0
-                key = 1.0 0.0
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_PbAc
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 0.95
+                    Crate = 0.2
+
+                    SelfDischargeRate = 0.045
+                    CycleDurability = 75
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 35
+
+                    ThermalLoss = 0.3
+                    TempOverheat = 390
+                    TempRunaway = 490
+                    RunawayHeatFactor = 0.8
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.55
+                        key = 0.3 0.65
+                        key = 0.5 0.70
+                        key = 0.8 0.60
+                        key = 1.0 0.50
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Silver-Zinc
-```
-SUBTYPE
-{
-    name = AgZn
-    title = #LOC_RB_title_AgZn
-    descriptionSummary = #LOC_RB_descSum_AgZn
-    descriptionDetail = #LOC_RB_descDet_AgZn
-    tankType = AgZn
-    upgradeRequired = RB_UpgradeAgZn
-    defaultSubtypePriority = 3
-    MODULE
-    {
-        IDENTIFIER
+        ### Nickel-Cadmium
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_AgZn
-
-            Crate = 1.5
-
-            SelfDischargeRate = 0.025
-            CycleDurability = 50
-
-            ThermalLoss = 0.3
-            TempOverheat = 370
-            TempRunaway = 470
-
-            ChargeEfficiencyCurve
+            name = NiCd
+            title = #LOC_RB_title_NiCd
+            descriptionSummary = #LOC_RB_descSum_NiCd
+            descriptionDetail = #LOC_RB_descDet_NiCd
+            tankType = NiCd
+            upgradeRequired = RB_UpgradeNiCd
+            defaultSubtypePriority = 4
+            MODULE
             {
-                key = 0.0 0.60
-                key = 0.3 0.75
-                key = 0.6 0.85
-                key = 0.85 0.70
-                key = 1.0 0.50
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_NiCd
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 0.95
+                    Crate = 0.5
+
+                    SelfDischargeRate = 0.03
+                    CycleDurability = 500
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 14
+
+                    ThermalLoss = 0.2
+                    TempOverheat = 340
+                    TempRunaway = 440
+                    RunawayHeatFactor = 1
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.70
+                        key = 0.5 0.75
+                        key = 0.9 0.80
+                        key = 1.0 0.65
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Nickel-Zinc
-```
-SUBTYPE
-{
-    name = NiZn
-    title = #LOC_RB_title_NiZn
-    descriptionSummary = #LOC_RB_descSum_NiZn
-    descriptionDetail = #LOC_RB_descDet_AgZn
-    tankType = NiZn
-    upgradeRequired = RB_UpgradeNiCd
-    defaultSubtypePriority = 4
-    MODULE
-    {
-        IDENTIFIER
+        ### Nickel-Zinc
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_NiZn
-
-            Crate = 0.7
-
-            SelfDischargeRate = 0.04
-            CycleDurability = 800
-
-            ThermalLoss = 0.15
-            TempOverheat = 340
-            TempRunaway = 440
-
-            ChargeEfficiencyCurve
+            name = NiZn
+            title = #LOC_RB_title_NiZn
+            descriptionSummary = #LOC_RB_descSum_NiZn
+            descriptionDetail = #LOC_RB_descDet_NiZn
+            tankType = NiZn
+            defaultSubtypePriority = 5
+            MODULE
             {
-                key = 0.0  1.0
-                key = 0.6  0.98
-                key = 0.85 0.90
-                key = 0.95 0.70
-                key = 1.0  0.5
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_NiZn
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 0.95
+                    Crate = 0.7
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 8
+
+                    SelfDischargeRate = 0.04
+                    CycleDurability = 800
+
+                    ThermalLoss = 0.15
+                    TempOverheat = 340
+                    TempRunaway = 440
+                    RunawayHeatFactor = 1.2
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0  1.0
+                        key = 0.6  0.98
+                        key = 0.85 0.90
+                        key = 0.95 0.70
+                        key = 1.0  0.5
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Nickel-Cadmium
-```
-SUBTYPE
-{
-    name = NiCd
-    title = #LOC_RB_title_NiCd
-    descriptionSummary = #LOC_RB_descSum_NiCd
-    descriptionDetail = #LOC_RB_descDet_NiCd
-    tankType = NiCd
-    upgradeRequired = RB_UpgradeNiCd
-    defaultSubtypePriority = 4
-    MODULE
-    {
-        IDENTIFIER
+        ### Silver-oxide (non-rechargeable)
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_NiCd
-
-            Crate = 0.5
-
-            SelfDischargeRate = 0.03
-            CycleDurability = 500
-
-            ThermalLoss = 0.2
-            TempOverheat = 340
-            TempRunaway = 440
-
-            ChargeEfficiencyCurve
+            name = AgOx
+            title = #LOC_RB_title_AgOx
+            descriptionSummary = #LOC_RB_descSum_AgOx
+            descriptionDetail = #LOC_RB_descDet_AgOx
+            tankType = AgOx
+            upgradeRequired = RB_UpgradeAgZn
+            defaultSubtypePriority = 6
+            MODULE
             {
-                key = 0.0 0.70
-                key = 0.5 0.75
-                key = 0.9 0.80
-                key = 1.0 0.65
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_AgOx
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 2
+                    Crate = 1
+
+                    SelfDischargeRate = 0.025
+                    CycleDurability = 1
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 5
+
+                    ThermalLoss = 0.3
+                    TempOverheat = 370
+                    TempRunaway = 470
+                    RunawayHeatFactor = 1.5
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.0
+                        key = 1.0 0.0
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Nickel-Hydrogen
-```
-SUBTYPE
-{
-    name = NiH2
-    title = #LOC_RB_title_NiH2
-    descriptionSummary = #LOC_RB_descSum_NiH2
-    descriptionDetail = #LOC_RB_descDet_NiH2
-    tankType = NiH2
-    //upgradeRequired = RB_UpgradeNiCd
-    defaultSubtypePriority = 5
-    MODULE
-    {
-        IDENTIFIER
+        ### Silver-Zinc
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_NiH2
-
-            Crate = 0.3
-
-            SelfDischargeRate = 0.15
-            CycleDurability = 20000
-
-            ThermalLoss = 0.15
-            TempOverheat = 360
-            TempRunaway = 460
-
-            ChargeEfficiencyCurve
+            name = AgZn
+            title = #LOC_RB_title_AgZn
+            descriptionSummary = #LOC_RB_descSum_AgZn
+            descriptionDetail = #LOC_RB_descDet_AgZn
+            tankType = AgZn
+            upgradeRequired = RB_UpgradeAgZn
+            defaultSubtypePriority = 6
+            MODULE
             {
-                key = 0.0 0.80
-                key = 0.2 0.85
-                key = 0.8 0.85
-                key = 1.0 0.80
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_AgZn
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 0.95
+                    Crate = 1.5
+
+                    SelfDischargeRate = 0.025
+                    CycleDurability = 50
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 5
+
+                    ThermalLoss = 0.3
+                    TempOverheat = 370
+                    TempRunaway = 470
+                    RunawayHeatFactor = 1.6
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.60
+                        key = 0.3 0.75
+                        key = 0.6 0.85
+                        key = 0.85 0.70
+                        key = 1.0 0.50
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Lithium-ion
-```
-SUBTYPE
-{
-    name = Li_ion
-    title = #LOC_RB_title_Li_ion
-    descriptionSummary = #LOC_RB_descSum_Li_ion
-    descriptionDetail = #LOC_RB_descDet_Li_ion
-    tankType = Li_ion
-    upgradeRequired = RB_UpgradeLiIon
-    defaultSubtypePriority = 6
-    MODULE
-    {
-        IDENTIFIER
+        ### Nickel-Hydrogen
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_Li_ion
-
-            Crate = 1
-
-            SelfDischargeRate = 0.01
-            CycleDurability = 1000
-
-            ThermalLoss = 0.15
-            TempOverheat = 435
-            TempRunaway = 535
-
-            ChargeEfficiencyCurve
+            name = NiH2
+            title = #LOC_RB_title_NiH2
+            descriptionSummary = #LOC_RB_descSum_NiH2
+            descriptionDetail = #LOC_RB_descDet_NiH2
+            tankType = NiH2
+            defaultSubtypePriority = 7
+            MODULE
             {
-                key = 0.0 0.80
-                key = 0.3 0.85
-                key = 0.6 0.90
-                key = 0.85 0.85
-                key = 1.0 0.80
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_NiH2
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 0.95
+                    Crate = 0.3
+
+                    SelfDischargeRate = 0.15
+                    CycleDurability = 20000
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 19
+
+                    ThermalLoss = 0.15
+                    TempOverheat = 360
+                    TempRunaway = 460
+                    RunawayHeatFactor = 0.7
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.80
+                        key = 0.2 0.85
+                        key = 0.8 0.85
+                        key = 1.0 0.80
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Lithium-polymer
-```
-SUBTYPE
-{
-    name = Li_poly
-    title = #LOC_RB_title_Li_poly
-    descriptionSummary = #LOC_RB_descSum_Li_poly
-    descriptionDetail = #LOC_RB_descDet_Li_poly
-    tankType = Li_poly
-    upgradeRequired = RB_UpgradeLiPoly
-    defaultSubtypePriority = 7
-    MODULE
-    {
-        IDENTIFIER
+        ### ZEBRA battery
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_Li_poly
-
-            Crate = 3
-
-            SelfDischargeRate = 0.015
-            CycleDurability = 500
-
-            ThermalLoss = 0.25
-            TempOverheat = 420
-            TempRunaway = 470
-
-            ChargeEfficiencyCurve
+            name = RBZebra
+            title = #LOC_RB_title_Zebra
+            descriptionSummary = #LOC_RB_descSum_Zebra
+            descriptionDetail = #LOC_RB_descDet_Zebra
+            tankType = RBZebra
+            upgradeRequired = RB_UpgradeZebra
+            defaultSubtypePriority = 8
+            MODULE
             {
-                key = 0.0 0.90
-                key = 0.2 0.95
-                key = 0.8 0.95
-                key = 1.0 0.90
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_Zebra
+
+                    FixedOutput = false
+                    KeepWarm = true
+                    SelfRunaway = false
+                    
+                    HighEClevel = 0.95
+                    Crate = 1
+
+                    SelfDischargeRate = 0
+                    CycleDurability = 4500
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 6
+
+                    ThermalLoss = 0.1
+                    TempOverheat = 1000
+                    TempRunaway = 9999
+                    RunawayHeatFactor = 0
+
+                    ChargeEfficiencyCurve
+                    {
+                            key = 0.0 0.90
+                            key = 0.3 0.95
+                            key = 0.5 0.99
+                            key = 0.8 0.95
+                            key = 1.0 0.90
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Graphene
-```
-SUBTYPE
-{
-    name = Graphene
-    title = #LOC_RB_title_Graphene
-    descriptionSummary = #LOC_RB_descSum_Graphene
-    descriptionDetail = #LOC_RB_descDet_Graphene
-    tankType = Graphene
-    upgradeRequired = RB_UpgradeGraphene
-    defaultSubtypePriority = 8
-    MODULE
-    {
-        IDENTIFIER
+        ### Lithium-ion
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_title_Graphene
-
-            Crate = 5
-
-            SelfDischargeRate = 0.002
-            CycleDurability = 2500
-
-            ThermalLoss = 0.03
-            TempOverheat = 450
-            TempRunaway = 550
-
-            ChargeEfficiencyCurve
+            name = Li_ion
+            title = #LOC_RB_title_Li_ion
+            descriptionSummary = #LOC_RB_descSum_Li_ion
+            descriptionDetail = #LOC_RB_descDet_Li_ion
+            tankType = Li_ion
+            upgradeRequired = RB_UpgradeLiIon
+            defaultSubtypePriority = 9
+            MODULE
             {
-                key = 0.0   0.90
-                key = 0.25  0.96
-                key = 0.5   0.97
-                key = 0.75  0.96
-                key = 1.0   0.92
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_Li_ion
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 0.95
+                    Crate = 1
+
+                    SelfDischargeRate = 0.01
+                    CycleDurability = 1000
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 13
+
+                    ThermalLoss = 0.15
+                    TempOverheat = 435
+                    TempRunaway = 535
+                    RunawayHeatFactor = 2
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.80
+                        key = 0.3 0.85
+                        key = 0.6 0.90
+                        key = 0.85 0.85
+                        key = 1.0 0.80
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Solid-State Battery
-```
-SUBTYPE
-{
-    name = SSB
-    title = #LOC_RB_title_SSB
-    descriptionSummary = #LOC_RB_descSum_SSB
-    descriptionDetail = #LOC_RB_descDet_SSB
-    tankType = SSB
-    upgradeRequired = RB_UpgradeSSB
-    defaultSubtypePriority = 9
-    MODULE
-    {
-        IDENTIFIER
+        ### Lithium-polymer
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_SSB
-
-            Crate = 2
-
-            SelfDischargeRate = 0.003
-            CycleDurability = 10000
-
-            ThermalLoss = 0.05
-            TempOverheat = 470
-            TempRunaway = 570
-
-            ChargeEfficiencyCurve
+            name = Li_poly
+            title = #LOC_RB_title_Li_poly
+            descriptionSummary = #LOC_RB_descSum_Li_poly
+            descriptionDetail = #LOC_RB_descDet_Li_poly
+            tankType = Li_poly
+            upgradeRequired = RB_UpgradeLiPoly
+            defaultSubtypePriority = 10
+            MODULE
             {
-                key = 0.0 0.90
-                key = 0.2 0.95
-                key = 0.8 0.95
-                key = 1.0 0.90
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_Li_poly
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 0.95
+                    Crate = 3
+
+                    SelfDischargeRate = 0.015
+                    CycleDurability = 600
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 12
+
+                    ThermalLoss = 0.25
+                    TempOverheat = 420
+                    TempRunaway = 470
+                    RunawayHeatFactor = 2.2
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.90
+                        key = 0.2 0.95
+                        key = 0.8 0.95
+                        key = 1.0 0.90
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Thermal battery (non-rechargeable)
-```
-SUBTYPE
-{
-    name = TBat
-    title = #LOC_RB_title_TBat
-    descriptionSummary = #LOC_RB_descSum_TBat
-    descriptionDetail = #LOC_RB_descDet_TBat
-    tankType = TBat
-    defaultSubtypePriority = 0
-    MODULE
-    {
-        IDENTIFIER
+        ### Graphene
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_TBat
-            
-            HighEClevel = 2
-            Crate = 20
-
-            SelfDischargeRate = 0
-            CycleDurability = 1
-
-            ThermalLoss = 0.6
-            TempOverheat = 1000
-            TempRunaway = 1500
-
-            ChargeEfficiencyCurve
+            name = Graphene
+            title = #LOC_RB_title_Graphene
+            descriptionSummary = #LOC_RB_descSum_Graphene
+            descriptionDetail = #LOC_RB_descDet_Graphene
+            tankType = Graphene
+            upgradeRequired = RB_UpgradeGraphene
+            defaultSubtypePriority = 11
+            MODULE
             {
-                key = 0.0 0.0
-                key = 1.0 0.0
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_title_Graphene
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 0.95
+                    Crate = 5
+
+                    SelfDischargeRate = 0.002
+                    CycleDurability = 2500
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 4
+
+                    ThermalLoss = 0.03
+                    TempOverheat = 450
+                    TempRunaway = 550
+                    RunawayHeatFactor = 130
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0   0.90
+                        key = 0.25  0.96
+                        key = 0.5   0.97
+                        key = 0.75  0.96
+                        key = 1.0   0.92
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### ZEBRA battery
-```
-SUBTYPE
-{
-    name = RBZebra
-    title = #LOC_RB_title_Zebra
-    descriptionSummary = #LOC_RB_descSum_Zebra
-    descriptionDetail = #LOC_RB_descDet_Zebra
-    tankType = RBZebra
-    upgradeRequired = RB_UpgradeZebra
-    defaultSubtypePriority = 5
-    MODULE
-    {
-        IDENTIFIER
+        ### Solid-State Battery
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_Zebra
-            
-            Crate = 1
-
-            SelfDischargeRate = 0
-            CycleDurability = 4500
-
-            ThermalLoss = 0.1
-            TempOverheat = 1000
-            TempRunaway = 1500
-
-            ChargeEfficiencyCurve
+            name = SSB
+            title = #LOC_RB_title_SSB
+            descriptionSummary = #LOC_RB_descSum_SSB
+            descriptionDetail = #LOC_RB_descDet_SSB
+            tankType = SSB
+            upgradeRequired = RB_UpgradeSSB
+            defaultSubtypePriority = 12
+            MODULE
             {
-                    key = 0.0 0.85
-                    key = 0.3 0.90
-                    key = 0.5 0.90
-                    key = 0.8 0.85
-                    key = 1.0 0.80
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_SSB
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = false
+
+                    HighEClevel = 0.95
+                    Crate = 2
+
+                    SelfDischargeRate = 0.003
+                    CycleDurability = 10000
+                    EvaRefurbishEnabled = true
+                    SparePartsPerKWh = 2
+
+                    ThermalLoss = 0.05
+                    TempOverheat = 470
+                    TempRunaway = 570
+                    RunawayHeatFactor = 90
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.90
+                        key = 0.2 0.95
+                        key = 0.8 0.95
+                        key = 1.0 0.90
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
 
-### Nuclear battery (non-rechargeable)
-```
-SUBTYPE
-{
-    name = NukeCell
-    title = #LOC_RB_short_Nuke
-    descriptionSummary = #LOC_RB_descSum_Nuke
-    descriptionDetail = #LOC_RB_descDet_Nuke
-    tankType = NukeCell
-    upgradeRequired = RB_UpgradeNuke
-    defaultSubtypePriority = 0
-    MODULE
-    {
-        IDENTIFIER
+        ### Hafnium-178m2 (non-rechargeable)
+        ```
+        SUBTYPE
         {
-            name = RealBattery
-        }
-        DATA
-        {
-            BatteryTypeDisplayName = #LOC_RB_short_Nuke
-
-            HighEClevel = 2
-            Crate = 0.001
-
-            SelfDischargeRate = 0.0001            
-            CycleDurability = 1
-
-            ThermalLoss = 0.4
-            TempOverheat = 1000
-            TempRunaway = 1200
-
-            ChargeEfficiencyCurve
+            name = NukeCell
+            title = #LOC_RB_short_Nuke
+            descriptionSummary = #LOC_RB_descSum_Nuke
+            descriptionDetail = #LOC_RB_descDet_Nuke
+            tankType = NukeCell
+            upgradeRequired = RB_UpgradeNuke
+            defaultSubtypePriority = 1
+            MODULE
             {
-                key = 0.0 0.0
-                key = 1.0 0.0
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    BatteryTypeDisplayName = #LOC_RB_short_Nuke
+
+                    FixedOutput = false
+                    KeepWarm = false
+                    SelfRunaway = true
+
+                    HighEClevel = 2
+                    Crate = 0.001
+
+                    SelfDischargeRate = 0.0001            
+                    CycleDurability = 1
+                    EvaRefurbishEnabled = false
+                    SparePartsPerKWh = 2
+
+                    ThermalLoss = 0.12
+                    TempOverheat = 1500
+                    TempRunaway = 2500
+                    RunawayHeatFactor = 750
+
+                    ChargeEfficiencyCurve
+                    {
+                        key = 0.0 0.0
+                        key = 1.0 0.0
+                    }
+                }
             }
         }
-    }
-}
-```
+        ```
