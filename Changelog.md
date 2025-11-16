@@ -1,5 +1,37 @@
 # Changelog
 
+## v2.3.0
+
+### Major Changes
+
+- **Low-power battery alerts**: Enable automatic alarms (stock or KAC) and inbox messages when a vessel is about to run out of power. This *should* also apply to vessels already in flight before 2.3, but it's not guaranteed.
+- **Optional Stock Heat Simulation**: batteries can now produce and handle heat using the stock thermal system if *SystemHeat* is disabled or not installed. This option is selectable in the difficulty settings. *SystemHeat is no longer a hard dependency*.
+- **Staging integration**: all batteries can now be armed for activation via staging, with a dedicated toggle and staging icon.
+- **Thermal batteries overhaul**: thermal batteries now start inactive by default, provide continuous fixed power output once activated, and cannot be turned off afterward.
+- **New KERBA batteries**: inspired from Zebra Batteries, they require pre-heating before activation, continuous power (or loop heat) to stay warm, and a controlled cooldown when manually shut down.
+- **Self-runaway logic**: added hourly chance (configurable) in Hafnium batteries for a spontaneous meltdown. 
+- **Tech-locked UI fields**: certain telemetry and diagnostics readouts (SoC, Time-to-Depletion, Health) now require dedicated upgrades to be unlocked in _Career_ and _Science_ modes; in Sandbox they remain fully visible.
+- **Automatic battery shutdown**: once the *Protection Circuit Module* is unlocked, batteries will automatically disable themselves if they overheat beyond their safe temperature threshold.
+- **EVA Battery Refurbishment**: Engineers on EVA can now restore worn-out batteries using SpareParts resource from the vessel, with cost scaled by battery capacity.
+
+### Minor Improvements
+
+- *Day length* for background simulation is now auto-detected from the homeworld. You can override it in settings (0 = Auto, otherwise 1–24 h).
+- Added *polar mode* for background simulation while landed near poles (configurable).
+- *Thermal runaway model*: batteries now generate heat autonomously once their temperature exceeds `TempRunaway`, even if disabled. Heat output scales with chemistry (defaults to DischargeRate; optional `RunawayHeatKW` field per subtype).
+- *Engineer Bonus*: engineer level slightly boosts discharge output and reduces heat & degradation (up to 25% better); slight malus (-5%) with no engineers on board.
+- *Battery health* field now shows remaining cycles left for rechargeable batteries.
+- When a cell’s health drops below 80%, a localized system message (contract-style inbox alert) is generated once per part.
+- *DischargeRate* is now shown correctly in the editor, and automatically updates when switching to a different subtype.
+- RealBattery PAW group is now automatically hidden when the current B9 subtype does not include an active battery module (`moduleActive = false`).  
+- Reorganized *Difficulty Settings* into three tabs.
+- Rebalanced subtype costs to better follow career progression.
+- Custom models & textures for tech nodes.
+- General code cleanup and refactoring.
+- Improved some localization strings.
+
+---
+
 ## v2.2.4
 
 - Further improved background simulation for partial night/day cycles (both orbital and surface).

@@ -59,14 +59,19 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="source\BackgroundSimulator.cs" />
-    <Compile Include="source\ModuleEnergyEstimator.cs" />
-    <Compile Include="source\RealBattery.cs" />
+    <Compile Include="source\Alarms\AlarmBackends.cs" />
+    <Compile Include="source\Alarms\AlarmManager.cs" />
+    <Compile Include="source\Background Simulation\BackgroundSimulator.cs" />
+    <Compile Include="source\Alarms\KACWrapper.cs" />
+    <Compile Include="source\Background Simulation\ModuleEnergyEstimator.cs" />
+    <Compile Include="source\Core\EVAService.cs" />
+    <Compile Include="source\Core\Logging.cs" />
+    <Compile Include="source\Core\RealBattery.cs" />
     <Compile Include="source\AssemblyInfo.cs" />
-    <Compile Include="source\RealBatteryLoadMaster.cs" />
-    <Compile Include="source\RealBatterySettings.cs" />
-    <Compile Include="source\RealBatterySnapshotManager.cs" />
-    <Compile Include="source\RealBatteryVesselModule.cs" />
+    <Compile Include="source\Core\RealBatteryLoadMaster.cs" />
+    <Compile Include="source\Core\RealBatterySettings.cs" />
+    <Compile Include="source\Background Simulation\RealBatterySnapshotManager.cs" />
+    <Compile Include="source\Background Simulation\RealBatteryVesselModule.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="GameData\RealBattery\RealBattery_mm.cfg" />

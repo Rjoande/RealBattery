@@ -13,7 +13,8 @@
 - [x] PAW fields visible only if technology/upgrades are unlocked (`PartTechAvailable`).
 - [x] Hide PAW group if `moduleActive = false` (non-battery).
 - [x] Engineer Bonus: Improves thermal performance and slows degradation (`ThermalLoss`, `WearCounter`) and slightly increases discharge output.
-- [ ] **BonVoyage Compatibility**: wrapper `otherPower += DischargeRate`
+- [x] **BonVoyage Compatibility**: wrapper `otherPower += DischargeRate`
+- [x] Engineers may replace old batteries using spare parts (using DangIt scripts if installed?)
 
 ## Thermals and Failures
 - [x] Automatic battery deactivation in overheat/runaway (unlockable tech).
@@ -31,8 +32,9 @@
 - [x] Optional SystemHeat mechanics: fallback to stock heat or completely disable it.
 
 ## Documentation & Support
-- [ ] KSPedia: SC/EC system overview, battery types, flight usage, background simulation, third-party mod integration, icons/textures for chemistries.
+- ~~[ ] KSPedia: SC/EC system overview, battery types, flight usage, background simulation, third-party mod integration, icons/textures for chemistries.~~
 
 ## Aesthetics
 - [ ] ~~Texture switch for batteries, only with ReStock/Restock+/NFE (via B9PartSwitch or `ModulePartVariants`).~~
-- [ ] *Conformal Decals* stickers
+- [x] *Conformal Decals* stickers
+- [x] Tech node models and textures

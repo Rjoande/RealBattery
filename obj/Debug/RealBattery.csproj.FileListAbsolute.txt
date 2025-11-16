@@ -52,3 +52,10 @@ D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0\RealB
 D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0\RealBattery\obj\Debug\RealBattery.csproj.CoreCompileInputs.cache
 D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0\RealBattery\obj\Debug\RealBatt.E359B5B5.Up2Date
 D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0\RealBattery\obj\Debug\RealBattery.dll
+D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0 - dev\RealBattery\GameData\RealBattery\plugin\RealBattery.dll
+D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0 - dev\RealBattery\GameData\RealBattery\plugin\SystemHeat.dll
+D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0 - dev\RealBattery\GameData\RealBattery\plugin\UnityEngine.CoreModule.dll
+D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0 - dev\RealBattery\obj\Debug\RealBattery.csproj.AssemblyReference.cache
+D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0 - dev\RealBattery\obj\Debug\RealBattery.csproj.CoreCompileInputs.cache
+D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0 - dev\RealBattery\obj\Debug\RealBatt.E359B5B5.Up2Date
+D:\Pietro\OneDrive\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v2_3_0 - dev\RealBattery\obj\Debug\RealBattery.dll
