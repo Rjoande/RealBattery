@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.3.1
+
+- Added support for Kopernicus Multistar systems (Kopernicus remains an optional dependency).
+- Fixed PAW group name not displaying in some situations (Editor and/or Flight).
+- Fixed loading issue when SystemHeat is not installed (no longer required to start).
+- Revised Bluedog ProbeExpansions configs: battery types now match the historical chemistry of each probe, with a small easter egg included.
+
+---
+
 ## v2.3.0
 
 ### Major Changes
