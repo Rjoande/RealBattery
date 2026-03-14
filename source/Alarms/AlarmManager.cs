@@ -1,10 +1,8 @@
-﻿using KSP;
-using KSP.Localization;
+﻿using KSP.Localization;
 using KSP.UI.Screens;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace RealBattery

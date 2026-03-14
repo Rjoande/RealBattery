@@ -1,13 +1,6 @@
 ﻿using KSP.Localization;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using SystemHeat;
-using TMPro;
 using UnityEngine;
-using static PartModule;
 
 namespace RealBattery
 {
@@ -61,9 +54,13 @@ namespace RealBattery
             }
 
             // Temperature guard
-            float tempNow = RealBatterySettings.UseSystemHeat && systemHeat != null
-                ? systemHeat.currentLoopTemperature
-                : (float)part.temperature;
+            float tempNow;
+            if (RealBatterySettings.UseSystemHeat)
+            {
+                var sh = (systemHeat != null) ? systemHeat : SystemHeatBridge.GetModule(part);
+                tempNow = (sh != null && SystemHeatBridge.TryGetLoopTempK(sh, out float tK)) ? tK : (float)part.temperature;
+            }
+            else tempNow = (float)part.temperature;
 
             if (tempNow > (float)(TempOverheat - SafeTempMargin))
             {

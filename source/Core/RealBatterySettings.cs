@@ -1,6 +1,4 @@
-﻿using KSP;
-using KSP.Localization;
-using System;
+﻿using System;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;

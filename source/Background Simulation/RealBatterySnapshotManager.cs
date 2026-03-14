@@ -1,6 +1,4 @@
 ﻿using UnityEngine;
-using KSP;
-using System;
 using System.Collections;
 
 namespace RealBattery

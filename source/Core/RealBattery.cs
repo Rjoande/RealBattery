@@ -1,13 +1,7 @@
-﻿using Contracts.Agents.Mentalities;
-using KSP.Localization;
+﻿using KSP.Localization;
 using KSP.UI.Screens;
-using RealBattery;
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using SystemHeat;
 using UnityEngine;
 
 namespace RealBattery
@@ -91,10 +85,10 @@ namespace RealBattery
 
         // --- Telemetry / Editor preview --------------------------------------------
         [KSPField(isPersistant = false)] public double lastECpower = 0; // +charge / -discharge
-        [KSPField(isPersistant = true, guiActiveEditor = true, guiName = "#LOC_RB_DischargeRate", guiUnits = "#LOC_RB_guiUnitsECs", guiFormat = "F2", groupName = "RealBatteryInfo")]
+        [KSPField(isPersistant = true, guiActiveEditor = true, guiName = "#LOC_RB_DischargeRate", guiUnits = "#LOC_RB_guiUnitsECs", guiFormat = "F2", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public double DischargeRate = 0.0;
         private double GUI_power = 0;
-        [KSPField(isPersistant = false, guiActiveEditor = true, guiName = "#LOC_RB_ChargeRate", guiUnits = "#LOC_RB_guiUnitsECs", groupName = "RealBatteryInfo")]
+        [KSPField(isPersistant = false, guiActiveEditor = true, guiName = "#LOC_RB_ChargeRate", guiUnits = "#LOC_RB_guiUnitsECs", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public string ChargeInfoEditor;
         private float smoothFlux = 0f;
 
@@ -103,19 +97,19 @@ namespace RealBattery
         [UI_Toggle(disabledText = "#LOC_RB_disableText", enabledText = "#LOC_RB_enableText")]
         public bool BatteryDisabled = false;
 
-        [KSPField(isPersistant = false, guiActive = true, guiActiveEditor = true, guiName = "#LOC_RB_Tech", groupName = "RealBatteryInfo")]
+        [KSPField(isPersistant = false, guiActive = true, guiActiveEditor = true, guiName = "#LOC_RB_Tech", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public string BatteryTypeDisplayName;
-        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_StateOfCharge", groupName = "RealBatteryInfo")]
+        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_StateOfCharge", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public string BatterySOCStatus;
-        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_Status", groupName = "RealBatteryInfo")]
+        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_Status", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public string BatteryChargeStatus;
-        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_TimeTo", groupName = "RealBatteryInfo")]
+        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_TimeTo", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public string BatteryTimeTo;
-        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_BatteryHealth", groupName = "RealBatteryInfo")]
+        [KSPField(isPersistant = false, guiActive = true, guiName = "#LOC_RB_BatteryHealth", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public string BatteryHealthStatus;
 
         // --- Staging integration ----------------------------------------------------
-        [KSPField(isPersistant = true, guiActiveEditor = true, guiName = "#LOC_RB_StageArm", groupName = "RealBatteryInfo")]
+        [KSPField(isPersistant = true, guiActiveEditor = true, guiName = "#LOC_RB_StageArm", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         [UI_Toggle(disabledText = "#LOC_RB_StageArm_off", enabledText = "#LOC_RB_StageArm_on")]
         public bool BatteryStaged = false;
         [KSPField(isPersistant = true)] private bool StageFired = false;
@@ -131,7 +125,7 @@ namespace RealBattery
 
         // --- Editor Simulation Mode -------------------------------------------------
         public enum SimMode { Idle, Discharge, Charge }
-        [KSPField(isPersistant = true, guiActiveEditor = true, guiName = "#LOC_RB_SimMode", groupName = "RealBatteryInfo")]
+        [KSPField(isPersistant = true, guiActiveEditor = true, guiName = "#LOC_RB_SimMode", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         [UI_ChooseOption(scene = UI_Scene.Editor, options = new[] { "#LOC_RB_SimMode_Idle", "#LOC_RB_SimMode_Discharge", "#LOC_RB_SimMode_Charge" })]
         public string SimulationMode;
 
@@ -143,7 +137,8 @@ namespace RealBattery
 
         // --- External dependencies (cached) ----------------------------------------
         // Optional SystemHeat module; assigned on-demand when heat sim is in use.
-        private ModuleSystemHeat systemHeat = null;  // resolved lazily (UseSystemHeat)
+        // private ModuleSystemHeat systemHeat = null;
+        private PartModule systemHeat = null; // SystemHeat module (optional)
 
         // --- KeepWarm / Controlled Shutdown state machine --------------------------
         // Tracks current thermal runaway state (true while active, cleared when extinguished)
@@ -181,8 +176,10 @@ namespace RealBattery
 
             // 0) Boot banner / early refs
             BatteryChargeStatus = Localizer.Format("#LOC_RB_Initializing");
+            //if (RealBatterySettings.UseSystemHeat && systemHeat == null)
+            //    systemHeat = part?.Modules?.GetModule<ModuleSystemHeat>();
             if (RealBatterySettings.UseSystemHeat && systemHeat == null)
-                systemHeat = part?.Modules?.GetModule<ModuleSystemHeat>();
+                systemHeat = SystemHeatBridge.GetModule(part);
 
             // 1) Load config & basic UI gating
             LoadConfig();
@@ -519,13 +516,27 @@ namespace RealBattery
                 {
                     isRunaway = true;
 
-                    RBLog.Verbose(
+                    if (RBLog.VerboseEnabled)
+                    {
+                        string loopT = "n/a";
+                        if (RealBatterySettings.UseSystemHeat)
+                        {
+                            // Refresh on demand in case the module wasn't cached yet.
+                            if (systemHeat == null)
+                                systemHeat = SystemHeatBridge.GetModule(part);
+                            
+                            if (systemHeat != null && SystemHeatBridge.TryGetLoopTempK(systemHeat, out float loopTK))
+                                loopT = loopTK.ToString("F1");
+                        }
+                        
+                        RBLog.Verbose(
                         $"[Runaway][DEBUG] Setting isRunaway=true on '{part.partInfo?.title}' " +
                         $"canTriggerRunaway={RunawayAllowed}, tempK={tempK:F1}, TempRunaway={TempRunaway:F0}, " +
                         $"forcedRunawayActive={forcedRunawayActive}, SelfRunaway={SelfRunaway}, " +
                         $"UseSystemHeat={RealBatterySettings.UseSystemHeat}, " +
-                        $"loopT={(systemHeat != null ? systemHeat.currentLoopTemperature.ToString("F1") : "n/a")}"
-                    );
+                        $"loopT={loopT}"
+                        );
+                    }
                 }
 
                 // If the feature is disabled in settings mid-flight, force-clear runaway state.
@@ -601,7 +612,7 @@ namespace RealBattery
                     if (ActualLife < 0.01 && !isRunaway && !forcedRunawayActive && Math.Abs(smoothFlux) > 1e-6f)
                     {
                         smoothFlux = 0f;
-                        systemHeat.AddFlux("RealBattery", 0f, 0f, true);
+                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", 0f, 0f, true);
                         RBLog.Info($"[RealBattery] Cleared residual SystemHeat flux on '{part.partInfo?.title}' after battery death.");
                     }
                 }
@@ -618,7 +629,7 @@ namespace RealBattery
                 double sign = 0;
 
                 if (systemHeat != null)
-                    systemHeat.moduleUsed = true;
+                    SystemHeatBridge.MarkUsed(systemHeat);
 
                 if (SimulationMode == Localizer.Format("#LOC_RB_SimMode_Discharge"))
                     sign = -1.0;
@@ -900,11 +911,12 @@ namespace RealBattery
 
             // Resolve heat backend and current temperature once
             // Always refresh SystemHeat module if feature is enabled.
-            bool useSH = RealBatterySettings.UseSystemHeat && systemHeat != null;
-
+            
             // Ensure fresh SystemHeat reference if needed
             if (RealBatterySettings.UseSystemHeat && systemHeat == null)
-                systemHeat = part?.Modules?.GetModule<ModuleSystemHeat>();
+                systemHeat = SystemHeatBridge.GetModule(part);
+
+            bool useSH = RealBatterySettings.UseSystemHeat && systemHeat != null;
 
             float tempK = GetCurrentTemperatureK();
             double ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
@@ -1012,8 +1024,7 @@ namespace RealBattery
                     flux *= 0.01f;
                     float tau = 0.01f;
                     smoothFlux += tau * (flux - smoothFlux);
-                    systemHeat.moduleUsed = true;
-                    systemHeat.AddFlux("RealBattery", tempTarget, smoothFlux, true);
+                    SystemHeatBridge.AddFlux(systemHeat, "RealBattery", tempTarget, smoothFlux, true);
                     RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux ACTIVE {(isRunaway ? "(Runaway) " : "")}(SystemHeat): {smoothFlux:F2} W @ {TempOverheat:F0} K (loop={tempK:F1} K)");
                 }
                 else
@@ -1035,8 +1046,7 @@ namespace RealBattery
 
                 smoothFlux += (0f - smoothFlux) * k;
 
-                systemHeat.moduleUsed = true;
-                systemHeat.AddFlux("RealBattery", 0f, smoothFlux, true);
+                SystemHeatBridge.AddFlux(systemHeat, "RealBattery", 0f, smoothFlux, true);
                 RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux IDLE: {smoothFlux:F2} W -> no EC transfer, loop={tempK:F1} K");
             }
 
@@ -1294,11 +1304,13 @@ namespace RealBattery
             if (RealBatterySettings.UseSystemHeat)
             {
                 if (systemHeat == null)
-                    systemHeat = part?.Modules?.GetModule<ModuleSystemHeat>();
+                    systemHeat = SystemHeatBridge.GetModule(part);
 
                 // guard clause: avoid null access if module missing or feature disabled mid-flight
+                if (systemHeat != null && SystemHeatBridge.TryGetLoopTempK(systemHeat, out float tK))
+                    return tK;
                 if (systemHeat != null)
-                    return (float)systemHeat.currentLoopTemperature;
+                    RBLog.Warn($"[RealBattery] SystemHeat module present but temperature read failed on '{part.partInfo?.title}', falling back to stock temperature.");
                 else
                     RBLog.Warn($"[RealBattery] SystemHeat expected but missing on '{part.partInfo?.title}', falling back to stock temperature.");
             }
@@ -1306,6 +1318,7 @@ namespace RealBattery
             // --- Stock branch ---
             return (float)part.temperature;
         }
+
         private static string FormatTimeSpan(TimeSpan t)
         {
             if (t.TotalDays >= 1)

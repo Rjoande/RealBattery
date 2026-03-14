@@ -1,16 +1,7 @@
-﻿using CommNet.Network;
-using KSP;
-using KSP.UI.Screens;
-using RealBattery;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using VehiclePhysics;
-using static PropTools;
-using static RealBattery.RealBatterySettings;
-using static Targeting;
-using static VehiclePhysics.EnergyProvider;
 
 namespace RealBattery
 {
@@ -243,8 +234,8 @@ namespace RealBattery
             IlluminationStatus(vessel, ref IllumStartPhase, ref IllumtToTransition, ref IllumOrbitalShadowFrac);
 
             double period = vessel.LandedOrSplashed
-                    ? Math.Max(vessel.mainBody.rotationPeriod, 1.0)
-                    : Math.Max(vessel.orbit.period, 1.0);
+                ? Math.Max(vessel.mainBody.rotationPeriod, 1.0)
+                : Math.Max(vessel.orbit.period, 1.0);
             int mainBody = vessel.mainBody.flightGlobalsIndex;
             string mainBodyName = vessel.mainBody.name;
             IllumPhase startPhase = IllumStartPhase;
@@ -602,6 +593,14 @@ namespace RealBattery
             var snap = energySnapshots[vessel.id];
 
             int sun = Planetarium.fetch.Sun.flightGlobalsIndex;
+            // Resolve the correct star for the initial and final main bodies (Kopernicus multistar).
+            // Fallback to stock Sun when Kopernicus data is unavailable.
+            CelestialBody initMainBody = GetBodyByFlightGlobalsIndex(snap.mainBody) ?? Planetarium.fetch.Sun;
+            CelestialBody finalMainBody = vessel.mainBody ?? Planetarium.fetch.Sun;
+            CelestialBody initStar = ResolveStarForBody(initMainBody, out _);
+            CelestialBody finalStar = ResolveStarForBody(finalMainBody, out _);
+            int initStarIdx = initStar.flightGlobalsIndex;
+            int finalStarIdx = finalStar.flightGlobalsIndex;
             int initBody = snap.mainBody;
             int finalBody = vessel.mainBody.flightGlobalsIndex;
 
@@ -617,7 +616,7 @@ namespace RealBattery
                 Debug.Log($"[RealBattery][SolarSim] Vessel '{vessel.vesselName}' stayed on {vessel.mainBody.name}, simulating night/day cycle...");
                 total_kWh = SimulateSolar_Planet(vessel, deltaTime);
             }
-            else if (initBody == sun || finalBody == sun || initEscape || finalEscape)
+            else if (initBody == initStarIdx || finalBody == finalStarIdx || initEscape || finalEscape)
             {
                 Debug.Log($"[RealBattery][SolarSim] Vessel '{vessel.vesselName}' has been in heliocentric orbit and/or changed SOI, ignoring shadow phases...");
                 total_kWh = SimulateSolar_Sun(vessel, deltaTime);
@@ -650,7 +649,11 @@ namespace RealBattery
         {
             var snap = energySnapshots[vessel.id];
 
-            // If the snapshot was taken with orbital naming, remap to surface naming.
+            // Resolve correct star for surface day/night and orbital eclipse logic.
+            CelestialBody sun = ResolveStarForBody(vessel.mainBody, out _);
+            
+                
+                // If the snapshot was taken with orbital naming, remap to surface naming.
             if (vessel.LandedOrSplashed && (snap.startPhase == IllumPhase.Sunlit || snap.startPhase == IllumPhase.Shadow))
             {
                 // Remap labels and (optionally) refresh tToTransition & period for surface consistency
@@ -759,9 +762,9 @@ namespace RealBattery
         // --- Helper: precompute illumination & panels --------------------------------
         private static void IlluminationStatus(Vessel vessel, ref IllumPhase startPhase, ref double tToTransition, ref double orbitalShadowFrac)
         {
-            var sun = Planetarium.fetch.Sun;
             var body = vessel.mainBody;
-            
+            var sun = ResolveStarForBody(body, out _);
+
             if (vessel.LandedOrSplashed)
             {
                 // --- SURFACE BRANCH ---
@@ -807,9 +810,37 @@ namespace RealBattery
             return value;
         }
 
+        private static CelestialBody ResolveStarForBody(CelestialBody body, out double luminosity)
+        {
+            luminosity = 1.0;
+            if (body == null) return Planetarium.fetch.Sun;
 
-        // Returns true if vessel is behind the body w.r.t the Sun (umbra test)
-        private static bool IsInEclipse(Vessel v, CelestialBody body, CelestialBody sun)
+            if (KopernicusStarResolver.TryResolveStar(body, out var star, out var lum))
+            {
+                if (star != null)
+                {
+                    luminosity = lum;
+                    return star;
+                }
+            }
+            return Planetarium.fetch.Sun;
+        }
+
+        private static CelestialBody GetBodyByFlightGlobalsIndex(int idx)
+        {
+            if (FlightGlobals.Bodies == null) return null;
+            for (int i = 0; i < FlightGlobals.Bodies.Count; i++)
+            {
+                var b = FlightGlobals.Bodies[i];
+                if (b != null && b.flightGlobalsIndex == idx)
+                    return b;
+            }
+            return null;
+        }
+
+
+// Returns true if vessel is behind the body w.r.t the Sun (umbra test)
+private static bool IsInEclipse(Vessel v, CelestialBody body, CelestialBody sun)
         {
             Vector3d r = v.GetWorldPos3D() - body.position;     // vessel from body center
             Vector3d s = sun.position - body.position;          // sun from body center

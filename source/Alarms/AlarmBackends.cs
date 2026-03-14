@@ -2,12 +2,8 @@
 // Namespace: RealBattery
 // Comments in English as requested.
 
-using Expansions.Missions;
-using KSP.Localization;
-using RealBattery;
 using System;
 using System.Linq;
-using System.Security.Policy;
 
 namespace RealBattery
 {

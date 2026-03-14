@@ -8,11 +8,8 @@
 // - Lights (basic: no blinking estimation)
 // - Science Lab (data processing)
 
-using KSP;
 using System;
-using System.Collections.Generic;
 using UnityEngine;
-using static VehiclePhysics.EnergyProvider;
 
 namespace RealBattery
 {
@@ -427,9 +424,20 @@ namespace RealBattery
         {
             if (vessel == null) return 0.0;
 
+            // Resolve the correct star in multistar setups (Kopernicus) and its luminosity.
+            // Fallback to stock Sun + luminosity=1 when not available.
+            CelestialBody starBody = Planetarium.fetch.Sun;
+            double luminosity = 1.0;
+            if (KopernicusStarResolver.TryResolveStar(vessel.mainBody, out var kopStar, out var kopLum))
+            {
+                if (kopStar != null) starBody = kopStar;
+                luminosity = kopLum/1360;
+            }
+            
             // 1/r^2 w.r.t Kerbin SMA as reference (same as current estimator)
             double refDist = FlightGlobals.GetBodyByName("Kerbin")?.orbit?.semiMajorAxis ?? 13599840256.0;
-            double currDist = vessel.distanceToSun;
+            // vessel.distanceToSun always refers to Planetarium.fetch.Sun, so compute distance to the resolved star.
+            double currDist = (vessel.GetWorldPos3D() - starBody.position).magnitude;
             double invSqrScale = Math.Pow(refDist / Math.Max(currDist, 1.0), 2.0);
 
             double totalPVECps = 0.0;
@@ -476,9 +484,12 @@ namespace RealBattery
                 }
             }
 
+            double logPVECps = totalPVECps;
             totalPVECps *= invSqrScale;
+            // Apply Kopernicus star luminosity scaling (Kerbol = 1).
+            totalPVECps *= luminosity;
 
-            Debug.Log($"[RealBattery] SolarPanelsBaseOutput for '{vessel.vesselName}': {totalPVECps:F3} EC/s");
+            Debug.Log($"[RealBattery] SolarPanelsBaseOutput for '{vessel.vesselName}': {logPVECps} raw EC/s at {currDist/refDist:F3} AU from {kopStar.displayName} ({luminosity:F3}x luminosity) = {totalPVECps:F3} EC/s");
 
             return totalPVECps;
         }
