@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.3.2
+
+- Added optional *Deep-space protection* setting to suppress float-charge wear during long unloaded deep-space transfers, preserving battery health without affecting normal charge behavior.
+- Fixed tech-locked PAW fields always visible due to `moduleActive` UI override ignoring unlock conditions
+- Integrated RealBattery settings with stock difficulty presets
+- Fixed Bluedog's X-15 battery type (AgOx).
+
 ## v2.3.1
 
 - Added support for Kopernicus Multistar systems (Kopernicus remains an optional dependency).
