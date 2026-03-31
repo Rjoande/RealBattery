@@ -1242,11 +1242,17 @@ namespace RealBattery
             Fields["BatteryTypeDisplayName"].guiActive = moduleActive;
             Fields["BatteryTypeDisplayName"].guiActiveEditor = moduleActive;
 
-            Fields["BatterySOCStatus"].guiActive = moduleActive;
             Fields["BatteryChargeStatus"].guiActive = moduleActive;
-            Fields["BatteryTimeTo"].guiActive = moduleActive;
-            Fields["BatteryHealthStatus"].guiActive = moduleActive;
 
+            // Tech-gated fields must not be forced visible here.
+            // Only force them OFF when the module is inactive.
+            if (!moduleActive)
+            {
+                Fields["BatterySOCStatus"].guiActive = moduleActive;
+                Fields["BatteryTimeTo"].guiActive = moduleActive;
+                Fields["BatteryHealthStatus"].guiActive = moduleActive;
+            }
+            
             Fields["DischargeRate"].guiActiveEditor = moduleActive;
             Fields["ChargeInfoEditor"].guiActiveEditor = moduleActive;
             Fields["BatteryStaged"].guiActiveEditor = moduleActive;

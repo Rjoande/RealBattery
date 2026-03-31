@@ -41,8 +41,8 @@ namespace RealBattery
         public static float PolarLatitudeThresholdDeg => A?.PolarLatitudeThresholdDeg ?? 80f;
         public static float PolarConstantLitFrac => A?.PolarConstantLitFrac ?? 0.50f;
 
-
         // ----- Logging -----
+        public static bool DeepSpaceProtection => D?.deepSpaceProtection ?? true;
         public static bool DisablePCM => D?.disablePCM ?? false;
         public static bool EnableDebugLogging => D?.enableDebugLogging ?? false;
         public static bool EnableVerboseLoadLogs => D?.enableVerboseLoadLogs ?? false;
@@ -113,7 +113,41 @@ namespace RealBattery
         public override int SectionOrder => 1;
         public override string Title => "#LOC_RB_Settings_Tab_Simulation";
         public override GameParameters.GameMode GameMode => GameParameters.GameMode.ANY;
-        public override bool HasPresets => false;
+        public override bool HasPresets => true;
+
+        public override void SetDifficultyPreset(GameParameters.Preset preset)
+        {
+            switch (preset)
+            {
+                case GameParameters.Preset.Easy:
+                    enableSelfDischarge = false;
+                    enableBatteryWear = false;
+                    enableHeatSimulation = false;
+                    enableThermalRunaway = false;
+                    break;
+
+                case GameParameters.Preset.Normal:
+                    enableSelfDischarge = true;
+                    enableBatteryWear = true;
+                    enableHeatSimulation = false;
+                    enableThermalRunaway = false;
+                    break;
+
+                case GameParameters.Preset.Moderate:
+                    enableSelfDischarge = true;
+                    enableBatteryWear = true;
+                    enableHeatSimulation = true;
+                    enableThermalRunaway = false;
+                    break;
+
+                case GameParameters.Preset.Hard:
+                    enableSelfDischarge = true;
+                    enableBatteryWear = true;
+                    enableHeatSimulation = true;
+                    enableThermalRunaway = true;
+                    break;
+            }
+        }
 
         // --- Battery model ---
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_SelfDischarge", toolTip = "#LOC_RB_Settings_SelfDischarge_desc")]
@@ -213,7 +247,33 @@ namespace RealBattery
         public override int SectionOrder => 3;
         public override string Title => "#LOC_RB_Settings_Tab_Debug";
         public override GameParameters.GameMode GameMode => GameParameters.GameMode.ANY;
-        public override bool HasPresets => false;
+        public override bool HasPresets => true;
+
+        public override void SetDifficultyPreset(GameParameters.Preset preset)
+        {
+            switch (preset)
+            {
+                case GameParameters.Preset.Easy:
+                    deepSpaceProtection = true;
+                    break;
+
+                case GameParameters.Preset.Normal:
+                    deepSpaceProtection = true;
+                    break;
+
+                case GameParameters.Preset.Moderate:
+                    deepSpaceProtection = true;
+                    break;
+
+                case GameParameters.Preset.Hard:
+                    deepSpaceProtection = false;
+                    break;
+            }
+        }
+
+        // Deep space protection (disable all drain when not in sunlight) for quality-of-life
+        [GameParameters.CustomParameterUI("#LOC_RB_DeepSpaceProtection", toolTip = "#LOC_RB_DeepSpaceProtection_tip")]
+        public bool deepSpaceProtection = true;
 
         // Disable PCM logic for debug
         [GameParameters.CustomParameterUI("#LOC_RB_DisablePCM", toolTip = "#LOC_RB_DisablePCM_desc")]
@@ -225,15 +285,5 @@ namespace RealBattery
 
         [GameParameters.CustomParameterUI("#LOC_RB_VerboseLog", toolTip = "#LOC_RB_VerboseLog_desc")]
         public bool enableVerboseLoadLogs = false;
-
-        /*private readonly string version = "v2.3";
-
-        [GameParameters.CustomStringParameterUI("")]
-        public string InfoText;
-
-        public RBParams_Info()
-        {
-            InfoText = Localizer.Format("#LOC_RB_Settings_About", version);
-        }*/
     }
 }

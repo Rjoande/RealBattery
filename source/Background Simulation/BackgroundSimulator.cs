@@ -381,6 +381,8 @@ namespace RealBattery
             bool initEscape = snap.isEscape;
             bool finalEscape = vessel.orbit.ApA > vessel.mainBody.sphereOfInfluence;
             bool boundOrSurface = vessel != null && (vessel.LandedOrSplashed || (!initEscape && !finalEscape));
+            bool deepSpaceCruise = !boundOrSurface;
+            bool protectFloatCharge = deepSpaceCruise && RealBatterySettings.DeepSpaceProtection;
             double cycleWear = Math.Max(0.0, Math.Abs(snap.netEC_True));
             bool appliedCycleWearThisTick = false;
 
@@ -416,7 +418,7 @@ namespace RealBattery
                     }
 
                     // === Float-charge if battery already at or near full ===
-                    else if (sc.amount >= virtualCap - EPS)
+                    else if (sc.amount >= virtualCap - EPS && !protectFloatCharge)
                     {
                         // Wear calculation based on the remaining simulation time
                         // Example: if it charges in half deltaTime, the other half is float-charge
@@ -430,6 +432,10 @@ namespace RealBattery
                             rb.UpdateBatteryLife();
                             Debug.Log($"[RealBattery] Float-charge simulated on '{sc.part.partInfo.title}': +{cycleAmount:F5} kWh wear over {timeFractionFull:P0} of background time");
                         }
+                    }
+                    else if (sc.amount >= virtualCap - EPS && protectFloatCharge)
+                    {
+                        Debug.Log($"[RealBattery] Float-charge wear skipped on '{sc.part.partInfo.title}' (Deep Space Protection active).");
                     }
                 }
 
