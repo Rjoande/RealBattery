@@ -112,6 +112,7 @@ namespace RealBattery
                 var sc = part.Resources.Get("StoredCharge");
                 sc.amount = sc.maxAmount;
                 EOLToastSent = false;
+                BGSelfRunawaySent = false;
                 //if (Fields["BatteryHealthStatus"] != null)
                 //    BatteryHealthStatus = $"{(BatteryLife * 100):F0}%";
 

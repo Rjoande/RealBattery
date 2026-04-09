@@ -38,7 +38,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>G:\SteamLibrary\steamapps\common\Kerbal Space Program\KSP_x64_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>lib\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System" />
@@ -47,15 +47,13 @@
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="SystemHeat">
-      <HintPath>G:\SteamLibrary\steamapps\common\Kerbal Space Program\GameData\SystemHeat\Plugin\SystemHeat.dll</HintPath>
-    </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>G:\SteamLibrary\steamapps\common\Kerbal Space Program\KSP_x64_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>lib\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>G:\SteamLibrary\steamapps\common\Kerbal Space Program\KSP_x64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>lib\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -63,15 +61,19 @@
     <Compile Include="source\Alarms\AlarmManager.cs" />
     <Compile Include="source\Background Simulation\BackgroundSimulator.cs" />
     <Compile Include="source\Alarms\KACWrapper.cs" />
+    <Compile Include="source\Background Simulation\KopernicusStarResolver.cs" />
     <Compile Include="source\Background Simulation\ModuleEnergyEstimator.cs" />
     <Compile Include="source\Core\EVAService.cs" />
     <Compile Include="source\Core\Logging.cs" />
     <Compile Include="source\Core\RealBattery.cs" />
     <Compile Include="source\AssemblyInfo.cs" />
+    <Compile Include="source\Core\RealBatteryChemistry.cs" />
+    <Compile Include="source\Core\RealBatteryChemistryDB.cs" />
     <Compile Include="source\Core\RealBatteryLoadMaster.cs" />
     <Compile Include="source\Core\RealBatterySettings.cs" />
     <Compile Include="source\Background Simulation\RealBatterySnapshotManager.cs" />
     <Compile Include="source\Background Simulation\RealBatteryVesselModule.cs" />
+    <Compile Include="source\Core\SystemHeatBridge.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="GameData\RealBattery\RealBattery_mm.cfg" />

@@ -35,7 +35,8 @@ namespace RealBattery
         public static double LowPowerMinWindowSeconds => Math.Max(0.0, (A?.LowPowerMinWindow ?? 5f) * 60.0);
         public static double LowPowerLeadSeconds => Math.Max(0.0, (A?.LowPowerLead ?? 2f) * 60.0);
         public static float RunawayBaseMagnitude => A?.runawayBaseMagnitude ?? 0.25f;
-        public static float SelfRunawayChancePerHour => A?.SelfRunawayChancePerHour ?? 0.05f;
+        public static float SelfRunawayChanceMultiplier  => A?.SelfRunawayChanceMultiplier  ?? 1.0f;
+        public static bool  SelfRunawayInBackground      => A?.SelfRunawayInBackground      ?? true;
 
         public static float DayLengthHours => A?.DayLengthHours ?? 6f;
         public static float PolarLatitudeThresholdDeg => A?.PolarLatitudeThresholdDeg ?? 80f;
@@ -69,6 +70,24 @@ namespace RealBattery
         public static void Error(string msg) { RBLog.Error(msg); }
 
         // ----- Helpers used elsewhere in the mod -----
+        public static float GetDaysPerYear()
+        {
+            try
+            {
+                var home = FlightGlobals.GetHomeBody();
+                if (home?.orbit != null)
+                {
+                    double yearSeconds = home.orbit.period;
+                    double daySeconds  = home.rotationPeriod > 0 ? home.rotationPeriod : 21600.0;
+                    float  days        = (float)(yearSeconds / daySeconds);
+                    return Mathf.Clamp(days, 1f, 10000f);
+                }
+            }
+            catch { /* ignore, use fallback */ }
+            if (EnableVerboseLoadLogs)
+                Debug.Log("[RealBattery][Settings] Auto year detection failed, using fallback 426.00 days.");
+            return 426f; // stock Kerbin year
+        }
         public static float GetHoursPerDay()
         {
             var configured = A?.DayLengthHours ?? 0f;
@@ -222,9 +241,12 @@ namespace RealBattery
         [GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_RunawayMagnitude_title", toolTip = "#LOC_RB_Settings_RunawayMagnitude_desc", minValue = 0.1f, maxValue = 2.0f, stepCount = 20, displayFormat = "F2")]
         public float runawayBaseMagnitude = 0.25f;
 
-        [GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_SelfRunawayChance", toolTip = "#LOC_RB_Settings_SelfRunawayChance_tip", minValue = 0f, maxValue = 0.10f, stepCount = 11, displayFormat = "P0")]
-        public float SelfRunawayChancePerHour = 0.05f; // default 5%/h
-        
+        [GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_SelfRunawayMultiplier", toolTip = "#LOC_RB_Settings_SelfRunawayMultiplier_tip", minValue = 0f, maxValue = 5.0f, stepCount = 51, displayFormat = "F2")]
+        public float SelfRunawayChanceMultiplier = 1.0f; // scales per-chemistry RunawayBaseChance/halfLife rate
+
+        [GameParameters.CustomParameterUI("#LOC_RB_Settings_SelfRunawayBG", toolTip = "#LOC_RB_Settings_SelfRunawayBG_tip")]
+        public bool SelfRunawayInBackground = true; // allow RIP dice to fire during background simulation
+
         // --- Polar constant lighting approximation (for solar) ---
         [GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_PolarThreshold", toolTip = "#LOC_RB_Settings_PolarThreshold_tip", minValue = 60f, maxValue = 89f, stepCount = 30)]
         public float PolarLatitudeThresholdDeg = 80f;

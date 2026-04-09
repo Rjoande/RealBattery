@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using KSP.Localization;
+using KSP.UI.Screens;
 using UnityEngine;
 
 namespace RealBattery
@@ -36,13 +38,16 @@ namespace RealBattery
             return false;
         }
 
-        // Temperature -> upkeep multiplier (same curve as flight):
-        // >=600 K -> 0; <=500 K -> 1; linear in between. When heat sim disabled, caller should skip.
-        private static float KeepWarmTempMulFrom(float tK)
+        // Temperature -> upkeep multiplier (mirrors RealBattery.KeepWarmTempMultiplier).
+        // mode: "warm" -> 1 when cold, 0 when hot (LO→HI = 1→0)
+        //       "cryo" -> 0 when cold, 1 when hot (LO→HI = 0→1)
+        // When heat sim disabled, caller should skip or pass mode="false" (returns 0).
+        private static float KeepWarmTempMulFrom(float tK, string mode, float lo, float hi)
         {
-            if (tK >= 600f) return 0f;
-            if (tK <= 500f) return 1f;
-            return 1f - Mathf.Clamp01((tK - 500f) / 100f);
+            if (mode == "false") return 0f;
+            float span = Mathf.Max(hi - lo, 1f);
+            float t    = Mathf.Clamp01((tK - lo) / span); // 0 at lo, 1 at hi
+            return mode == "cryo" ? t : 1f - t;
         }
 
 
@@ -154,48 +159,55 @@ namespace RealBattery
                         }
                     }
 
-                    // Check KeepWarm flag
-                    bool keepWarm = false;
-                    var keepWarmField = pm.Fields["KeepWarm"];
-                    if (keepWarmField != null)
+                    // Read KeepWarmMode (v3); fall back to KeepWarm bool (v2 cfg compat).
+                    string keepWarmMode   = "false";
+                    float  tempKeepWarmLo = 500f;
+                    float  tempKeepWarmHi = 600f;
+
+                    var kwModeField = pm.Fields["KeepWarmMode"];
+                    if (kwModeField != null)
                     {
-                        var raw = keepWarmField.GetValue(pm);
-                        if (raw != null && bool.TryParse(raw.ToString(), out bool kw))
-                            keepWarm = kw;
+                        var raw = kwModeField.GetValue(pm);
+                        if (raw != null) keepWarmMode = raw.ToString();
+                    }
+                    else
+                    {
+                        // v2 fallback
+                        var kwField = pm.Fields["KeepWarm"];
+                        if (kwField != null)
+                        {
+                            var raw = kwField.GetValue(pm);
+                            if (raw != null && bool.TryParse(raw.ToString(), out bool kw) && kw)
+                                keepWarmMode = "warm";
+                        }
                     }
 
-                    if (keepWarm)
-                    {
-                        // Read dischargeRate (kW ≈ EC/s base)
-                        if (dischargeField != null)
-                        {
-                            var rv = dischargeField.GetValue(pm);
-                            if (rv != null && double.TryParse(rv.ToString(), out double rate))
-                                dischargeRate = rate;
-                        }
+                    var loField = pm.Fields["TempKeepWarmLo"];
+                    if (loField != null) { var r = loField.GetValue(pm); if (r != null && float.TryParse(r.ToString(), out float lo)) tempKeepWarmLo = lo; }
+                    var hiField = pm.Fields["TempKeepWarmHi"];
+                    if (hiField != null) { var r = hiField.GetValue(pm); if (r != null && float.TryParse(r.ToString(), out float hi)) tempKeepWarmHi = hi; }
 
-                        if (dischargeRate > 1e-6)
+                    if (keepWarmMode != "false" && dischargeRate > 1e-6)
+                    {
+                        // Base upkeep (warmup and operational share same baseline in BG)
+                        double upkeep = dischargeRate * RealBatterySettings.KeepWarmFrac; // EC/s nominal
+
+                        if (RealBatterySettings.EnableHeatSimulation)
                         {
-                            // Base upkeep (warmup and operational share same baseline in BG)
-                            double upkeep = dischargeRate * RealBatterySettings.KeepWarmFrac; // EC/s nominal
-                            
-                            if (RealBatterySettings.EnableHeatSimulation)
+                            // Try precise SystemHeat loop temperature; fallback to coarse 0.5×
+                            if (TryGetSystemHeatTemp(part, out float tK))
                             {
-                                // Try precise SystemHeat loop temperature; fallback to coarse 0.5×
-                                if (TryGetSystemHeatTemp(part, out float tK))
-                                {
-                                    float mul = KeepWarmTempMulFrom(tK); // 0..1
-                                    upkeep *= mul;
-                                }
-                                else
-                                {
-                                    // Fallback when loop temp is unavailable in background
-                                    upkeep *= 0.5;
-                                }
+                                float mul = KeepWarmTempMulFrom(tK, keepWarmMode, tempKeepWarmLo, tempKeepWarmHi);
+                                upkeep *= mul;
                             }
-                            totalECconsumed += upkeep;
-                            Debug.Log($"[RealBattery][BG] KeepWarm upkeep +{upkeep:F3} EC/s on '{part.partInfo?.title}'");
+                            else
+                            {
+                                // Fallback when loop temp is unavailable in background
+                                upkeep *= 0.5;
+                            }
                         }
+                        totalECconsumed += upkeep;
+                        Debug.Log($"[RealBattery][BG] KeepWarm ({keepWarmMode}) upkeep +{upkeep:F3} EC/s on '{part.partInfo?.title}'");
                     }
                 }
             }
@@ -403,16 +415,22 @@ namespace RealBattery
                     if (applied > EPS)
                     {
                         sc.amount = target;
-                        rb.WearCounter += Math.Abs(applied) / EngBonus;
-                        rb.UpdateBatteryLife();
+                        if (!rb.InfiniteCycles)
+                        {
+                            rb.WearCounter += Math.Abs(applied) / EngBonus;
+                            rb.UpdateBatteryLife();
+                        }
                         Debug.Log($"[RealBattery] Charged '{sc.part.partInfo.title}': +{applied:F3} kWh @ {efficiency:P0} eff");
                     }
 
                     // === Wear if a charge/discharge cycle has been simulated (non-perma-sunlight) ===
                     if (snap.netEC_True < 0 && boundOrSurface && cycleWear > EPS)
                     {
-                        rb.WearCounter += cycleWear / EngBonus;
-                        rb.UpdateBatteryLife();
+                        if (!rb.InfiniteCycles)
+                        {
+                            rb.WearCounter += cycleWear / EngBonus;
+                            rb.UpdateBatteryLife();
+                        }
                         appliedCycleWearThisTick = true; // prevent self-discharge this tick
                         Debug.Log($"[RealBattery] Cycle wear on '{sc.part.partInfo.title}': +{cycleWear:F5} kWh (surface/bound orbit)");
                     }
@@ -423,7 +441,7 @@ namespace RealBattery
                         // Wear calculation based on the remaining simulation time
                         // Example: if it charges in half deltaTime, the other half is float-charge
                         double timeFractionFull = Math.Max(0.0, (deltaTime - (applied > EPS ? (applied / (effDelta / deltaTime)) : 0.0)) / deltaTime);
-                        if (timeFractionFull > 0)
+                        if (timeFractionFull > 0 && !rb.InfiniteCycles)
                         {
                             double ActualLife = RealBatterySettings.EnableBatteryWear ? rb.BatteryLife : 1.0;
                             double lossPerSecond = (rb.SelfDischargeRate / (ActualLife > 0 ? ActualLife : 1.0)) / (hoursPerDay * 3600.0) * virtualCap;
@@ -448,19 +466,77 @@ namespace RealBattery
                     if (applied < -EPS)
                     {
                         sc.amount = target;
-                        rb.WearCounter += Math.Abs(applied) / EngBonus;
-                        rb.UpdateBatteryLife();
+                        if (!rb.InfiniteCycles)
+                        {
+                            rb.WearCounter += Math.Abs(applied) / EngBonus;
+                            rb.UpdateBatteryLife();
+                        }
                         Debug.Log($"[RealBattery] Discharged '{sc.part.partInfo.title}': {applied:F3} kWh");
                     }
                 }
             }
 
-            // --- Pass 2: self-discharge ---
+            // --- Pass 2: self-discharge, LifeDecay, SelfRunaway ---
             foreach (var (sc, rb, isEnabled, virtualCap) in allBatteries)
             {
+                // --- SelfRunaway RIP check (scaled per-chemistry rate) ---
+                // Guarded by the SelfRunawayInBackground setting.
+                // RNG covers the full elapsed background interval.
+                if (RealBatterySettings.SelfRunawayInBackground
+                    && rb.SelfRunaway && rb.RunawayBaseChance > 0.0
+                    && !rb.forcedRunawayActive && rb.SC_SOC >= 0.01)
+                {
+                    double ripHoursPerDay   = RealBatterySettings.GetHoursPerDay();
+                    double ripDecayPerSec   = rb.SelfDischargeRate / (ripHoursPerDay * 3600.0);
+                    double ripHalfLifeHours = ripDecayPerSec > 0.0
+                        ? Math.Log(2) / ripDecayPerSec / 3600.0
+                        : double.PositiveInfinity;
+                    if (!double.IsInfinity(ripHalfLifeHours) && ripHalfLifeHours > 0.0)
+                    {
+                        float pPerHour = (float)(rb.RunawayBaseChance / ripHalfLifeHours * RealBatterySettings.SelfRunawayChanceMultiplier);
+                        float pTotal   = 1f - Mathf.Pow(Mathf.Max(0f, 1f - pPerHour), (float)(deltaTime / 3600.0));
+                        if (pTotal > 0f && UnityEngine.Random.value < pTotal)
+                        {
+                            rb.BatteryLife        = 0.0;
+                            sc.amount             = 0.0;
+                            rb.SC_SOC             = 0.0;
+                            rb.BGSelfRunawaySent  = true;
+                            rb.UpdateBatteryLife();
+
+                            string partName   = sc.part.partInfo?.title ?? sc.part.partName;
+                            string vesselName = vessel.vesselName;
+                            var msg = new MessageSystem.Message(
+                                Localizer.Format("#LOC_RB_BG_SelfRunaway_title"),
+                                Localizer.Format("#LOC_RB_BG_SelfRunaway_msg", partName, vesselName),
+                                MessageSystemButton.MessageButtonColor.RED,
+                                MessageSystemButton.ButtonIcons.ALERT
+                            );
+                            MessageSystem.Instance?.AddMessage(msg);
+
+                            RBLog.Warn($"[RealBattery][BG][RIP] Background self-runaway on '{partName}' ({vesselName}) (p={pTotal:P4})");
+                            continue; // nothing more to do for this battery
+                        }
+                    }
+                }
+
+                // --- LifeDecay: SelfDischargeRate decays BatteryLife, not SoC ---
+                // Unconditional (radioactive decay doesn't care about ON/OFF state).
+                if (rb.LifeDecay && RealBatterySettings.EnableSelfDischarge)
+                {
+                    if (RealBatterySettings.EnableBatteryWear)
+                    {
+                        double lifeDecayPerSec = rb.SelfDischargeRate / (hoursPerDay * 3600.0);
+                        rb.BatteryLife = Math.Max(0.0, rb.BatteryLife - lifeDecayPerSec * deltaTime);
+                        rb.UpdateBatteryLife();
+                        Debug.Log($"[RealBattery][BG] LifeDecay on '{sc.part.partInfo?.title}': BatteryLife={rb.BatteryLife:F6}");
+                    }
+                    continue; // skip SoC self-discharge for LifeDecay cells
+                }
+
+                // --- Standard self-discharge ---
                 if (sc.amount <= EPS) continue;
 
-                // Non-rechargeable "primary" heuristic (better than the current virtualCap<=EPS)
+                // Non-rechargeable "primary" heuristic
                 bool isPrimary = rb.CycleDurability <= 1 || rb.ChargeEfficiencyCurve.Evaluate(0f) <= EPS;
 
                 bool idle = !vesselWantsCharge && !vesselWantsDischarge;
@@ -474,12 +550,12 @@ namespace RealBattery
                 if (!shouldSelfDischarge) continue;
 
                 double ActualLife = RealBatterySettings.EnableBatteryWear ? rb.BatteryLife : 1.0;
-                double socLossPerDay = rb.SelfDischargeRate / (ActualLife > 0 ? ActualLife : 1.0);
+                double socLossPerDay    = rb.SelfDischargeRate / (ActualLife > 0 ? ActualLife : 1.0);
                 double socLossPerSecond = socLossPerDay / (hoursPerDay * 3600.0);
-                double lossAmount = socLossPerSecond * deltaTime * sc.maxAmount;
+                double lossAmount       = socLossPerSecond * deltaTime * sc.maxAmount;
 
                 double newAmount = Math.Max(0.0, sc.amount - lossAmount);
-                double applied = sc.amount - newAmount;
+                double applied   = sc.amount - newAmount;
                 if (applied > EPS)
                 {
                     sc.amount = newAmount;
