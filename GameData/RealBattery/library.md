@@ -95,30 +95,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_TBat
-
-                    FixedOutput = true
-                    KeepWarm = false
-                    SelfRunaway = false
-                    
-                    HighEClevel = 2
-                    Crate = 6
-
-                    SelfDischargeRate = 0
-                    CycleDurability = 1
-                    EvaRefurbishEnabled = false
-                    SparePartsPerKWh = 4
-
-                    ThermalLoss = 0.6
-                    TempOverheat = 1300
-                    TempRunaway = 9999
-                    RunawayHeatFactor = 0
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.0
-                        key = 1.0 0.0
-                    }
+                    ChemistryID = TBat
                 }
             }
         }
@@ -144,33 +121,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_PbAc
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 0.95
-                    Crate = 0.2
-
-                    SelfDischargeRate = 0.045
-                    CycleDurability = 75
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 35
-
-                    ThermalLoss = 0.3
-                    TempOverheat = 390
-                    TempRunaway = 490
-                    RunawayHeatFactor = 0.8
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.55
-                        key = 0.3 0.65
-                        key = 0.5 0.70
-                        key = 0.8 0.60
-                        key = 1.0 0.50
-                    }
+                    ChemistryID = PbAc
                 }
             }
         }
@@ -195,32 +146,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_NiCd
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 0.95
-                    Crate = 0.5
-
-                    SelfDischargeRate = 0.03
-                    CycleDurability = 500
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 14
-
-                    ThermalLoss = 0.2
-                    TempOverheat = 340
-                    TempRunaway = 440
-                    RunawayHeatFactor = 1
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.70
-                        key = 0.5 0.75
-                        key = 0.9 0.80
-                        key = 1.0 0.65
-                    }
+                    ChemistryID = NiCd
                 }
             }
         }
@@ -244,33 +170,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_NiZn
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 0.95
-                    Crate = 0.7
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 8
-
-                    SelfDischargeRate = 0.04
-                    CycleDurability = 800
-
-                    ThermalLoss = 0.15
-                    TempOverheat = 340
-                    TempRunaway = 440
-                    RunawayHeatFactor = 1.2
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0  1.0
-                        key = 0.6  0.98
-                        key = 0.85 0.90
-                        key = 0.95 0.70
-                        key = 1.0  0.5
-                    }
+                    ChemistryID = NiZn
                 }
             }
         }
@@ -295,30 +195,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_AgOx
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 2
-                    Crate = 1
-
-                    SelfDischargeRate = 0.025
-                    CycleDurability = 1
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 5
-
-                    ThermalLoss = 0.3
-                    TempOverheat = 370
-                    TempRunaway = 470
-                    RunawayHeatFactor = 1.5
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.0
-                        key = 1.0 0.0
-                    }
+                    ChemistryID = AgOx
                 }
             }
         }
@@ -343,33 +220,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_AgZn
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 0.95
-                    Crate = 1.5
-
-                    SelfDischargeRate = 0.025
-                    CycleDurability = 50
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 5
-
-                    ThermalLoss = 0.3
-                    TempOverheat = 370
-                    TempRunaway = 470
-                    RunawayHeatFactor = 1.6
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.60
-                        key = 0.3 0.75
-                        key = 0.6 0.85
-                        key = 0.85 0.70
-                        key = 1.0 0.50
-                    }
+                    ChemistryID = AgZn
                 }
             }
         }
@@ -393,32 +244,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_NiH2
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 0.95
-                    Crate = 0.3
-
-                    SelfDischargeRate = 0.15
-                    CycleDurability = 20000
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 19
-
-                    ThermalLoss = 0.15
-                    TempOverheat = 360
-                    TempRunaway = 460
-                    RunawayHeatFactor = 0.7
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.80
-                        key = 0.2 0.85
-                        key = 0.8 0.85
-                        key = 1.0 0.80
-                    }
+                    ChemistryID = NiH2
                 }
             }
         }
@@ -443,33 +269,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_Zebra
-
-                    FixedOutput = false
-                    KeepWarm = true
-                    SelfRunaway = false
-                    
-                    HighEClevel = 0.95
-                    Crate = 1
-
-                    SelfDischargeRate = 0
-                    CycleDurability = 4500
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 6
-
-                    ThermalLoss = 0.1
-                    TempOverheat = 1000
-                    TempRunaway = 9999
-                    RunawayHeatFactor = 0
-
-                    ChargeEfficiencyCurve
-                    {
-                            key = 0.0 0.90
-                            key = 0.3 0.95
-                            key = 0.5 0.99
-                            key = 0.8 0.95
-                            key = 1.0 0.90
-                    }
+                    ChemistryID = RBZebra
                 }
             }
         }
@@ -494,33 +294,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_Li_ion
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 0.95
-                    Crate = 1
-
-                    SelfDischargeRate = 0.01
-                    CycleDurability = 1000
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 13
-
-                    ThermalLoss = 0.15
-                    TempOverheat = 435
-                    TempRunaway = 535
-                    RunawayHeatFactor = 2
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.80
-                        key = 0.3 0.85
-                        key = 0.6 0.90
-                        key = 0.85 0.85
-                        key = 1.0 0.80
-                    }
+                    ChemistryID = Li_ion
                 }
             }
         }
@@ -545,32 +319,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_Li_poly
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 0.95
-                    Crate = 3
-
-                    SelfDischargeRate = 0.015
-                    CycleDurability = 600
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 12
-
-                    ThermalLoss = 0.25
-                    TempOverheat = 420
-                    TempRunaway = 470
-                    RunawayHeatFactor = 2.2
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.90
-                        key = 0.2 0.95
-                        key = 0.8 0.95
-                        key = 1.0 0.90
-                    }
+                    ChemistryID = Li_poly
                 }
             }
         }
@@ -595,33 +344,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_title_Graphene
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 0.95
-                    Crate = 5
-
-                    SelfDischargeRate = 0.002
-                    CycleDurability = 2500
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 4
-
-                    ThermalLoss = 0.03
-                    TempOverheat = 450
-                    TempRunaway = 550
-                    RunawayHeatFactor = 130
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0   0.90
-                        key = 0.25  0.96
-                        key = 0.5   0.97
-                        key = 0.75  0.96
-                        key = 1.0   0.92
-                    }
+                    ChemistryID = Graphene
                 }
             }
         }
@@ -646,32 +369,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_SSB
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = false
-
-                    HighEClevel = 0.95
-                    Crate = 2
-
-                    SelfDischargeRate = 0.003
-                    CycleDurability = 10000
-                    EvaRefurbishEnabled = true
-                    SparePartsPerKWh = 2
-
-                    ThermalLoss = 0.05
-                    TempOverheat = 470
-                    TempRunaway = 570
-                    RunawayHeatFactor = 90
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.90
-                        key = 0.2 0.95
-                        key = 0.8 0.95
-                        key = 1.0 0.90
-                    }
+                    ChemistryID = SSB
                 }
             }
         }
@@ -696,31 +394,106 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 }
                 DATA
                 {
-                    BatteryTypeDisplayName = #LOC_RB_short_Nuke
-
-                    FixedOutput = false
-                    KeepWarm = false
-                    SelfRunaway = true
-
-                    HighEClevel = 2
-                    Crate = 0.001
-
-                    SelfDischargeRate = 0.0001            
-                    CycleDurability = 1
-                    EvaRefurbishEnabled = false
-                    SparePartsPerKWh = 2
-
-                    ThermalLoss = 0.12
-                    TempOverheat = 1500
-                    TempRunaway = 2500
-                    RunawayHeatFactor = 750
-
-                    ChargeEfficiencyCurve
-                    {
-                        key = 0.0 0.0
-                        key = 1.0 0.0
-                    }
+                    ChemistryID = NukeCell
                 }
             }
         }
         ```
+
+        ### VANADIUM REDOX FLOW BATTERY  (VRFB)
+        SUBTYPE
+        {
+            name = VRFB
+            title = #LOC_RB_title_VRFB
+            descriptionSummary = #LOC_RB_descSum_VRFB
+            descriptionDetail = #LOC_RB_descDet_VRFB
+            tankType = RB_VRFB
+            upgradeRequired = RB_UpgradeVRFB
+            defaultSubtypePriority = 8
+            MODULE
+            {
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    ChemistryID = VRFB
+                }
+            }
+        }
+
+        ### MAGNESIUM-ANTIMONY LIQUID METAL BATTERY
+        
+        SUBTYPE
+        {
+            name = MgSb
+            title = #LOC_RB_title_MgSb
+            descriptionSummary = #LOC_RB_descSum_MgSb
+            descriptionDetail = #LOC_RB_descDet_MgSb
+            tankType = RB_MgSb
+            upgradeRequired = RB_UpgradeMgSb
+            defaultSubtypePriority = 9
+            MODULE
+            {
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    ChemistryID = MgSb
+                }
+            }
+        }
+
+        ### SUPERCONDUCTING MAGNETIC ENERGY STORAGE
+        SUBTYPE
+        {
+            name = SMES
+            title = #LOC_RB_title_SMES
+            descriptionSummary = #LOC_RB_descSum_SMES
+            descriptionDetail = #LOC_RB_descDet_SMES
+            tankType = RB_SMES
+            upgradeRequired = RB_UpgradeSMES
+            defaultSubtypePriority = 1
+            MODULE
+            {
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    ChemistryID = SMES
+                }
+            }
+        }
+
+        ### HOLMIUM-166m
+        SUBTYPE
+        {
+            name = HoCell
+            title = #LOC_RB_title_HoCell
+            descriptionSummary = #LOC_RB_descSum_HoCell
+            descriptionDetail = #LOC_RB_descDet_HoCell
+            tankType = RB_HoCell
+            upgradeRequired = RB_UpgradeHoCell
+            defaultSubtypePriority = 1
+            MODULE
+            {
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    ChemistryID = HoCell
+                }
+            }
+        }
+
+// TODO:
+// PARTUPGRADE => partIcon
+// decals
+// #LOC keys
