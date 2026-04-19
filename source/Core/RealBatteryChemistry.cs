@@ -33,6 +33,7 @@ namespace RealBattery
         public double SelfDischargeRate   = 0.01;
         public bool   EvaRefurbishEnabled = true;
         public double SparePartsPerKWh    = 10.0;
+        public int    EVAminLevel         = 0;
 
         // --- Thermal ---
         public double ThermalLoss       = 0.15;

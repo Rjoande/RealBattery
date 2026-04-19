@@ -94,6 +94,12 @@ namespace RealBattery
         [KSPField(isPersistant = true)] public double selfRunawayTimer = 0.0;      // accumulated "hazard time" for RIP self-runaway, in seconds.
         [KSPField(isPersistant = true)] public bool   forcedRunawayActive = false; // once triggered, the cell remains in forced-runaway mode
         [KSPField(isPersistant = true)] public bool   FixedOutputDefaultApplied = false;
+        // Transient thermal capacity factor for InfiniteCycles batteries (0..1).
+        // Reduced linearly between TempOverheat and TempRunaway; resets on cooling.
+        [KSPField(isPersistant = true)] public double ThermalCapFactor = 1.0;
+        // One-shot notification flag for InfiniteCycles thermal cap events.
+        // Resets when ThermalCapFactor returns to 1.0 (battery cooled below TempOverheat).
+        [KSPField(isPersistant = true)] public bool ThermalCapNotified = false;
 
         // --- Telemetry / Editor preview --------------------------------------------
         [KSPField(isPersistant = false)] public double lastECpower = 0; // +charge / -discharge
@@ -251,8 +257,10 @@ namespace RealBattery
             {
                 WearCounter = 0.0;
                 BatteryLife = 1.0;
+                ThermalCapFactor = 1.0;
+                ThermalCapNotified = false;
                 smoothFlux = 0f;
-                Debug.Log($"Reset WearCounter and BatteryLife on launch (PreLaunch state)");
+                Debug.Log($"Reset WearCounter, BatteryLife and ThermalCapFactor on launch (PreLaunch state)");
             }
             TechUnlockUI();
 
@@ -297,7 +305,9 @@ namespace RealBattery
             else if (controlledShutdownActive)
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_ShuttingDown", pct);
             else if (!BatteryDisabled && keepWarmActive)
-                BatteryChargeStatus = Localizer.Format("#LOC_RB_WarmingUp", pct);
+                BatteryChargeStatus = (KeepWarmMode == "cryo")
+                    ? Localizer.Format("#LOC_RB_CoolingDown", pct)
+                    : Localizer.Format("#LOC_RB_WarmingUp", pct);
             else if (upkeepShort)
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_KeepWarm_ShutdownPending", Math.Ceiling(keepWarmGrace));
             else if (GUI_power < -0.001)
@@ -312,7 +322,14 @@ namespace RealBattery
 
             BatterySOCStatus = $"{(SC_SOC * 100):F0}%";
 
-            if (!isPrimary && RealBatterySettings.EnableBatteryWear && capacity > EPS)
+            if (InfiniteCycles)
+            {
+                // Show thermal efficiency (ThermalCapFactor), not BatteryLife/cycles
+                BatteryHealthStatus = Localizer.Format(
+                    "#LOC_RB_BatteryHealth_efficiency",
+                    $"{(ThermalCapFactor * 100):F0}");
+            }
+            else if (!isPrimary && RealBatterySettings.EnableBatteryWear && capacity > EPS)
             {
                 double cyclesLeft = Math.Max(0.0, CycleDurability - (WearCounter / (capacity * 2)));
                 string cyclesFmt = (cyclesLeft < 10.0) ? cyclesLeft.ToString("F2") : cyclesLeft.ToString("F0");
@@ -510,14 +527,15 @@ namespace RealBattery
 
                 float tempK = GetCurrentTemperatureK();
 
-                // Runaway can only be *triggered* if heat simulation and runaway features are enabled
-                // and this is not a KeepWarm / FixedOutput design. Once active, `isRunaway` stays
-                // latched until ApplyThermalEffects() explicitly extinguishes it.
+                // Runaway can only be *triggered* if heat simulation and runaway features are enabled.
+                // Once active, `isRunaway` stays latched until ApplyThermalEffects() explicitly
+                // extinguishes it.
+                // Note: neither KeepWarmMode nor FixedOutput are guarded here — chemistries that
+                // should be immune to runaway already set TempRunaway = 9999 and RunawayHeatFactor = 0
+                // in cfg.
                 bool RunawayAllowed =
                     RealBatterySettings.EnableHeatSimulation &&
-                    RealBatterySettings.EnableThermalRunaway &&
-                    KeepWarmMode == "false" &&
-                    !FixedOutput;
+                    RealBatterySettings.EnableThermalRunaway;
 
                 bool runawayCondition = (tempK > TempRunaway) || forcedRunawayActive;
 
@@ -864,6 +882,7 @@ namespace RealBattery
             SelfDischargeRate     = chem.SelfDischargeRate;
             EvaRefurbishEnabled   = chem.EvaRefurbishEnabled;
             SparePartsPerKWh      = chem.SparePartsPerKWh;
+            EVAminLevel           = chem.EVAminLevel;
 
             // Thermal
             ThermalLoss           = chem.ThermalLoss;
@@ -924,7 +943,8 @@ namespace RealBattery
 
             if (!FixedOutput) DischargeRate *= EngBonus;
 
-            if (amount > 0 && SC_SOC < ActualLife && !BatteryDisabled && !FixedOutput) // Charge battery
+            double chargeLimit = InfiniteCycles ? ThermalCapFactor : ActualLife;
+            if (amount > 0 && SC_SOC < chargeLimit && !BatteryDisabled && !FixedOutput) // Charge battery
             {
                 double SOC_ChargeEfficiency = ChargeEfficiencyCurve.Evaluate((float)SC_SOC);
                 EC_delta = TimeWarp.fixedDeltaTime * DischargeRate * SOC_ChargeEfficiency;  // maximum amount of EC the battery can convert to SC, limited by current charge capacity
@@ -1143,11 +1163,68 @@ namespace RealBattery
             if (!RealBatterySettings.EnableBatteryWear) return;
             if (!HighLogic.LoadedSceneIsFlight) return;
 
+            // --- InfiniteCycles thermal cap (replaces classic wear/runaway path for these batteries) ---
+            if (InfiniteCycles && sc != null && RealBatterySettings.EnableBatteryWear)
+            {
+                if (tempK > TempOverheat)
+                {
+                    float range    = Mathf.Max(TempRunaway - TempOverheat, 1f);
+                    float severity = Mathf.Clamp01((tempK - TempOverheat) / range);
+
+                    // Linear cap: 1.0 at TempOverheat → 0.0 at TempRunaway
+                    ThermalCapFactor = 1.0 - severity;
+
+                    // Clamp sc.amount to effective cap (mirrors UpdateBatteryLife pattern)
+                    double effectiveCap = sc.maxAmount * ThermalCapFactor;
+                    if (sc.amount > effectiveCap)
+                        sc.amount = effectiveCap;
+                    SC_SOC = sc.maxAmount > 0 ? sc.amount / sc.maxAmount : 0.0;
+
+                    // Additional heat proportional to severity (linear, unlike the exponential
+                    // used in the classic path — appropriate for InfiniteCycles physics)
+                    float heatBoost = severity * TimeWarp.fixedDeltaTime * (float)sc.maxAmount;
+                    if (useSH && systemHeat != null)
+                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery",
+                            (float)TempOverheat - 10f, heatBoost * (float)ThermalLoss * 0.01f, true);
+                    else
+                        part.AddThermalFlux(heatBoost * (float)ThermalLoss);
+
+                    RBLog.Verbose($"[ApplyThermalEffects] InfiniteCycles thermal cap: " +
+                                  $"severity={severity:F2}, cap={ThermalCapFactor:F3}, " +
+                                  $"effectiveCap={effectiveCap:F3}");
+
+                    if (ThermalCapFactor < 1.0 && !ThermalCapNotified)
+                    {
+                        ThermalCapNotified = true;
+
+                        var msg = new MessageSystem.Message(
+                            Localizer.Format("#LOC_RB_ThermalCap_title"),
+                            Localizer.Format("#LOC_RB_ThermalCap_body", part.partInfo.title),
+                            MessageSystemButton.MessageButtonColor.ORANGE,
+                            MessageSystemButton.ButtonIcons.ALERT
+                        );
+                        MessageSystem.Instance?.AddMessage(msg);
+
+                        RBLog.Warn($"[ApplyThermalEffects] InfiniteCycles thermal cap triggered on " +
+                                   $"'{part.partInfo?.title}' ({tempK:F1} K > {TempOverheat:F0} K)");
+                    }
+                }
+                else if (tempK < TempOverheat - 10f)
+                {
+                    // Reset cap on cooling (hysteresis matches OverheatNotified reset)
+                    ThermalCapFactor = 1.0;
+                    ThermalCapNotified = false; // reset: allow re-notification on next overheat event
+                }
+
+                // InfiniteCycles batteries do not use the classic overheat/runaway path: return early.
+                return;
+            }
+
             //var sc = part.Resources.Get("StoredCharge");
-            if (sc != null && tempK > TempOverheat)
+            if (!InfiniteCycles && sc != null && tempK > TempOverheat)
             {
                 float severity = Mathf.Clamp01((tempK - TempOverheat) / Mathf.Max(TempRunaway - TempOverheat, 1e-3f));
-                float thermalFactor = Mathf.Exp(severity * 4.0f) - 1.0f;                
+                float thermalFactor = Mathf.Exp(severity * 4.0f) - 1.0f;
                 float deltaWear = thermalFactor * TimeWarp.fixedDeltaTime * (float)(sc.maxAmount);
 
                 if (!FixedOutput && !isRunaway) deltaWear /= EngBonus;

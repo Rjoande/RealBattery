@@ -30,7 +30,7 @@ namespace RealBattery
         // ---- Public API ----
 
         /// <summary>
-        /// Returns the chemistry registered under <paramref name="id"/>, or null if not found.
+        /// Returns the chemistry registered under <paramref ChemistryID="id"/>, or null if not found.
         /// </summary>
         public static RealBatteryChemistry Get(string id)
         {
@@ -73,9 +73,9 @@ namespace RealBattery
         private static RealBatteryChemistry ParseNode(ConfigNode node)
         {
             string name = "";
-            if (!node.TryGetValue("name", ref name) || string.IsNullOrEmpty(name))
+            if (!node.TryGetValue("ChemistryID", ref name) || string.IsNullOrEmpty(name))
             {
-                RBLog.Warn("[ChemistryDB] REALBATTERY_CHEMISTRY node has no 'name' — skipping.");
+                RBLog.Warn("[ChemistryDB] REALBATTERY_CHEMISTRY node has no 'ChemistryID' — skipping.");
                 return null;
             }
 
@@ -97,6 +97,7 @@ namespace RealBattery
             node.TryGetValue("SelfDischargeRate",    ref c.SelfDischargeRate);
             node.TryGetValue("EvaRefurbishEnabled",  ref c.EvaRefurbishEnabled);
             node.TryGetValue("SparePartsPerKWh",     ref c.SparePartsPerKWh);
+            node.TryGetValue("EVAminLevel",          ref c.EVAminLevel);
 
             // --- Thermal ---
             node.TryGetValue("ThermalLoss",          ref c.ThermalLoss);

@@ -299,6 +299,12 @@ namespace RealBattery
 
         public static void ApplySnapshot(Vessel vessel)
         {
+            if (!RealBatterySettings.EnableBackgroundSimulation)
+            {
+                Debug.Log("[RealBattery] Background simulation disabled — ApplySnapshot skipped.");
+                return;
+            }
+
             int maxSpecialistLevel = ModuleEnergyEstimator.GetMaxSpecialistLevel(vessel, "Engineer");
             double EngBonus = 0.95 + 0.06 * maxSpecialistLevel;
 

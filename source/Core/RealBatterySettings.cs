@@ -36,15 +36,16 @@ namespace RealBattery
         public static double LowPowerLeadSeconds => Math.Max(0.0, (A?.LowPowerLead ?? 2f) * 60.0);
         public static float RunawayBaseMagnitude => A?.runawayBaseMagnitude ?? 0.25f;
         public static float SelfRunawayChanceMultiplier  => A?.SelfRunawayChanceMultiplier  ?? 1.0f;
-        public static bool  SelfRunawayInBackground      => A?.SelfRunawayInBackground      ?? true;
+        public static bool  SelfRunawayInBackground      => S?.SelfRunawayInBackground      ?? true;
 
         public static float DayLengthHours => A?.DayLengthHours ?? 6f;
         public static float PolarLatitudeThresholdDeg => A?.PolarLatitudeThresholdDeg ?? 80f;
         public static float PolarConstantLitFrac => A?.PolarConstantLitFrac ?? 0.50f;
 
-        // ----- Logging -----
+        // ----- Debug / Logging -----
         public static bool DeepSpaceProtection => D?.deepSpaceProtection ?? true;
         public static bool DisablePCM => D?.disablePCM ?? false;
+        public static bool EnableBackgroundSimulation => !(D?.disableBackgroundSimulation ?? false);
         public static bool EnableDebugLogging => D?.enableDebugLogging ?? false;
         public static bool EnableVerboseLoadLogs => D?.enableVerboseLoadLogs ?? false;
 
@@ -188,6 +189,9 @@ namespace RealBattery
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_ThermalRunaway", toolTip = "#LOC_RB_Settings_ThermalRunaway_tip")]
         public bool enableThermalRunaway = true;
 
+        [GameParameters.CustomParameterUI("#LOC_RB_Settings_SelfRunawayBG", toolTip = "#LOC_RB_Settings_SelfRunawayBG_tip")]
+        public bool SelfRunawayInBackground = true; // allow RIP dice to fire during background simulation
+
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_LowPowerAlarm", toolTip = "#LOC_RB_Settings_LowPowerAlarm_tip")]
         public bool enableLowPowerAlarm = false;
 
@@ -244,9 +248,6 @@ namespace RealBattery
         [GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_SelfRunawayMultiplier", toolTip = "#LOC_RB_Settings_SelfRunawayMultiplier_tip", minValue = 0f, maxValue = 5.0f, stepCount = 51, displayFormat = "F2")]
         public float SelfRunawayChanceMultiplier = 1.0f; // scales per-chemistry RunawayBaseChance/halfLife rate
 
-        [GameParameters.CustomParameterUI("#LOC_RB_Settings_SelfRunawayBG", toolTip = "#LOC_RB_Settings_SelfRunawayBG_tip")]
-        public bool SelfRunawayInBackground = true; // allow RIP dice to fire during background simulation
-
         // --- Polar constant lighting approximation (for solar) ---
         [GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_PolarThreshold", toolTip = "#LOC_RB_Settings_PolarThreshold_tip", minValue = 60f, maxValue = 89f, stepCount = 30)]
         public float PolarLatitudeThresholdDeg = 80f;
@@ -300,6 +301,10 @@ namespace RealBattery
         // Disable PCM logic for debug
         [GameParameters.CustomParameterUI("#LOC_RB_DisablePCM", toolTip = "#LOC_RB_DisablePCM_desc")]
         public bool disablePCM = false;
+
+        // Disable background simulation entirely (useful for debugging or performance)
+        [GameParameters.CustomParameterUI("#LOC_RB_DisableBackgroundSim", toolTip = "#LOC_RB_DisableBackgroundSim_tip")]
+        public bool disableBackgroundSimulation = false;
 
         // --- Logging ---
         [GameParameters.CustomParameterUI("#LOC_RB_Log", toolTip = "#LOC_RB_Log_desc")]
