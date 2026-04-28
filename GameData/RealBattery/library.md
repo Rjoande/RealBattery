@@ -96,6 +96,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = TBat
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -122,6 +123,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = PbAc
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -147,6 +149,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = NiCd
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -171,6 +174,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = NiZn
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -196,6 +200,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = AgOx
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -221,6 +226,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = AgZn
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -245,6 +251,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = NiH2
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -270,6 +277,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = RBZebra
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -295,6 +303,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = Li_ion
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -320,6 +329,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = Li_poly
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -345,6 +355,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = Graphene
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -370,6 +381,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = SSB
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -395,6 +407,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = NukeCell
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -419,6 +432,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = VRFB
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -443,6 +457,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = MgSb
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -466,6 +481,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = SMES
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }
@@ -489,6 +505,7 @@ You can also copy the values from the `DATA` node to the main RealBattery module
                 DATA
                 {
                     ChemistryID = HoCell
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
                 }
             }
         }

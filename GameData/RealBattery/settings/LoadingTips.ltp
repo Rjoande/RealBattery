@@ -1,0 +1,18 @@
+LOADINGTOOLTIPSPLUS
+{
+    Overwrite = false
+    ToolTip = #LOC_RB_Tip_01
+    ToolTip = #LOC_RB_Tip_02
+    ToolTip = #LOC_RB_Tip_03
+    ToolTip = #LOC_RB_Tip_04
+    ToolTip = #LOC_RB_Tip_05
+    ToolTip = #LOC_RB_Tip_06
+    ToolTip = #LOC_RB_Tip_07
+    ToolTip = #LOC_RB_Tip_08
+    ToolTip = #LOC_RB_Tip_09
+    ToolTip = #LOC_RB_Tip_10
+    ToolTip = #LOC_RB_Tip_11
+    ToolTip = #LOC_RB_Tip_12
+    ToolTip = #LOC_RB_Tip_13
+    ToolTip = #LOC_RB_Tip_14
+}
