@@ -78,8 +78,8 @@ namespace RealBattery
             double totalDischargeRate = 0;
             double realDischargeEC = 0;
                         
-            double solarECproduced = 0;
-            double expUT = 0; // 0 means "no depletion expected / not appliable"
+            double solarECproduced;
+            double expUT; // 0 means "no depletion expected / not appliable"
                         
             VesselSnapshot snapshot = new VesselSnapshot
             {
@@ -330,7 +330,7 @@ namespace RealBattery
             // Base delta from TRUE net (no solar) — convert EC/s to kWh
             double deltaSC_true = (snap.netEC_True * deltaTime) / 3600.0;
 
-            double deltaSC_solar = 0.0;
+            double deltaSC_solar;
 
                 deltaSC_solar = SimulateSolar(vessel, deltaTime, hoursPerDay);
 
@@ -676,11 +676,11 @@ namespace RealBattery
 
         public static double SimulateSolar(Vessel vessel, double deltaTime, double hoursPerDay)
         {
-            double total_kWh = 0.0;
+            double total_kWh;
 
             var snap = energySnapshots[vessel.id];
 
-            int sun = Planetarium.fetch.Sun.flightGlobalsIndex;
+            //int sun = Planetarium.fetch.Sun.flightGlobalsIndex;
             // Resolve the correct star for the initial and final main bodies (Kopernicus multistar).
             // Fallback to stock Sun when Kopernicus data is unavailable.
             CelestialBody initMainBody = GetBodyByFlightGlobalsIndex(snap.mainBody) ?? Planetarium.fetch.Sun;
@@ -738,7 +738,7 @@ namespace RealBattery
             var snap = energySnapshots[vessel.id];
 
             // Resolve correct star for surface day/night and orbital eclipse logic.
-            CelestialBody sun = ResolveStarForBody(vessel.mainBody, out _);
+            //CelestialBody sun = ResolveStarForBody(vessel.mainBody, out _);
             
                 
                 // If the snapshot was taken with orbital naming, remap to surface naming.
@@ -758,7 +758,7 @@ namespace RealBattery
             double P = Math.Max(snap.period, 1.0);
             double t = deltaTime;
 
-            double total_kWh = 0;
+            double total_kWh;
 
             // --- Polar surface simplification (constant but reduced production) ---
             // If latitude is beyond a threshold (polar circle), assume a constant reduced output
@@ -864,7 +864,7 @@ namespace RealBattery
                 startPhase = isDay ? IllumPhase.Day : IllumPhase.Night;
 
                 // Very light model for daylight fraction: cos(latitude) (good enough on airless bodies)
-                double latRad = vessel.latitude * Math.PI / 180.0;
+                //double latRad = vessel.latitude * Math.PI / 180.0;
                 
                 // Time to sunrise/sunset using dH/dt ~ 2π/Pday * cos(lat)
                 tToTransition = TimeToSurfaceTransition(vessel, sun, Pday);
@@ -874,7 +874,7 @@ namespace RealBattery
                 // --- ORBITAL BRANCH ---
                 double R = body.Radius;
                 double a = vessel.orbit.semiMajorAxis;
-                double P = Math.Max(vessel.orbit.period, 1.0);
+                //double P = Math.Max(vessel.orbit.period, 1.0);
                 
                 // Geometric umbra fraction (clamped)
                 double s = Clamp(R / Math.Max(a, R + 1.0), 0.0, 1.0);

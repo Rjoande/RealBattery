@@ -19,7 +19,6 @@ namespace RealBattery
         private static RBParams_Debug D => HighLogic.CurrentGame?.Parameters?.CustomParams<RBParams_Debug>();
 
         // ----- Core Settings -----
-        /*public static bool UseLowPowerMessage => A?.enableLowPowerMessage ?? true;*/
         public static bool UseLowPowerAlarm => S?.enableLowPowerAlarm ?? true;
         public static bool UseKAC => S?.useKACAlarms ?? true;
         public static bool EnableSelfDischarge => S?.enableSelfDischarge ?? true;

@@ -131,8 +131,9 @@ namespace RealBattery
         [UI_Toggle(disabledText = "#LOC_RB_StageArm_off", enabledText = "#LOC_RB_StageArm_on")]
         public bool BatteryStaged = false;
         [KSPField(isPersistant = true)] private bool StageFired = false;
+        [KSPField(isPersistant = true)] public bool BatteryStagedUserSet = false;
         public override bool IsStageable() => BatteryStaged && !StageFired;
-        public override bool StagingToggleEnabledEditor() => true;
+        public override bool StagingToggleEnabledEditor() => BatteryStaged;
 
 
         // --- ACTIONS ----------------------------------------------------------------
@@ -183,6 +184,8 @@ namespace RealBattery
         private double runawayTailKW = 0.0;           // snapshot of last heat power
         private bool   runawayExtinguished = false;   // chemical source depleted; apply short tail
 
+        private string _lastAppliedChemistryID = null; // cache the last applied chemistry ID to avoid redundant DB lookups
+
 
 
         // ============================================================================
@@ -203,8 +206,8 @@ namespace RealBattery
             LoadConfig();
             ModuleActiveHideUI();
 
-            // 2) Post-load custom hook (existing)
-            RB_AfterOnStart();
+            // 2) Post-load custom hook moved to OnStartFinished()
+            //    (B9PS applies DATA-block fields in its own OnStart, which runs after ours)
 
             // 3) Defaults & invariants
             // Default: thermal batteries spawn disabled in Editor/PreLaunch (once).
@@ -223,8 +226,9 @@ namespace RealBattery
             EnforceNonDisableableLatch();
 
             // 4) Staging wiring + PAW handlers
-            // Show/hide staging icon and enablement depending on BatteryStaged.
-            InitStagingIconAndEnablement();
+            ApplyStagingState();
+            if (HighLogic.LoadedSceneIsEditor)
+                GameEvents.onEditorShipModified.Add(OnEditorShipModified);
             // Re-enforce latch when user flips BatteryDisabled in PAW (Editor & Flight).
             var disabledField = Fields[nameof(BatteryDisabled)];
             if (disabledField?.uiControlFlight != null)
@@ -266,14 +270,41 @@ namespace RealBattery
 
             // 7) Edge detectors & final UI state
             lastDisabled = BatteryDisabled; // initialize edge detector
+
+            // 8) Ping for SystemHeat to refresh loop temperature after scene re-entry
+            if (HighLogic.LoadedSceneIsFlight
+                && state != StartState.PreLaunch 
+                && RealBatterySettings.UseSystemHeat 
+                && systemHeat != null)
+            {
+                float tempTarget = (KeepWarmMode == "cryo")
+                        ? TempKeepWarmLo                 // For cryo batteries, target the lower keep-warm threshold
+                        : (float)TempOverheat - 10;
+                SystemHeatBridge.AddFlux(systemHeat, "RealBattery", tempTarget, (float)EPS, true);
+            }
         }
+
+        // Called by KSP after ALL modules on the part have completed OnStart().
+        // At this point B9PS has already applied DATA-block KSPFields (including EVAupgrade),
+        // so EVA event visibility and labels can be wired correctly.
+        public override void OnStartFinished(StartState state)
+        {
+            base.OnStartFinished(state);
+            RB_AfterOnStart();
+        }
+
         public override void OnUpdate()
         {
-            ModuleActiveHideUI();
+            RBLog.Verbose($"[RealBattery] OnUpdate check on {part.partInfo.title} in {HighLogic.LoadedScene} | LastChemistryID: {_lastAppliedChemistryID}, ChemistryID: {ChemistryID}");
+            if (ChemistryID != _lastAppliedChemistryID)
+            {
+                _lastAppliedChemistryID = ChemistryID;
+                ApplyChemistryFromDB();
+            }
+                ModuleActiveHideUI();
 
             if (HighLogic.LoadedSceneIsEditor)
             {
-                InitStagingIconAndEnablement();
                 return;
             }
             
@@ -293,7 +324,7 @@ namespace RealBattery
             float   tempK = GetCurrentTemperatureK();
             bool    isPrimary = (CycleDurability <= 1.0) || (HighEClevel > 1);
 
-            GUI_power = GUI_power + statusLowPassTauRatio * (lastECpower - GUI_power);
+            GUI_power += statusLowPassTauRatio * (lastECpower - GUI_power);
 
             // GUI
             if (isRunaway)
@@ -358,13 +389,33 @@ namespace RealBattery
             RBLog.Verbose($"[RealBattery] GUI_power update: lastECpower={lastECpower:F3}, GUI_power={GUI_power:F3}, Δt={TimeWarp.fixedDeltaTime:F3}");
 
             // Runaway trigger while OFF or idle: if temperature exceeds TempRunaway, force a thermal pass up to battery death.
-            if (isRunaway) 
-                ApplyThermalEffects(0.0);            
+            if (isRunaway || (InfiniteCycles && tempK > TempOverheat-10)) 
+                ApplyThermalEffects(0.0);
+
+            // Register with SystemHeat even when disabled, so the loop uses our tempTarget
+            if (((BatteryDisabled && !isRunaway) || (!BatteryDisabled && keepWarmActive)) && RealBatterySettings.UseSystemHeat)
+            {
+                // Ensure fresh SystemHeat reference if needed
+                if (systemHeat == null)
+                    systemHeat = SystemHeatBridge.GetModule(part);
+
+                float tempTarget = (KeepWarmMode == "cryo")
+                        ? TempKeepWarmLo                 // For cryo batteries, target the lower keep-warm threshold
+                        : (float)TempOverheat - 10;
+                SystemHeatBridge.AddFlux(systemHeat, "RealBattery", tempTarget, 0f, true);
+            }
         }
         public void FixedUpdate()
         {
             if (!moduleActive) return;
-            
+
+            RBLog.Verbose($"[RealBattery] OnUpdate check on {part.partInfo.title} in {HighLogic.LoadedScene} | LastChemistryID: {_lastAppliedChemistryID}, ChemistryID: {ChemistryID}");
+            if (ChemistryID != _lastAppliedChemistryID)
+            {
+                _lastAppliedChemistryID = ChemistryID;
+                ApplyChemistryFromDB();
+            }
+
             double ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
             double dt = TimeWarp.fixedDeltaTime;
             if (dt <= 0) return;
@@ -456,7 +507,7 @@ namespace RealBattery
                         
                         // if heat-sim enabled and temp <600 K, EC may be required; detect shortfall
                         bool upkeepNeeded = KeepWarmTempMultiplier() > 0f;
-                        double wantThisFrame = KeepWarmECperSec(true, (part.Resources.Get("StoredCharge")?.maxAmount ?? 0.0) * Crate * ActualLife) * dt;
+                        double wantThisFrame = KeepWarmECperSec(true, (part.Resources.Get("StoredCharge")?.maxAmount ?? 0.0)) * dt;
                         upkeepShort = upkeepNeeded && (wantThisFrame > EPS) && (got < wantThisFrame * 0.999);
                         if (upkeepShort)
                         {
@@ -483,8 +534,8 @@ namespace RealBattery
                     // -----------------------------------------------------------------
                     if (!BatteryDisabled && !keepWarmActive)
                     {
-                        double dischargeKW = (sc?.maxAmount ?? 0.0) * Crate * ActualLife;
-                        double wantEC = KeepWarmECperSec(isWarmupPhase: false, dischargeKW) * dt;
+                        //double dischargeKW = (sc?.maxAmount ?? 0.0) * Crate * ActualLife;
+                        double wantEC = KeepWarmECperSec(isWarmupPhase: false, (sc?.maxAmount ?? 0.0)) * dt;
                         double gotEC = (wantEC > 0.0) ? part.RequestResource(PartResourceLibrary.ElectricityHashcode, wantEC) : 0.0;
                         
                         bool upkeepNeeded = wantEC > EPS;                   // temp < 600 K
@@ -535,7 +586,8 @@ namespace RealBattery
                 // in cfg.
                 bool RunawayAllowed =
                     RealBatterySettings.EnableHeatSimulation &&
-                    RealBatterySettings.EnableThermalRunaway;
+                    RealBatterySettings.EnableThermalRunaway &&
+                    !InfiniteCycles;
 
                 bool runawayCondition = (tempK > TempRunaway) || forcedRunawayActive;
 
@@ -545,6 +597,7 @@ namespace RealBattery
                 if (!isRunaway && RunawayAllowed && runawayCondition && ActualLife >= 0.01)
                 {
                     isRunaway = true;
+                    forcedRunawayActive = true; // latch runaway state until explicitly cleared (e.g., by cooling or death)
 
                     if (RBLog.VerboseEnabled)
                     {
@@ -703,12 +756,20 @@ namespace RealBattery
                     Fields[nameof(ChargeInfoEditor)].SetValue(ChargeInfoEditor, this);
                 }
 
-                InitStagingIconAndEnablement();
-
                 ApplyThermalEffects(lastECpower);
             }
 
             ModuleActiveHideUI();
+        }
+
+        private void OnEditorShipModified(ShipConstruct ship)
+        {
+            ApplyStagingState();
+        }
+
+        private void OnDestroy()
+        {
+            GameEvents.onEditorShipModified.Remove(OnEditorShipModified);
         }
 
         public override void OnActive()
@@ -892,7 +953,8 @@ namespace RealBattery
 
             // Behavior flags
             FixedOutput           = chem.FixedOutput;
-            BatteryStaged         = chem.BatteryStaged;
+            if (!BatteryStagedUserSet)
+                BatteryStaged     = chem.BatteryStaged;
             KeepWarmMode          = chem.KeepWarmMode;
             TempKeepWarmLo        = chem.TempKeepWarmLo;
             TempKeepWarmHi        = chem.TempKeepWarmHi;
@@ -901,8 +963,7 @@ namespace RealBattery
             LifeDecay             = chem.LifeDecay;
             InfiniteCycles        = chem.InfiniteCycles;
 
-            if (string.IsNullOrEmpty(BatteryTypeDisplayName))
-                BatteryTypeDisplayName = chem.displayName;
+            BatteryTypeDisplayName = chem.displayName;
 
             RBLog.Verbose($"[RealBattery] Chemistry '{ChemistryID}' applied from DB on '{part?.partInfo?.title}'.");
         }
@@ -925,7 +986,6 @@ namespace RealBattery
                 lastECpower = 0.0;
                 return 0.0;
             }
-
 
             // normal battery part
 
@@ -1015,11 +1075,9 @@ namespace RealBattery
         }
         private void ApplyThermalEffects(double EC_power)
         {
-            if (!RealBatterySettings.EnableHeatSimulation) return;
-
             // Resolve heat backend and current temperature once
             // Always refresh SystemHeat module if feature is enabled.
-            
+
             // Ensure fresh SystemHeat reference if needed
             if (RealBatterySettings.UseSystemHeat && systemHeat == null)
                 systemHeat = SystemHeatBridge.GetModule(part);
@@ -1027,20 +1085,18 @@ namespace RealBattery
             bool useSH = RealBatterySettings.UseSystemHeat && systemHeat != null;
 
             float tempK = GetCurrentTemperatureK();
+            float tempTarget = (KeepWarmMode == "cryo")
+                        ? TempKeepWarmLo                 // For cryo batteries, target the lower keep-warm threshold
+                        : (float)TempOverheat - 10;
             double ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
 
-            // Runaway gate (honor ThermalRunaway setting)
+            // If thermal runaway is globally disabled, suppress runaway state
             if (!RealBatterySettings.EnableThermalRunaway)
-            {
-                // If runaway is globally disabled, respect OFF state and bypass runaway logic
-                if (BatteryDisabled) return;
-                isRunaway = false; // do not trigger any runaway-specific path
-            }
+                isRunaway = false;
 
-            // First-run runaway toast + flag reset when cooled down
             HandleRunawayNotifications(isRunaway, tempK);
 
-            // Respect OFF only if not in runaway
+            // After runaway suppression, re-check if we should still proceed
             if (BatteryDisabled && !isRunaway)
                 return;
 
@@ -1056,12 +1112,10 @@ namespace RealBattery
                 dischargeKW *= RunawayHeatFactor;
             else
                 dischargeKW *= Crate;
-            //if (forcedRunawayActive) dischargeKW *= 100;
 
             double heatPowerKW = isRunaway ? dischargeKW : Math.Abs(EC_power);
 
             float flux = 0f;
-
             if (isRunaway && !InfiniteCycles && RealBatterySettings.EnableThermalRunaway && heatPowerKW > EPS)
             {
                 WearCounter += (heatPowerKW * CycleDurability * TimeWarp.fixedDeltaTime / 3600.0);
@@ -1127,7 +1181,6 @@ namespace RealBattery
                 if (useSH && systemHeat != null)
                 {
                     // Keep the existing smoothing/scaling behavior
-                    float tempTarget = (float)TempOverheat - 10;
                     if (tempTarget > 1000) tempTarget = 1000; // clamp to prevent runaway target
                     flux *= 0.01f;
                     float tau = 0.01f;
@@ -1519,7 +1572,7 @@ namespace RealBattery
                        Localizer.Format("#LOC_RB_seconds", t.Seconds);
                 return Localizer.Format("#LOC_RB_seconds", t.Seconds);
         }
-        private void InitStagingIconAndEnablement()
+        private void ApplyStagingState()
         {
             if (BatteryStaged)
             {
@@ -1531,26 +1584,27 @@ namespace RealBattery
             {
                 part.stagingOn = false;
             }
+            part.UpdateStageability(true, true);
+
+            // Force staging panel rebuild in editor (safe: event-driven, not per-frame)
+            if (HighLogic.LoadedSceneIsEditor)
+                StageManager.Instance?.SortIcons(true);
         }
         private void WireStagedToggleHandlers()
         {
             var stagedField = Fields[nameof(BatteryStaged)];
             if (stagedField?.uiControlEditor != null)
-                stagedField.uiControlEditor.onFieldChanged = (f, o) =>
+                stagedField.uiControlEditor.onFieldChanged += (f, o) =>
                 {
-                    part.stagingOn = BatteryStaged;
-                    part.UpdateStageability(true, true);
-                    if (BatteryStaged && string.IsNullOrEmpty(part.stagingIcon))
-                        part.stagingIcon = "FUEL_TANK";
+                    BatteryStagedUserSet = true;
+                    ApplyStagingState();
                 };
 
             if (stagedField?.uiControlFlight != null)
-                stagedField.uiControlFlight.onFieldChanged = (f, o) =>
+                stagedField.uiControlFlight.onFieldChanged += (f, o) =>
                 {
-                    part.stagingOn = BatteryStaged;
-                    part.UpdateStageability(true, true);
-                    if (BatteryStaged && string.IsNullOrEmpty(part.stagingIcon))
-                        part.stagingIcon = "FUEL_TANK";
+                    BatteryStagedUserSet = true;
+                    ApplyStagingState();
                 };
         }
         private float KeepWarmTempMultiplier()
@@ -1568,20 +1622,20 @@ namespace RealBattery
         }
         private double TickKeepWarm(bool isWarmupPhase, double dt)
         {
-            double ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
+            //double ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
             PartResource sc = part.Resources.Get("StoredCharge");
-            double dischargeKW = (sc?.maxAmount ?? 0.0) * Crate * ActualLife; // mirrors Xfer estimation
-            double ecPerSec = KeepWarmECperSec(isWarmupPhase, dischargeKW);
+            //double dischargeKW = (sc?.maxAmount ?? 0.0) * Crate * ActualLife; // mirrors Xfer estimation
+            double ecPerSec = KeepWarmECperSec(isWarmupPhase, sc?.maxAmount ?? 0.0);
                         if (ecPerSec <= EPS) return 0.0; // hot enough or negligible cost
             double wantEC = ecPerSec * dt;
             double gotEC = (wantEC > 0.0) ? part.RequestResource(PartResourceLibrary.ElectricityHashcode, wantEC) : 0.0;
                 return Math.Max(0.0, gotEC);
         }
-        private double KeepWarmECperSec(bool isWarmupPhase, double dischargeRateKW)
+        private double KeepWarmECperSec(bool isWarmupPhase, double capacity)
         {
             double baseMul = isWarmupPhase ? WARMUP_MULT : 1.0; // warmup is 6× upkeep
             float tempMul = KeepWarmTempMultiplier();  // heat-aware 0..1
-            return dischargeRateKW* RealBatterySettings.KeepWarmFrac * baseMul* tempMul; // EC/s (≈kW)
+            return capacity * RealBatterySettings.KeepWarmFrac * baseMul* tempMul; // EC/s (≈kW)
         }
         private void HandleRunawayNotifications(bool isRunaway, float tempK)
         {

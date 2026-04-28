@@ -60,18 +60,12 @@ namespace RealBattery
         {
             tempK = 0f;
             if (sh == null) return false;
-
-            EnsureCache();
-            if (_loopTempProp == null) return false;
-
-            try
-            {
-                object v = _loopTempProp.GetValue(sh, null);
-                if (v == null) return false;
-                tempK = Convert.ToSingle(v);
-                return true;
-            }
-            catch { return false; }
+            var f = sh.Fields?["currentLoopTemperature"] ?? sh.Fields?["loopTemperature"];
+            if (f == null) return false;
+            var v = f.GetValue(sh);
+            if (v == null) return false;
+            tempK = Convert.ToSingle(v);
+            return true;
         }
 
         public static void MarkUsed(PartModule sh)
@@ -101,7 +95,7 @@ namespace RealBattery
             try
             {
                 // Mark module used if possible.
-                if (_moduleUsedProp != null) _moduleUsedProp.SetValue(sh, true, null);
+                _moduleUsedProp?.SetValue(sh, true, null);
 
                 _addFluxMethod.Invoke(sh, new object[] { source, targetK, fluxW, additive });
             }
