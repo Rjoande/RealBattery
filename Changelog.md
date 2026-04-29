@@ -1,5 +1,37 @@
 # Changelog
 
+## v3.0.0
+
+### Major Changes
+
+- **New battery chemistries**: four new chemistry types are now available across the tech tree:
+  - *Vanadium Redox Flow Batteries (VRFB)*: high-capacity late-game option with virtually no degradation.
+  - *Liquid Metal Batteries (Mg||Sb LMB)*: must be kept at operating temperature (~700 K) to function; suited for high-power industrial applications.
+  - *Superconducting Magnetic Energy Storage (SMES)*: must be kept cryogenic to operate; immune to cycle wear, but suffers reversible capacity loss if overheated.
+  - *Long-lived Isotopic Cells (Ho-166m)*: radioisotope cells with a half-life measured in centuries, designed for interstellar missions; capacity degrades very slowly over time.
+- **Chemistry database** (`Chemistries.cfg`): all battery chemistry parameters are now defined in a single centralized file, making it straightforward for modders to add custom chemistries without editing core files. See the [Wiki](https://github.com/Rjoande/RealBattery/wiki) for the modding guide.
+- **EVA Chemistry Upgrade**: Engineers on EVA can now upgrade a battery to the next chemistry tier (e.g. NiCd -> Li-ion) by consuming SpareParts. The upgrade resets battery wear. Required engineer level and SpareParts cost depend on the target chemistry.
+- **Engineer level requirements**: EVA refurbishment and chemistry upgrades now require a minimum Engineer star level depending on the battery chemistry. Higher-tier chemistries require more experienced engineers.
+- **Cryogenic KeepWarm mode**: the thermal upkeep system now handles both hot-side (warm) and cold-side (cryo) chemistries. SMES batteries must be actively cooled; PAW status reflects this with dedicated *cooling down* / *heating up* labels instead of the warm-chemistry equivalents.
+- **SMES thermal cap**: if an SMES battery overheats above its operating threshold, its usable capacity is temporarily reduced proportionally to temperature. Capacity is fully restored once the battery cools down. A one-time inbox alert is generated when this occurs.
+- **Background SelfRunaway notifications**: if an isotopic battery suffers a spontaneous meltdown while the vessel is unloaded, player will receive an inbox message on returning to that vessel.
+- **Loading tips**: in-game loading screen tips are now included via *LoadingTipsPlus* (now bundled with RealBattery).
+
+### Minor Improvements
+
+- Fixed a staging integration bug that could cause incorrect stage ordering in the editor. *Note: after updating, reload your vessel to see the staging icon correctly. See [Troubleshooting & FAQ](https://github.com/Rjoande/RealBattery/wiki/Troubleshooting-&-FAQ) for details.*
+- Added *Disable background simulation* toggle in advanced settings (intended for debugging and troubleshooting).
+- Added *Self-runaway in background* toggle in advanced settings: spontaneous meltdown events can now be independently disabled for unloaded vessels without affecting foreground behavior.
+- Tech tree nodes reorganized for both stock and Community Tech Tree, to better reflect the progression of new chemistries.
+- General localization improvements.
+
+### Compatibility Notes
+
+- Existing saves are fully compatible. Chemistry parameters are not stored in save files.
+- Third-party patches written for v2.x remain functional via the optional **RealBattery Legacy Configs** package (see included `HOW_TO_INSTALL.txt`).
+
+---
+
 ## v2.3.2
 
 - Added optional *Deep-space protection* setting to suppress float-charge wear during long unloaded deep-space transfers, preserving battery health without affecting normal charge behavior.
