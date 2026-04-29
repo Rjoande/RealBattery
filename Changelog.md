@@ -24,6 +24,7 @@
 - Added *Disable background simulation* toggle in advanced settings (intended for debugging and troubleshooting).
 - Added *Self-runaway in background* toggle in advanced settings: spontaneous meltdown events can now be independently disabled for unloaded vessels without affecting foreground behavior.
 - Tech tree nodes reorganized for both stock and Community Tech Tree, to better reflect the progression of new chemistries.
+- Rebuilt all *ConformalDecals* and tech tree icon textures from scratch in DDS format for improved visual quality and performance.
 - General localization improvements.
 
 ### Compatibility Notes
