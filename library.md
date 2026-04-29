@@ -84,8 +84,8 @@ To define custom chemistries via `REALBATTERY_CHEMISTRY` nodes or inline paramet
 
 You can copy the values from the `DATA` node to the main RealBattery module (shown above) if you want to use just one chemistry in your part. Remember to remove (or comment with `//`) the value `upgradeRequired = ...` from the first subtype!
 
-        ### Thermal battery (non-rechargeable)
-        ```
+### Thermal battery (non-rechargeable)
+```
         SUBTYPE
         {
             name = TBat
@@ -107,10 +107,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Lead-acid
-        ```
+### Lead-acid
+```
         SUBTYPE
         {
             name = PbAc
@@ -133,10 +133,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Nickel-Cadmium
-        ```
+### Nickel-Cadmium
+```
         SUBTYPE
         {
             name = NiCd
@@ -159,10 +159,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Nickel-Zinc
-        ```
+### Nickel-Zinc
+```
         SUBTYPE
         {
             name = NiZn
@@ -184,10 +184,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Silver-oxide (non-rechargeable)
-        ```
+### Silver-oxide (non-rechargeable)
+```
         SUBTYPE
         {
             name = AgOx
@@ -210,10 +210,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Silver-Zinc
-        ```
+### Silver-Zinc
+```
         SUBTYPE
         {
             name = AgZn
@@ -236,10 +236,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Nickel-Hydrogen
-        ```
+### Nickel-Hydrogen
+```
         SUBTYPE
         {
             name = NiH2
@@ -261,10 +261,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### KERBA (Zebra-type)
-        ```
+### KERBA (Zebra-type)
+```
         SUBTYPE
         {
             name = RBZebra
@@ -287,10 +287,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Lithium-ion
-        ```
+### Lithium-ion
+```
         SUBTYPE
         {
             name = Li_ion
@@ -313,10 +313,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Lithium-polymer
-        ```
+### Lithium-polymer
+```
         SUBTYPE
         {
             name = Li_poly
@@ -339,10 +339,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Graphene
-        ```
+### Graphene
+```
         SUBTYPE
         {
             name = Graphene
@@ -365,62 +365,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Solid-State Battery
-        ```
-        SUBTYPE
-        {
-            name = SSB
-            title = #LOC_RB_title_SSB
-            descriptionSummary = #LOC_RB_descSum_SSB
-            descriptionDetail = #LOC_RB_descDet_SSB
-            tankType = SSB
-            upgradeRequired = RB_UpgradeSSB
-            defaultSubtypePriority = 12
-            MODULE
-            {
-                IDENTIFIER
-                {
-                    name = RealBattery
-                }
-                DATA
-                {
-                    ChemistryID = SSB
-                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
-                }
-            }
-        }
-        ```
-
-        ### Hafnium-178m2 (non-rechargeable)
-        ```
-        SUBTYPE
-        {
-            name = NukeCell
-            title = #LOC_RB_short_Nuke
-            descriptionSummary = #LOC_RB_descSum_Nuke
-            descriptionDetail = #LOC_RB_descDet_Nuke
-            tankType = NukeCell
-            upgradeRequired = RB_UpgradeNuke
-            defaultSubtypePriority = 1
-            MODULE
-            {
-                IDENTIFIER
-                {
-                    name = RealBattery
-                }
-                DATA
-                {
-                    ChemistryID = NukeCell
-                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
-                }
-            }
-        }
-        ```
-
-        ### Vanadium Redox Flow Battery (VRFB)
-        ```
+### Vanadium Redox Flow Battery (VRFB)
+```
         SUBTYPE
         {
             name = VRFB
@@ -443,10 +391,36 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Magnesium-Antimony Liquid Metal Battery (MgSb)
-        ```
+### Solid-State Battery
+```
+        SUBTYPE
+        {
+            name = SSB
+            title = #LOC_RB_title_SSB
+            descriptionSummary = #LOC_RB_descSum_SSB
+            descriptionDetail = #LOC_RB_descDet_SSB
+            tankType = SSB
+            upgradeRequired = RB_UpgradeSSB
+            defaultSubtypePriority = 12
+            MODULE
+            {
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    ChemistryID = SSB
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
+                }
+            }
+        }
+```
+
+### Magnesium-Antimony Liquid Metal Battery (MgSb)
+```
         SUBTYPE
         {
             name = MgSb
@@ -469,10 +443,10 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Superconducting Magnetic Energy Storage (SMES)
-        ```
+### Superconducting Magnetic Energy Storage (SMES)
+```
         SUBTYPE
         {
             name = SMES
@@ -495,10 +469,36 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
 
-        ### Holmium-166m (HoCell)
-        ```
+### Hafnium-178m2 (non-rechargeable)
+```
+        SUBTYPE
+        {
+            name = NukeCell
+            title = #LOC_RB_short_Nuke
+            descriptionSummary = #LOC_RB_descSum_Nuke
+            descriptionDetail = #LOC_RB_descDet_Nuke
+            tankType = NukeCell
+            upgradeRequired = RB_UpgradeNuke
+            defaultSubtypePriority = 1
+            MODULE
+            {
+                IDENTIFIER
+                {
+                    name = RealBattery
+                }
+                DATA
+                {
+                    ChemistryID = NukeCell
+                    EVAupgrade  = none // target SUBTYPE name; "none" = upgrade prohibited
+                }
+            }
+        }
+```
+
+### Holmium-166m (HoCell)
+```
         SUBTYPE
         {
             name = HoCell
@@ -521,4 +521,4 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
                 }
             }
         }
-        ```
+```
