@@ -16,6 +16,7 @@
 - **SMES thermal cap**: if an SMES battery overheats above its operating threshold, its usable capacity is temporarily reduced proportionally to temperature. Capacity is fully restored once the battery cools down. A one-time inbox alert is generated when this occurs.
 - **Background SelfRunaway notifications**: if an isotopic battery suffers a spontaneous meltdown while the vessel is unloaded, player will receive an inbox message on returning to that vessel.
 - **Loading tips**: in-game loading screen tips are now included via *LoadingTipsPlus* (now bundled with RealBattery).
+- Added support for [**Grounded**](https://forum.kerbalspaceprogram.com/topic/171377-110x-grounded-modular-vehicles-r50-mining-modules-rotor-emergency-light-jun-5-2019/).
 
 ### Minor Improvements
 
