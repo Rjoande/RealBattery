@@ -1,4 +1,3 @@
-# RealBattery Recharged
 ![logo](assets/images/RealBattery-logo-3.png)
 
 **RealBattery Recharged** is a complete overhaul of the stock electric system in Kerbal Space Program, originally designed by Blackliner. 
