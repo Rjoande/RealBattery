@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.0.1
+
+- Fixed a number of parts not receiving the correct dedicated patch.
+- Review of the autopatch filters, load order and subtypes.
+
 ## v3.0.0
 
 ### Major Changes
@@ -48,8 +53,6 @@
 - Fixed loading issue when SystemHeat is not installed (no longer required to start).
 - Revised Bluedog ProbeExpansions configs: battery types now match the historical chemistry of each probe, with a small easter egg included.
 
----
-
 ## v2.3.0
 
 ### Major Changes
@@ -92,13 +95,9 @@
 - Fixed poor synthax for Module Manager patches, for enhanced compatibility with other mods (thanks to **JadeOfMaar**).
 - Added **Simplified Chinese** localization (thanks to **Aebestach**).
 
----
-
 ## v2.2.2
 
 - Fixed a bug that caused errors in Module Manager when adding *SystemHeat* support to certain third-party batteries (notably BDB, OPT, HabTech, and US2).
-
----
 
 ## v2.2.1
 
@@ -109,8 +108,6 @@
 - *SimulationMode* now defaults to "Idle" instead of showing "NotFound" in the editor PAW.
 - Improved runtime logging and code reliability.
 - Fixed broken strings and improved localization.
-
----
 
 ## v2.2.0
 
