@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.0.2
+
+- `GetInfo()` tooltip now shows a descriptive module summary and battery volume instead of potentially incorrect charge rate values.
+- Fixed `\\n` artifacts in some localization file.
+- Fixed `bluedog_solarBattery` subtypes list (AgOx -> AgZn).
+
 ## v3.0.1
 
 - Fixed a number of parts not receiving the correct dedicated patch.
