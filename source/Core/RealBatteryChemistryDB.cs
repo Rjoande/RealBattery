@@ -103,6 +103,7 @@ namespace RealBattery
             node.TryGetValue("ThermalLoss",          ref c.ThermalLoss);
             node.TryGetValue("TempOverheat",         ref c.TempOverheat);
             node.TryGetValue("TempRunaway",          ref c.TempRunaway);
+            node.TryGetValue("TempOptimal",          ref c.TempOptimal);
             node.TryGetValue("RunawayHeatFactor",    ref c.RunawayHeatFactor);
 
             // --- Behavior flags ---

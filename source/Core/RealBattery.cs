@@ -1,6 +1,8 @@
-﻿using KSP.Localization;
+﻿using B9PartSwitch;
+using KSP.Localization;
 using KSP.UI.Screens;
 using System;
+using System.Linq;
 using System.Text;
 using UnityEngine;
 
@@ -15,6 +17,15 @@ namespace RealBattery
 
         // --- Resource ratios / conversions ---
         public const double EC2SCratio = 3600;      // 3600 EC = 1 SC = 1 kWh
+
+        // Cryo waste heat flux per liter of battery volume (W/L).
+        // Empirically matched to CryoTanks' CoolingHeatCost.
+        private const float CRYO_WASTE_HEAT_W_PER_L = 0.00002f;
+
+        // Volume-based warmup scaling: reference volume (L) at which nominal duration = 60 s.
+        private const double WARMUP_VOL_REF = 200.0;
+        // Hard cap on warmup/shutdown duration regardless of volume.
+        private const double WARMUP_MAX_S   = 720.0;
 
         // --- End-of-life threshold ---
         const double EOL_THRESHOLD = 0.80;          // 80% of BatteryLife
@@ -49,8 +60,9 @@ namespace RealBattery
         [KSPField(isPersistant = false)] public FloatCurve ChargeEfficiencyCurve = new FloatCurve();
         // Thermal model
         [KSPField(isPersistant = false)] public double ThermalLoss = 0.01;      // kW per EC/s
-        [KSPField(isPersistant = false)] public float TempOverheat = 350f;      // K
-        [KSPField(isPersistant = false)] public float TempRunaway = 400f;       // K
+        [KSPField(isPersistant = false)] public float TempOptimal = 350f;       // K — target K signal for SystemHeat loop only
+        [KSPField(isPersistant = false)] public float TempOverheat = 450f;      // K — RB internal threshold (wear/runaway/PCM/cap)
+        [KSPField(isPersistant = false)] public float TempRunaway = 550f;       // K
         [KSPField(isPersistant = false)] public double RunawayHeatFactor = 0.0; // <=0: use Crate
         [KSPField(isPersistant = false)] public bool KeepWarm = false;          // heat-aware warmup/upkeep
         [KSPField(isPersistant = false)] public bool SelfRunaway = false;       // spontaneous runaway
@@ -90,7 +102,7 @@ namespace RealBattery
         [KSPField(isPersistant = true)] public double BatteryLife = 1.0;           // 0..1 (computed)
         [KSPField(isPersistant = true)] public double WearCounter = 0.0;           // kWh transferred total
         [KSPField(isPersistant = true)] public bool   EOLToastSent = false;        // once-only message
-        [KSPField(isPersistant = true)] public bool   BGSelfRunawaySent = false;  // suppresses EOL toast when BG RIP already fired
+        [KSPField(isPersistant = true)] public bool   BGSelfRunawaySent = false;   // suppresses EOL toast when BG RIP already fired
         [KSPField(isPersistant = true)] public double selfRunawayTimer = 0.0;      // accumulated "hazard time" for RIP self-runaway, in seconds.
         [KSPField(isPersistant = true)] public bool   forcedRunawayActive = false; // once triggered, the cell remains in forced-runaway mode
         [KSPField(isPersistant = true)] public bool   FixedOutputDefaultApplied = false;
@@ -159,6 +171,20 @@ namespace RealBattery
         // private ModuleSystemHeat systemHeat = null;
         private PartModule systemHeat = null; // SystemHeat module (optional)
 
+        // Physical part volume in liters (from RBbaseVolume cfg key set by MM patches); 0 if absent.
+        private double _rbVolume = 0.0;
+
+        // Effective warmup/shutdown duration for this part; cached at phase start by EffectiveWarmupSeconds().
+        private double _keepWarmDuration = 60.0;
+
+        // True for superconductor batteries (SMES): stored energy is the persistent supercurrent,
+        // which is lost when the cryogenic state is interrupted.
+        private bool IsSMES => KeepWarmMode == "cryo" && InfiniteCycles;
+
+        // True when this cryo battery should use the CryoTanks-like waste heat model instead of EC upkeep.
+        private bool UsesCryoWasteHeat() =>
+            KeepWarmMode == "cryo" && RealBatterySettings.UseCryoWasteHeatMode;
+
         // --- KeepWarm / Controlled Shutdown state machine --------------------------
         // Tracks current thermal runaway state (true while active, cleared when extinguished)
         public bool    isRunaway = false;
@@ -178,13 +204,18 @@ namespace RealBattery
 
         // --- Thermal warnings & runaway bookkeeping --------------------------------
         // Overheat (non-runaway) user notifications
-        private bool OverheatNotified = false;
+        private bool   OverheatNotified = false;
         // Runaway: one-time toast + residual heat tail
         private bool   RunawayNotified = false;       // first-time runaway trigger in flight
         private double runawayTailKW = 0.0;           // snapshot of last heat power
         private bool   runawayExtinguished = false;   // chemical source depleted; apply short tail
 
         private string _lastAppliedChemistryID = null; // cache the last applied chemistry ID to avoid redundant DB lookups
+
+        // True after we've sent an explicit zero-flux to SystemHeat because either
+        // EnableHeatSimulation or UseSystemHeat is off. Prevents re-sending every FixedUpdate.
+        // Reset when both settings are on again, so toggles work symmetrically.
+        private bool _shSilenced = false;
 
 
 
@@ -214,7 +245,7 @@ namespace RealBattery
             if (FixedOutput && !FixedOutputDefaultApplied && !ActivationLatched)
             {
                 bool editorScene = HighLogic.LoadedSceneIsEditor;
-                bool newVesselSpawn = (HighLogic.LoadedSceneIsFlight && state == StartState.PreLaunch);
+                bool newVesselSpawn = (HighLogic.LoadedSceneIsFlight && state.HasFlag(StartState.PreLaunch));
                 if (editorScene || newVesselSpawn)
                 {
                     BatteryDisabled = true;
@@ -257,30 +288,48 @@ namespace RealBattery
             }
 
             // 6) Launch-time resets & tech gates
-            if (HighLogic.LoadedSceneIsFlight && state == StartState.PreLaunch)
+            if (HighLogic.LoadedSceneIsFlight && state.HasFlag(StartState.PreLaunch))
             {
                 WearCounter = 0.0;
                 BatteryLife = 1.0;
                 ThermalCapFactor = 1.0;
                 ThermalCapNotified = false;
                 smoothFlux = 0f;
-                Debug.Log($"Reset WearCounter, BatteryLife and ThermalCapFactor on launch (PreLaunch state)");
+                RBLog.Info("[RealBattery] Reset WearCounter, BatteryLife and ThermalCapFactor on launch (PreLaunch state)");
             }
             TechUnlockUI();
+
+            _rbVolume = ReadPartVolumeL();
 
             // 7) Edge detectors & final UI state
             lastDisabled = BatteryDisabled; // initialize edge detector
 
-            // 8) Ping for SystemHeat to refresh loop temperature after scene re-entry
+            // 8) Initial SystemHeat handshake after scene re-entry.
+            // Gate on SystemHeatAvailable (assembly present) rather than UseSystemHeat,
+            // so we can still silence a residual flux when the user has SH installed but
+            // has opted out via UseSystemHeat = false.
             if (HighLogic.LoadedSceneIsFlight
-                && state != StartState.PreLaunch 
-                && RealBatterySettings.UseSystemHeat 
-                && systemHeat != null)
+                && !state.HasFlag(StartState.PreLaunch)
+                && RealBatterySettings.SystemHeatAvailable)
             {
-                float tempTarget = (KeepWarmMode == "cryo")
-                        ? TempKeepWarmLo                 // For cryo batteries, target the lower keep-warm threshold
-                        : (float)TempOverheat - 10;
-                SystemHeatBridge.AddFlux(systemHeat, "RealBattery", tempTarget, (float)EPS, true);
+                if (systemHeat == null)
+                    systemHeat = SystemHeatBridge.GetModule(part);
+
+                if (systemHeat != null)
+                {
+                    if (!RealBatterySettings.EnableHeatSimulation || !RealBatterySettings.UseSystemHeat)
+                    {
+                        // Heat sim or SH integration disabled at scene load: send an explicit zero
+                        // so SystemHeat doesn't show a residual/default value before the first FixedUpdate runs.
+                        smoothFlux = 0f;
+                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", 0f, 0f, true);
+                        _shSilenced = true;
+                    }
+                    else
+                    {
+                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", TempOptimal, (float)EPS, true);
+                    }
+                }
             }
         }
 
@@ -291,6 +340,18 @@ namespace RealBattery
         {
             base.OnStartFinished(state);
             RB_AfterOnStart();
+
+            // SMES that starts disabled has no active supercurrent:
+            // zero ThermalCapFactor and StoredCharge immediately.
+            if (HighLogic.LoadedSceneIsFlight && state.HasFlag(StartState.PreLaunch)
+                && IsSMES && BatteryDisabled)
+            {
+                ThermalCapFactor = 0.0;
+                PartResource sc = part.Resources.Get("StoredCharge");
+                if (sc != null) sc.amount = 0.0;
+                SC_SOC = 0.0;
+                RBLog.Info("[RealBattery] SMES starts disabled: ThermalCapFactor and SC zeroed at PreLaunch.");
+            }
         }
 
         public override void OnUpdate()
@@ -322,15 +383,13 @@ namespace RealBattery
             double  deltaSC = GUI_power > 0 ? max - stored : stored;
             double  timeInSeconds = (deltaSC * EC2SCratio) / Math.Abs(GUI_power);
             float   tempK = GetCurrentTemperatureK();
-            bool    isPrimary = (CycleDurability <= 1.0) || (HighEClevel > 1);
+            bool    isPrimary = !InfiniteCycles && ((CycleDurability <= 1.0) || (HighEClevel > 1));
 
             GUI_power += statusLowPassTauRatio * (lastECpower - GUI_power);
 
             // GUI
             if (isRunaway)
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_Status_Runaway");
-            else if (isPrimary && SC_SOC < 0.01)
-                BatteryChargeStatus = Localizer.Format("#LOC_RB_INF_PrimaryDepleted");
             else if (ActualLife < 0.01)
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_INF_DeadBattery");
             else if (controlledShutdownActive)
@@ -345,6 +404,8 @@ namespace RealBattery
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_INF_Discharging", GUI_power.ToString("F1"));
             else if (GUI_power > 0.001)
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_INF_Charging", GUI_power.ToString("F1"));
+            else if (SC_SOC < 0.01)
+                BatteryChargeStatus = Localizer.Format("#LOC_RB_INF_PrimaryDepleted");
             else
             {
                 part.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double EC_amount, out double EC_maxAmount);
@@ -392,17 +453,14 @@ namespace RealBattery
             if (isRunaway || (InfiniteCycles && tempK > TempOverheat-10)) 
                 ApplyThermalEffects(0.0);
 
-            // Register with SystemHeat even when disabled, so the loop uses our tempTarget
-            if (((BatteryDisabled && !isRunaway) || (!BatteryDisabled && keepWarmActive)) && RealBatterySettings.UseSystemHeat)
+            // Register with SystemHeat even when disabled, so the loop uses our TempOptimal target
+            if (RealBatterySettings.EnableHeatSimulation && RealBatterySettings.UseSystemHeat && ((BatteryDisabled && !isRunaway) || (!BatteryDisabled && keepWarmActive)))
             {
                 // Ensure fresh SystemHeat reference if needed
                 if (systemHeat == null)
                     systemHeat = SystemHeatBridge.GetModule(part);
 
-                float tempTarget = (KeepWarmMode == "cryo")
-                        ? TempKeepWarmLo                 // For cryo batteries, target the lower keep-warm threshold
-                        : (float)TempOverheat - 10;
-                SystemHeatBridge.AddFlux(systemHeat, "RealBattery", tempTarget, 0f, true);
+                SystemHeatBridge.AddFlux(systemHeat, "RealBattery", TempOptimal, 0f, true);
             }
         }
         public void FixedUpdate()
@@ -425,6 +483,7 @@ namespace RealBattery
             if(HighLogic.LoadedSceneIsFlight)
             {
                 EnforceNonDisableableLatch();
+                TickCryoWasteHeat();
 
                 // Enforce UI toggle lock: while a phase is in progress, force the
                 // BatteryDisabled field to the locked value, defeating user clicks.
@@ -446,7 +505,8 @@ namespace RealBattery
                     {
                         // OFF -> ON : start warmup latency (even if hot; EC cost may be 0 if >=600 K)
                         keepWarmActive = true;
-                        keepWarmTleft = RealBatterySettings.WarmupSeconds;
+                        _keepWarmDuration = EffectiveWarmupSeconds();
+                        keepWarmTleft = _keepWarmDuration;
                         keepWarmGrace = 0.0;
                         controlledShutdownActive = false;
                         shutdownTleft = 0.0;
@@ -463,7 +523,8 @@ namespace RealBattery
                         uiToggleLockActive = true;
                         uiLockDisabledState = true; // force OFF
                         controlledShutdownActive = true;
-                        shutdownTleft = RealBatterySettings.WarmupSeconds;
+                        _keepWarmDuration = EffectiveWarmupSeconds();
+                        shutdownTleft = _keepWarmDuration;
                         // cancel any warmup/grace
                         keepWarmActive = false;
                         keepWarmGrace = 0.0;
@@ -479,9 +540,20 @@ namespace RealBattery
                     {
                         if (!BatteryDisabled) BatteryDisabled = true; // cannot flip ON
                         shutdownTleft = Math.Max(0.0, shutdownTleft - dt);
-                        double total = Math.Max(1e-3, RealBatterySettings.WarmupSeconds);
+                        double total = Math.Max(1e-3, _keepWarmDuration);
                         pct = (int)Mathf.Round(100f * (float)((total - shutdownTleft) / total));
-                        //BatteryChargeStatus = Localizer.Format("#LOC_RB_ShuttingDown", pct);
+                        
+                        // SMES: drive ThermalCapFactor -> 0 and clamp sc.amount each frame
+                        if (IsSMES)
+                        {
+                            double progress = shutdownTleft / total;          // 1.0 -> 0.0
+                            ThermalCapFactor = Math.Min(ThermalCapFactor, progress * progress);
+                            if (sc != null)
+                            {
+                                double effCap = sc.maxAmount * ThermalCapFactor;
+                                if (sc.amount > effCap) sc.amount = effCap;
+                            }
+                        }
                         if (shutdownTleft <= EPS)
                         {
                             controlledShutdownActive = false;
@@ -501,7 +573,7 @@ namespace RealBattery
                         
                         // progress UI
                         keepWarmTleft = Math.Max(0.0, keepWarmTleft - dt);
-                        double total = Math.Max(1e-3, RealBatterySettings.WarmupSeconds);
+                        double total = Math.Max(1e-3, _keepWarmDuration);
                         pct = (int)Mathf.Round(100f * (float)((total - keepWarmTleft) / total));
                         //BatteryChargeStatus = Localizer.Format("#LOC_RB_WarmingUp", pct);
                         
@@ -518,6 +590,13 @@ namespace RealBattery
                             return; // skip normal path while pending
                         }
                         
+                        // SMES: ramp ThermalCapFactor 0->1 symmetric with shutdown drain. Math.Max so it only rises.
+                        if (IsSMES)
+                        {
+                            double progress = 1.0 - (keepWarmTleft / total);  // 0.0 -> 1.0
+                            ThermalCapFactor = Math.Max(ThermalCapFactor, progress * progress);
+                        }
+
                         if (keepWarmTleft <= EPS)
                         {
                             keepWarmActive = false;
@@ -544,7 +623,7 @@ namespace RealBattery
                         if (RealBatterySettings.EnableHeatSimulation && upkeepShort)
                         {
                             // start/continue grace
-                            if (keepWarmGrace <= 0.0) keepWarmGrace = RealBatterySettings.WarmupSeconds;
+                            if (keepWarmGrace <= 0.0) keepWarmGrace = _keepWarmDuration;
                             else keepWarmGrace = Math.Max(0.0, keepWarmGrace - dt);
                             
                             //BatteryChargeStatus = Localizer.Format("#LOC_RB_KeepWarm_ShutdownPending", Math.Ceiling(keepWarmGrace));
@@ -557,7 +636,7 @@ namespace RealBattery
                         }
                         else
                         {
-                            // upkeep satisfied or not needed → cancel pending shutdown
+                            // upkeep satisfied or not needed -> cancel pending shutdown
                             keepWarmGrace = 0.0;
                         }
                         
@@ -565,9 +644,7 @@ namespace RealBattery
                         if (keepWarmGrace <= EPS && KeepWarmMode != "false" && !BatteryDisabled && keepWarmTleft > EPS)
                         {
                             keepWarmActive = true; // resume latency
-                            pct = (int)Mathf.Round(100f * (float)((RealBatterySettings.WarmupSeconds - keepWarmTleft) / Math.Max(1e-3, RealBatterySettings.WarmupSeconds)));
-                            //BatteryChargeStatus = Localizer.Format("#LOC_RB_WarmingUp",
-                            //(int)Mathf.Round(100f * (float)((RealBatterySettings.WarmupSeconds - keepWarmTleft) / Math.Max(1e-3, RealBatterySettings.WarmupSeconds))));
+                            pct = (int)Mathf.Round(100f * (float)((_keepWarmDuration - keepWarmTleft) / Math.Max(1e-3, _keepWarmDuration)));
                         }
                     }
                 }
@@ -792,12 +869,111 @@ namespace RealBattery
         {
             RBLog.Verbose("INF GetInfo");
 
-            LoadConfig();
+            // Branch A: multi-chemistry part (has B9PS batterySwitch) — generic tooltip
+            bool hasB9Switch = part?.Modules != null &&
+                part.Modules.OfType<ModuleB9PartSwitch>().Any(m => m.moduleID == "batterySwitch");
+            Debug.Log($"[RB GetInfo] hasB9Switch = {hasB9Switch}"); // DEBUG
+            if (hasB9Switch)
+            {
+                double vol = ReadPartVolumeL();
+                return vol > 0.0
+                    ? Localizer.Format("#LOC_RB_VAB_Info", vol.ToString("F1"))
+                    : Localizer.Format("#LOC_RB_VAB_Info_NoVolume");
+            }
 
-            PartResource StoredCharge = part.Resources.Get("StoredCharge");
-            DischargeRate = StoredCharge.maxAmount * Crate;
+            // Branch B: single-chemistry part — resolve title/description
+            ConfigNode partCfg = part?.partInfo?.partConfig;
+            Debug.Log($"[RB GetInfo] partCfg = {(partCfg == null ? "null" : "found")}"); // DEBUG
+            string title = null, descDetail = null, descSummary = null;
 
-            return Localizer.Format("#LOC_RB_VAB_Info", BatteryTypeDisplayName, DischargeRate.ToString("F2"), (DischargeRate * ChargeEfficiencyCurve.Evaluate(0f)).ToString("F2"));
+            if (partCfg != null)
+            {
+                ConfigNode rbModule = partCfg.GetNodes("MODULE") // DEBUG
+                    .FirstOrDefault(n => n.GetValue("name") == "RealBattery"); // DEBUG
+
+                // Try ChemistryID → look up raw node in GameDatabase
+                string chemId = rbModule?.GetValue("ChemistryID");
+                Debug.Log($"[RB GetInfo] chemId = {(string.IsNullOrEmpty(chemId) ? "null/empty" : chemId)}"); // DEBUG
+                if (!string.IsNullOrEmpty(chemId) && GameDatabase.Instance != null)
+                {
+                    ConfigNode[] nodes = GameDatabase.Instance.GetConfigNodes("REALBATTERY_CHEMISTRY");
+                    bool matchFound = false;
+                    if (nodes != null)
+                    {
+                        foreach (ConfigNode n in nodes)
+                        {
+                            if (n.GetValue("ChemistryID") == chemId)
+                            {
+                                title       = n.GetValue("title");
+                                descDetail  = n.GetValue("descriptionDetail");
+                                descSummary = n.GetValue("descriptionSummary");
+                                matchFound  = true;
+                                break;
+                            }
+                        }
+                    }
+                    Debug.Log($"[RB GetInfo] GameDatabase nodes found = {nodes?.Length ?? 0}, match = {matchFound}"); // DEBUG
+                }
+
+                // Fallback: inline fields in MODULE { name = RealBattery }
+                if (string.IsNullOrEmpty(title))
+                    title = rbModule?.GetValue("title");
+                if (string.IsNullOrEmpty(descDetail))
+                    descDetail = rbModule?.GetValue("descriptionDetail");
+                if (string.IsNullOrEmpty(descSummary))
+                    descSummary = rbModule?.GetValue("descriptionSummary");
+                Debug.Log($"[RB GetInfo] after fallback — title={title ?? "null"}, descDetail={descDetail ?? "null"}, descSummary={descSummary ?? "null"}"); // DEBUG
+            }
+
+            // No useful data → fall back to generic tooltip
+            if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(descDetail) && string.IsNullOrEmpty(descSummary))
+            {
+                Debug.Log("[RB GetInfo] returning branch: generic (no useful data)"); // DEBUG
+                double vol = ReadPartVolumeL();
+                return vol > 0.0
+                    ? Localizer.Format("#LOC_RB_VAB_Info", vol.ToString("F1"))
+                    : Localizer.Format("#LOC_RB_VAB_Info_NoVolume");
+            }
+
+            // Assemble Branch B tooltip
+            var sb = new StringBuilder();
+
+            if (!string.IsNullOrEmpty(title))
+                sb.Append("<b>").Append(Localizer.Format("#LOC_RB_Tech")).Append("</b>: ")
+                  .Append(Localizer.Format(title));
+
+            if (!string.IsNullOrEmpty(descDetail))
+            {
+                if (sb.Length > 0) sb.Append('\n').Append('\n');
+                sb.Append(Localizer.Format(descDetail));
+            }
+
+            if (!string.IsNullOrEmpty(descSummary))
+            {
+                if (sb.Length > 0) sb.Append('\n').Append('\n');
+                sb.Append(Localizer.Format(descSummary));
+            }
+
+            double volume = ReadPartVolumeL();
+            if (volume > 0.0)
+            {
+                sb.Append('\n').Append('\n')
+                  .Append(Localizer.Format("#LOC_RB_VAB_Info_Volume", volume.ToString("F1")));
+            }
+
+            Debug.Log("[RB GetInfo] returning branch: assembled (Branch B)"); // DEBUG
+            return sb.ToString();
+        }
+
+        // Reads the RBbaseVolume cfg key set by MM patches; 0 if absent or unparseable.
+        // Called from GetInfo() (before OnStart) and from OnStart() to populate _rbVolume.
+        private double ReadPartVolumeL()
+        {
+            if (part?.partInfo?.partConfig != null &&
+                part.partInfo.partConfig.HasValue("RBbaseVolume") &&
+                double.TryParse(part.partInfo.partConfig.GetValue("RBbaseVolume"), out double v))
+                return v;
+            return 0.0;
         }
         private void LoadConfig(ConfigNode node = null)
         {
@@ -844,6 +1020,9 @@ namespace RealBattery
                 if (config.HasValue("TempRunaway"))
                     TempRunaway = float.Parse(config.GetValue("TempRunaway"));
 
+                if (config.HasValue("TempOptimal"))
+                    TempOptimal = float.Parse(config.GetValue("TempOptimal"));
+
                 if (config.HasValue("moduleActive"))
                     bool.TryParse(config.GetValue("moduleActive"), out moduleActive); // default stays 'true' if missing
 
@@ -857,7 +1036,7 @@ namespace RealBattery
                     RunawayHeatFactor = double.Parse(config.GetValue("RunawayHeatFactor"));
             }
 
-            // v2 backward compat: KeepWarm (bool) → KeepWarmMode (string).
+            // v2 backward compat: KeepWarm (bool) -> KeepWarmMode (string).
             // Only migrate when the cfg did not supply KeepWarmMode explicitly.
             if (KeepWarm && KeepWarmMode == "false")
                 KeepWarmMode = "warm";
@@ -949,6 +1128,7 @@ namespace RealBattery
             ThermalLoss           = chem.ThermalLoss;
             TempOverheat          = chem.TempOverheat;
             TempRunaway           = chem.TempRunaway;
+            TempOptimal           = chem.TempOptimal;
             RunawayHeatFactor     = chem.RunawayHeatFactor;
 
             // Behavior flags
@@ -1075,6 +1255,37 @@ namespace RealBattery
         }
         private void ApplyThermalEffects(double EC_power)
         {
+            bool heatSimOn = RealBatterySettings.EnableHeatSimulation;
+            bool useSHOn = RealBatterySettings.UseSystemHeat;
+
+            // If we shouldn't be feeding SystemHeat (heat sim off, or SH integration off),
+            // send a one-shot zero to silence the loop. SH seems to treat registered-but-silent
+            // modules as having a residual/default value.
+            if (!heatSimOn || !useSHOn)
+            {
+                if (RealBatterySettings.SystemHeatAvailable && !_shSilenced)
+                {
+                    if (systemHeat == null)
+                        systemHeat = SystemHeatBridge.GetModule(part);
+                    if (systemHeat != null)
+                    {
+                        smoothFlux = 0f;
+                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", 0f, 0f, true);
+                        _shSilenced = true;
+                        RBLog.Info($"[ApplyThermalEffects] Cleared SystemHeat flux on '{part.partInfo?.title}' (heat sim or SH integration disabled).");
+                    }
+                }
+
+                // If heat sim is fully off, bail entirely.
+                // Otherwise (heat sim on, SH off) fall through so the stock heat path still runs.
+                if (!heatSimOn) return;
+            }
+            else
+            {
+                // Both heat sim and SH integration on: clear flag so off-branch can re-trigger later.
+                _shSilenced = false;
+            }
+
             // Resolve heat backend and current temperature once
             // Always refresh SystemHeat module if feature is enabled.
 
@@ -1085,9 +1296,6 @@ namespace RealBattery
             bool useSH = RealBatterySettings.UseSystemHeat && systemHeat != null;
 
             float tempK = GetCurrentTemperatureK();
-            float tempTarget = (KeepWarmMode == "cryo")
-                        ? TempKeepWarmLo                 // For cryo batteries, target the lower keep-warm threshold
-                        : (float)TempOverheat - 10;
             double ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
 
             // If thermal runaway is globally disabled, suppress runaway state
@@ -1100,8 +1308,6 @@ namespace RealBattery
             if (BatteryDisabled && !isRunaway)
                 return;
 
-            // Derive a chemical-equivalent power to turn into heat when in runaway even if EC_power = 0.
-            // If EC_power is 0 and runaway is active, we use a chemistry-specific proxy based on DischargeRate.
             PartResource sc = part.Resources.Get("StoredCharge");
             double safeLife = ActualLife > 0.001 ? ActualLife : 0.001;
             float EngBonus = (float)EngineerBonus();
@@ -1162,53 +1368,46 @@ namespace RealBattery
                 }
             }
 
-            // If we have power movement or a runaway condition, compute heat.
-            // Charging inefficiency -> extra heat, discharging -> direct loss -> heat.
-            // During runaway we model it as "discharge-like" heat based on chemistry.
-            if (heatPowerKW > 0.0001)
+            // In waste heat mode, thermal modeling is handled exclusively by TickCryoWasteHeat()
+            if (!UsesCryoWasteHeat())
             {
-                // Use "discharge-like" path for runaway to avoid division by charge efficiency
-                bool treatAsDischarge = (EC_power < 0) || isRunaway;
-                double ineff = Math.Max(SOC_ChargeEfficiency, 0.001); // avoid 0 div
-
-                if (treatAsDischarge)
-                    flux = (float)(heatPowerKW * ThermalLoss / safeLife);
-                else
-                    flux = (float)(heatPowerKW * ThermalLoss / ineff / safeLife);
-
-                if (!isRunaway) flux /= EngBonus;
-
-                if (useSH && systemHeat != null)
+                // If we have power movement or a runaway condition, compute heat
+                if (heatPowerKW > 0.0001)
                 {
-                    // Keep the existing smoothing/scaling behavior
-                    if (tempTarget > 1000) tempTarget = 1000; // clamp to prevent runaway target
-                    flux *= 0.01f;
-                    float tau = 0.01f;
-                    smoothFlux += tau * (flux - smoothFlux);
-                    SystemHeatBridge.AddFlux(systemHeat, "RealBattery", tempTarget, smoothFlux, true);
-                    RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux ACTIVE {(isRunaway ? "(Runaway) " : "")}(SystemHeat): {smoothFlux:F2} W @ {TempOverheat:F0} K (loop={tempK:F1} K)");
+                    // Use "discharge-like" path for runaway to avoid division by charge efficiency
+                    bool treatAsDischarge = (EC_power < 0) || isRunaway;
+                    double ineff = Math.Max(SOC_ChargeEfficiency, 0.001); // avoid 0 div
+
+                    if (treatAsDischarge)
+                        flux = (float)(heatPowerKW * ThermalLoss / safeLife);
+                    else
+                        flux = (float)(heatPowerKW * ThermalLoss / ineff / safeLife);
+
+                    if (!isRunaway) flux /= EngBonus;
+
+                    if (useSH && systemHeat != null)
+                    {
+                        // Keep the existing smoothing/scaling behavior
+                        flux *= 0.01f;
+                        float tau = 0.01f;
+                        smoothFlux += tau * (flux - smoothFlux);
+                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", TempOptimal, smoothFlux, true);
+                        RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux ACTIVE {(isRunaway ? "(Runaway) " : "")}(SystemHeat): {smoothFlux:F2} W @ target={TempOptimal:F0} K (loop={tempK:F1} K)");
+                    }
+                    else
+                    {
+                        part.AddThermalFlux(flux);
+                        RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux ACTIVE {(isRunaway ? "(Runaway) " : "")}(stock): {flux:F2} W (part={tempK:F1} K)");
+                    }
                 }
-                else
+                else if (useSH && systemHeat != null)
                 {
-                    part.AddThermalFlux(flux);
-                    RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux ACTIVE {(isRunaway ? "(Runaway) " : "")}(stock): {flux:F2} W @ {TempOverheat:F0} K (part={tempK:F1} K)");
+                    // Battery idle: no heat injected, but keep the operating target declared
+                    // so the loop doesn't collapse toward 0 K between active cycles.
+                    smoothFlux = 0f;
+                    SystemHeatBridge.AddFlux(systemHeat, "RealBattery", TempOptimal, 0f, true);
+                    RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux IDLE: 0 W -> no EC transfer, loop={tempK:F1} K, target={TempOptimal:F0} K");
                 }
-            }
-            else if (useSH && systemHeat != null)
-            {
-                // Smooth decay to 0 over a long timescale (idle cooling)
-                // tauSeconds is the e-folding time (seconds) for the residual flux.
-                float tauSeconds = 120f; // 2 minutes to drop by 63%
-                float dt = TimeWarp.fixedDeltaTime;
-
-                // Clamp to avoid overshoot if dt is very large (high timewarp, etc.)
-                float k = dt / tauSeconds;
-                if (k > 1f) k = 1f;
-
-                smoothFlux += (0f - smoothFlux) * k;
-
-                SystemHeatBridge.AddFlux(systemHeat, "RealBattery", 0f, smoothFlux, true);
-                RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux IDLE: {smoothFlux:F2} W -> no EC transfer, loop={tempK:F1} K");
             }
 
             // --- Thermal wear (flight only) ---
@@ -1217,14 +1416,17 @@ namespace RealBattery
             if (!HighLogic.LoadedSceneIsFlight) return;
 
             // --- InfiniteCycles thermal cap (replaces classic wear/runaway path for these batteries) ---
-            if (InfiniteCycles && sc != null && RealBatterySettings.EnableBatteryWear)
+            // Skip during warmup/shutdown: ThermalCapFactor is owned by the state machine ramps in those
+            // phases. The OnUpdate force-tick would otherwise race against FixedUpdate at display framerate.
+            if (InfiniteCycles && sc != null && RealBatterySettings.EnableBatteryWear
+                && !keepWarmActive && !controlledShutdownActive)
             {
                 if (tempK > TempOverheat)
                 {
-                    float range    = Mathf.Max(TempRunaway - TempOverheat, 1f);
+                    float range = Mathf.Max(Mathf.Min(TempOverheat - TempOptimal, TempRunaway - TempOverheat), 1f);
                     float severity = Mathf.Clamp01((tempK - TempOverheat) / range);
 
-                    // Linear cap: 1.0 at TempOverheat → 0.0 at TempRunaway
+                    // Linear cap: 1.0 at TempOverheat -> 0.0 at TempRunaway
                     ThermalCapFactor = 1.0 - severity;
 
                     // Clamp sc.amount to effective cap (mirrors UpdateBatteryLife pattern)
@@ -1238,7 +1440,7 @@ namespace RealBattery
                     float heatBoost = severity * TimeWarp.fixedDeltaTime * (float)sc.maxAmount;
                     if (useSH && systemHeat != null)
                         SystemHeatBridge.AddFlux(systemHeat, "RealBattery",
-                            (float)TempOverheat - 10f, heatBoost * (float)ThermalLoss * 0.01f, true);
+                            TempOptimal, heatBoost * (float)ThermalLoss * 0.01f, true);
                     else
                         part.AddThermalFlux(heatBoost * (float)ThermalLoss);
 
@@ -1272,11 +1474,11 @@ namespace RealBattery
                 // InfiniteCycles batteries do not use the classic overheat/runaway path: return early.
                 return;
             }
-
-            //var sc = part.Resources.Get("StoredCharge");
+            
             if (!InfiniteCycles && sc != null && tempK > TempOverheat)
             {
-                float severity = Mathf.Clamp01((tempK - TempOverheat) / Mathf.Max(TempRunaway - TempOverheat, 1e-3f));
+                float range = Mathf.Max(Mathf.Min(TempOverheat - TempOptimal, TempRunaway - TempOverheat), 1f);
+                float severity = Mathf.Clamp01((tempK - TempOverheat) / range);
                 float thermalFactor = Mathf.Exp(severity * 4.0f) - 1.0f;
                 float deltaWear = thermalFactor * TimeWarp.fixedDeltaTime * (float)(sc.maxAmount);
 
@@ -1616,8 +1818,8 @@ namespace RealBattery
             float span  = Mathf.Max(TempKeepWarmHi - TempKeepWarmLo, 1f);
             float t     = Mathf.Clamp01((tempK - TempKeepWarmLo) / span); // 0 at Lo, 1 at Hi
 
-            // warm: full upkeep when cold, zero when hot  (LO→HI = 1→0)
-            // cryo: zero upkeep when cold, full when hot  (LO→HI = 0→1)
+            // warm: full upkeep when cold, zero when hot  (LO->HI = 1->0)
+            // cryo: zero upkeep when cold, full when hot  (LO->HI = 0->1)
             return KeepWarmMode == "cryo" ? t : 1f - t;
         }
         private double TickKeepWarm(bool isWarmupPhase, double dt)
@@ -1633,10 +1835,60 @@ namespace RealBattery
         }
         private double KeepWarmECperSec(bool isWarmupPhase, double capacity)
         {
-            double baseMul = isWarmupPhase ? WARMUP_MULT : 1.0; // warmup is 6× upkeep
-            float tempMul = KeepWarmTempMultiplier();  // heat-aware 0..1
-            return capacity * RealBatterySettings.KeepWarmFrac * baseMul* tempMul; // EC/s (≈kW)
+            // Cryo waste heat mode: cryocooler driven by SystemHeat, not EC; upkeep is always zero.
+            if (UsesCryoWasteHeat()) return 0.0;
+            double baseMul = isWarmupPhase ? WARMUP_MULT : 1.0;
+            float tempMul = KeepWarmTempMultiplier();
+            // Scale on volume (L) when available; KeepWarmFrac is then EC/s per litre.
+            // Falls back to sc.maxAmount for parts without RBbaseVolume.
+            double scalingBase = _rbVolume > 0.0 ? _rbVolume : capacity;
+            return scalingBase * RealBatterySettings.KeepWarmFrac * baseMul * tempMul;
         }
+
+        // Warmup/shutdown duration scaled on part volume via sqrt curve (WARMUP_VOL_REF = 200 L → 60 s).
+        // Parts without volume data fall back to 60 s. Hard cap: WARMUP_MAX_S.
+        private double EffectiveWarmupSeconds()
+        {
+            if (_rbVolume <= 0.0) return 60.0;
+            return Math.Max(1.0, Math.Min(WARMUP_MAX_S, 60.0 * Math.Sqrt(_rbVolume / WARMUP_VOL_REF)));
+        }
+        // Injects a fixed waste heat flux into SystemHeat for cryo batteries in waste heat mode.
+        // Flux = _rbVolume × CRYO_WASTE_HEAT_W_PER_L × phase (0..1), ramping with warmup/shutdown.
+        private bool _lastCryoWHMActive = false;
+        private void TickCryoWasteHeat()
+        {
+            bool nowActive = UsesCryoWasteHeat() && _rbVolume > 0.0;
+
+            // On mode toggle-off: flush zero to SH so the source doesn't persist.
+            if (_lastCryoWHMActive && !nowActive)
+            {
+                if (systemHeat == null) systemHeat = SystemHeatBridge.GetModule(part);
+                if (systemHeat != null)
+                    SystemHeatBridge.AddFlux(systemHeat, "RealBattery_Cryo", TempOptimal, 0f, true);
+            }
+            _lastCryoWHMActive = nowActive;
+            if (!nowActive) return;
+
+            if (!UsesCryoWasteHeat() || _rbVolume <= 0.0) return;
+
+            if (systemHeat == null) systemHeat = SystemHeatBridge.GetModule(part);
+            if (systemHeat == null) return;
+
+            float phase;
+            if (controlledShutdownActive)
+                phase = (float)(shutdownTleft / Math.Max(1e-3, _keepWarmDuration));
+            else if (keepWarmActive)
+                phase = 1f - (float)(keepWarmTleft / Math.Max(1e-3, _keepWarmDuration));
+            else if (BatteryDisabled)
+                phase = 0f;
+            else
+                phase = 1f;
+
+            float wasteW = Mathf.Clamp01(phase) * (float)_rbVolume * CRYO_WASTE_HEAT_W_PER_L;
+            SystemHeatBridge.AddFlux(systemHeat, "RealBattery_Cryo", TempOptimal, wasteW, true);
+            RBLog.Verbose($"[TickCryoWasteHeat] wasteW={wasteW:F3} W, phase={phase:F2}, vol={_rbVolume:F1} L");
+        }
+
         private void HandleRunawayNotifications(bool isRunaway, float tempK)
         {
             if (isRunaway && forcedRunawayActive)
@@ -1661,11 +1913,14 @@ namespace RealBattery
         {
             if (!HighLogic.LoadedSceneIsFlight) return;
 
+            if (!RealBatterySettings.EnableHeatSimulation) return;
+
             if (tempK >= TempRunaway || RunawayNotified) return;
 
             if (tempK > TempOverheat)
             {
-                if (!BatteryDisabled && PreventOverheat && !RealBatterySettings.DisablePCM)
+                // PCM is bypassed for SMES
+                if (!BatteryDisabled && PreventOverheat && !RealBatterySettings.DisablePCM && !IsSMES && !FixedOutput)
                 {
                     BatteryDisabled = true;
                     RBLog.Warn($"[ApplyThermalEffects] Battery '{part.partInfo.title}' auto-disabled (overheat {tempK:F1} K > {TempOverheat:F0} K)");

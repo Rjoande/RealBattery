@@ -8,6 +8,8 @@ namespace RealBattery
 {
     class RealBatteryLoadMaster : global::VesselModule
     {
+        private bool _deadBandFlushed = false; // Tracks whether we've flushed the dead band for non-fixed batteries in the current frame.
+
         protected override void OnStart()
         {
             base.OnStart();            
@@ -75,8 +77,15 @@ namespace RealBattery
 
             if (EC_maxAmount > 0 && rbList.Count != 0)
             {
-                double LowEClevel = rbList.First().LowEClevel; //they all (should) have the same levels tho
-                double HighEClevel = rbList.First().HighEClevel;
+                // HighEClevel: use the lowest among active batteries so an unusual threshold
+                // on one battery doesn't block charging for the whole vessel.
+                // LowEClevel: use the highest among active batteries (most conservative) so
+                // a battery with an unusually low threshold doesn't force premature discharge.
+                var activeBatteries = rbList.Where(rb => !rb.BatteryDisabled).ToList();
+                var refSource = activeBatteries.Any() ? activeBatteries : rbList;
+
+                double HighEClevel = refSource.OrderBy(rb => rb.HighEClevel).First().HighEClevel;
+                double LowEClevel  = refSource.OrderByDescending(rb => rb.LowEClevel).First().LowEClevel;
 
                 double EC_delta_highLevel = EC_amount - EC_maxAmount * HighEClevel;  //amount of available EC for charging: 980 - 1000 * 0.95 =   30EC
                 double EC_delta_lowLevel =  EC_amount - EC_maxAmount * LowEClevel; //amount of missing EC for discharging:  500 - 1000 * 0.9  = -400EC
@@ -84,7 +93,10 @@ namespace RealBattery
                 if (EC_delta_lowLevel < 0)
                 {
                     // sort the list by SC_SOC for discharging and run discharge
-                    rbList = rbList.OrderBy(rb => rb.part.GetResourcePriority()).ThenByDescending(rb => rb.SC_SOC).ToList();
+                    rbList = rbList.OrderByDescending(rb => rb.part.GetResourcePriority())
+                        .ThenByDescending(rb => rb.SC_SOC)
+                        .ThenByDescending(rb => rb.Crate)
+                        .ToList();
 
                     foreach (RealBattery rb in rbList)
                     {
@@ -95,12 +107,16 @@ namespace RealBattery
                         RBLog.Verbose("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
 
                         EC_delta_lowLevel -= deltaSucked;
+                        _deadBandFlushed = false;
                     } 
                 }                
                 else if (EC_delta_highLevel > 0)
                 {
                     //now reverse cowgirl for charging
-                    rbList = rbList.OrderByDescending(rb => rb.part.GetResourcePriority()).ThenBy(rb => rb.SC_SOC).ToList();
+                    rbList = rbList.OrderByDescending(rb => rb.part.GetResourcePriority())
+                        .ThenBy(rb => rb.SC_SOC)
+                        .ThenByDescending(rb => rb.Crate)
+                        .ToList();
 
                     foreach (RealBattery rb in rbList)
                     {
@@ -111,6 +127,7 @@ namespace RealBattery
                         RBLog.Verbose("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
 
                         EC_delta_highLevel -= deltaSucked;
+                        _deadBandFlushed = false;
                     }
                 }
                 else
@@ -129,11 +146,16 @@ namespace RealBattery
                             RBLog.Verbose("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
                             EC_delta_highLevel -= deltaSucked;
                         }
+                        else if (!rb.FixedOutput && !_deadBandFlushed)
+                        {
+                            // First dead-band frame: flush residual lastECpower and SH flux
+                            rb.XferECtoRealBattery(0);
+                        }
                     }
                     if (!anyFixed)
                     RBLog.Verbose("RealBatteryLoadMaster: nothing to do in the else path");
+                    _deadBandFlushed = true;
                 }
-
             }
         }
     }

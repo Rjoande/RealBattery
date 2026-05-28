@@ -1,10 +1,33 @@
 # Changelog
 
+## v3.1.0
+
+### Major Changes
+- **SystemHeat integration:** overhauled heat flux management. RealBattery now correctly silences the SystemHeat loop when heat simulation is disabled, and reports the correct operating temperature target at all times.
+- **TempOptimal:** each battery chemistry now declares an explicit SystemHeat loop target temperature (`TempOptimal`), independent of overheat/runaway thresholds. This allows finer thermal loop control per chemistry, improving compatibility with mixed-part loops and reducing unwanted thermal interactions.
+- **Rebalanced** high-tier chemistry costs and energy density (EC/vol, SC/vol, Crate) to prevent out-of-scale values on large-volume parts and better align with late-game part costs.
+- **Cryogenic Battery Rework:** SMES batteries now model superconductor physics more accurately. Shutting down an SMES drains its stored charge to zero as the cryocooler winds down; restarting requires recharging from an external source. Warmup and shutdown duration scale with battery volume (larger batteries take longer to reach operating temperature).
+- **Cryo Waste Heat Mode** *(requires SystemHeat, opt-in)*: SMES and other cryo batteries can now model their cryocooler as a fixed SystemHeat waste heat source instead of consuming ElectricCharge for thermal upkeep, in line with CryoTanks' thermal model.
+- **Part tooltip:** Single-chemistry battery parts now display the chemistry name, full description, and battery volume in the VAB/SPH editor.
+
+### Minor Improvements
+- Fixed battery state (Charging / Discharging / Idle) remaining stuck for extended periods after activity ceased.
+- Fixed SystemHeat loop target dropping to 0 K when a battery was idle or disabled, causing the loop to cool artificially between charge cycles.
+- Fixed low-power alarm triggering incorrectly for vessels with a positive energy balance (e.g. solar-powered probes in sunlight).
+- Fixed primary cells blocking charging of all rechargeable batteries on mixed vessels, depending on part load order (regression since v2.0).
+- Fixed the "Primary depleted" status incorrectly shown for InfiniteCycles batteries (e.g. SMES) when their charge reached zero.
+- PCM (thermal cutoff) no longer fires on SMES and Thermal batteries.
+- Batteries with higher resource priority now discharge first (and charge first), consistent with KSP's own resource flow convention. Also, discharge and charge priority ordering now uses C-rate as a tiebreaker when multiple batteries share the same Flow Priority and State of Charge, producing more consistent behavior.
+- BDB easter egg chemistries (HgZn, AgCd) now have slightly adjusted Crate values to reflect their historical application context, and dedicated tooltips.
+- Part `bluedog_Alouette_Core` now has correct chemistry (NiCd).
+- Added new chemistry subsets to **Universal Storage 2** microsats.
+
 ## v3.0.2
 
 - `GetInfo()` tooltip now shows a descriptive module summary and battery volume instead of potentially incorrect charge rate values.
 - Fixed `\\n` artifacts in some localization file.
 - Fixed `bluedog_solarBattery` subtypes list (AgOx -> AgZn).
+
 
 ## v3.0.1
 

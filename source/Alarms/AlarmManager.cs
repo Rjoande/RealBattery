@@ -14,7 +14,7 @@ namespace RealBattery
         public uint PersistentId;
         public string VesselName;
         public double StoredChargeAmount; // kWh
-        public double NetEC_True;         // EC/s (negative = draining)
+        public double NetEC_Gross;         // EC/s (negative = draining)
         public double ExpUT;              // UT when warning should fire (0 = N/A)
         public bool FromProto;            // true if loaded from ProtoVessel node
     }
@@ -128,12 +128,12 @@ namespace RealBattery
                         continue;
                     }
 
-                    // Reaching here: below MinWindow and no existing → skip (do not create/cancel)
+                    // Reaching here: below MinWindow and no existing -> skip (do not create/cancel)
                     skipped++;
                 }
                 else
                 {
-                    // Expired/past or invalid → delete existing if any
+                    // Expired/past or invalid -> delete existing if any
                     if (hasExisting)
                     {
                         DeleteAlarm(v.persistentId);
@@ -176,7 +176,7 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
                     PersistentId = v.persistentId,
                     VesselName = v.vesselName,
                     StoredChargeAmount = mem.storedChargeAmount,
-                    NetEC_True = mem.netEC_True,
+                    NetEC_Gross = mem.netEC_Gross,
                     ExpUT = mem.ExpUT,
                     FromProto = false
                 };
@@ -209,7 +209,7 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
                 if (rb == null) { RBAlarmUtil.Dbg($"MODULE found but no REALBATTERY_ENERGY node for '{v.vesselName}'."); return null; }
 
                 double sc = SafeParse(rb, "storedChargeAmount", 0);
-                double net = SafeParse(rb, "netEC_True", 0);
+                double net = SafeParse(rb, "netEC_Gross", 0);
                 double exp = SafeParse(rb, "ExpUT", 0);
 
                 return new RBLiteSnapshot
@@ -218,7 +218,7 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
                     PersistentId = v.persistentId,
                     VesselName = v.vesselName,
                     StoredChargeAmount = sc,
-                    NetEC_True = net,
+                    NetEC_Gross = net,
                     ExpUT = exp,
                     FromProto = true
                 };
@@ -232,8 +232,10 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
 
         internal static void ComputeExpUTIfMissing(RBLiteSnapshot snap)
         {
-            if (snap.ExpUT > 0) return;
-            if (snap.NetEC_True < -1e-6 && snap.StoredChargeAmount > 1e-9)
+            if (snap.ExpUT > 0) return;  // already computed
+            if (snap.ExpUT < 0) return;  // explictly suppressed from BackgroundSimulator
+
+            if (snap.NetEC_Gross < -1e-6 && snap.StoredChargeAmount > 1e-9)
             {
                 // Use cached value for proto to avoid drift in SC/TS one-shot
                 if (snap.FromProto && RBAlarmSessionCache.ProtoComputedExpUT.TryGetValue(snap.PersistentId, out var cached))
@@ -243,7 +245,7 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
                     return;
                 }
 
-                double secondsToEmpty = (snap.StoredChargeAmount * 3600.0) / Math.Abs(snap.NetEC_True);
+                double secondsToEmpty = (snap.StoredChargeAmount * 3600.0) / Math.Abs(snap.NetEC_Gross);
                 double lead = RealBatterySettings.LowPowerLeadSeconds;
                 snap.ExpUT = Planetarium.GetUniversalTime() + Math.Max(0.0, secondsToEmpty - lead);
                 RBAlarmUtil.Dbg($"Computed ExpUT for '{snap.VesselName}' => {snap.ExpUT:F0} (retro-compat).");
@@ -326,7 +328,7 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
         {
             if (debouncePending) return;
             debouncePending = true;
-            RBAlarmUtil.Dbg($"[SC] Vessel topology changed → {reason} → scheduling debounced resync.");
+            RBAlarmUtil.Dbg($"[SC] Vessel topology changed -> {reason} -> scheduling debounced resync.");
             StartCoroutine(DebouncedResync());
         }
 
@@ -397,7 +399,7 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
         {
             if (debouncePending) return;
             debouncePending = true;
-            RBAlarmUtil.Dbg($"[TS] Vessel topology changed → {reason} → scheduling debounced resync.");
+            RBAlarmUtil.Dbg($"[TS] Vessel topology changed -> {reason} -> scheduling debounced resync.");
             StartCoroutine(DebouncedResync());
         }
 
@@ -455,7 +457,7 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
                 if (lite.FromProto) protoUsed++;
 
                 // Retro-compat fill-in (may read from proto cache)
-                if (lite.ExpUT <= 0) RBAlarmSync.ComputeExpUTIfMissing(lite);
+                if (lite.ExpUT == 0) RBAlarmSync.ComputeExpUTIfMissing(lite);
 
                 // Trigger policy: show when now >= ExpUT (pre-warning moment)
                 if (lite.ExpUT > 0 && now >= lite.ExpUT)

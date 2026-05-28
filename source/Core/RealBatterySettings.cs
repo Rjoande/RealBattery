@@ -25,12 +25,15 @@ namespace RealBattery
         public static bool EnableBatteryWear => S?.enableBatteryWear ?? true;
         public static bool EnableHeatSimulation => S?.enableHeatSimulation ?? true;
         public static bool UseSystemHeat => (S?.useSystemHeat ?? true) && SystemHeatAvailable;
+
+        // True only when heat sim, UseSystemHeat, and the cryo waste heat opt-in are all active.
+        public static bool UseCryoWasteHeatMode =>
+            (S?.useCryoWasteHeatMode ?? false) && UseSystemHeat && EnableHeatSimulation;
         public static bool EnableThermalRunaway => S?.enableThermalRunaway ?? true;
         public static bool EnableEVARefurbush => S?.enableEVARefurbish ?? true;
 
         // ----- Advanced -----
         public static float KeepWarmFrac => A?.KeepWarmFrac ?? 0.05f;
-        public static float WarmupSeconds => A?.WarmupSeconds ?? 60f;
         public static double LowPowerMinWindowSeconds => Math.Max(0.0, (A?.LowPowerMinWindow ?? 5f) * 60.0);
         public static double LowPowerLeadSeconds => Math.Max(0.0, (A?.LowPowerLead ?? 2f) * 60.0);
         public static float RunawayBaseMagnitude => A?.runawayBaseMagnitude ?? 0.25f;
@@ -185,6 +188,12 @@ namespace RealBattery
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_UseSystemHeat", toolTip = "#LOC_RB_Settings_UseSystemHeat_tip")]
         public bool useSystemHeat = true;
 
+        // Cryo waste heat mode: replaces EC upkeep for cryo batteries with a fixed SystemHeat flux.
+        // Only meaningful when SystemHeat is installed and the heat simulation is active.
+        [GameParameters.CustomParameterUI("#LOC_RB_Settings_CryoWHM",
+            toolTip = "#LOC_RB_Settings_CryoWHM_tip")]
+        public bool useCryoWasteHeatMode = false;
+
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_ThermalRunaway", toolTip = "#LOC_RB_Settings_ThermalRunaway_tip")]
         public bool enableThermalRunaway = true;
 
@@ -205,6 +214,9 @@ namespace RealBattery
 
             if (member.Name == nameof(useSystemHeat))
                 return enableHeatSimulation && RealBatterySettings.SystemHeatAvailable;
+
+            if (member.Name == nameof(useCryoWasteHeatMode))
+                return enableHeatSimulation && useSystemHeat && RealBatterySettings.SystemHeatAvailable;
 
             if (member.Name == nameof(enableThermalRunaway))
                 return enableHeatSimulation;
@@ -231,9 +243,6 @@ namespace RealBattery
         [GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_KeepWarmFrac", toolTip = "#LOC_RB_Settings_KeepWarmFrac_tip", minValue = 0f, maxValue = 0.50f, stepCount = 51, displayFormat = "F2")]
         public float KeepWarmFrac = 0.05f;
         
-        [GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_WarmupSeconds", toolTip = "#LOC_RB_Settings_WarmupSeconds_tip",minValue = 5f, maxValue = 600f, stepCount = 596, displayFormat = "F0")]
-        public float WarmupSeconds = 60f;
-
         [GameParameters.CustomFloatParameterUI("#LOC_RB_Settings_LowPowerMinWindow", toolTip = "#LOC_RB_Settings_LowPowerMinWindow_tip", minValue = 0f, maxValue = 120f, stepCount = 121)]
         public float LowPowerMinWindow = 5f;
 

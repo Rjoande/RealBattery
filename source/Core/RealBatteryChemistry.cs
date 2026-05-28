@@ -39,6 +39,7 @@ namespace RealBattery
         public double ThermalLoss       = 0.15;
         public float  TempOverheat      = 435f;
         public float  TempRunaway       = 535f;
+        public float  TempOptimal       = 300f;  // operational target K communicated to SystemHeat loop
         public double RunawayHeatFactor = 0.0;
 
         // --- Behavior flags ---

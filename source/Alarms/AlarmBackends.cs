@@ -32,14 +32,14 @@ namespace RealBattery
             // If we have an impl already but the "kind" changed, switch (with cleanup)
             if (impl != null && isKACActive != wantKAC)
             {
-                RBAlarmUtil.Log($"[Backend] Switching backend → {(wantKAC ? "KAC" : "Stock")}");
+                RBAlarmUtil.Log($"[Backend] Switching backend -> {(wantKAC ? "KAC" : "Stock")}");
                 // Cleanup alarms from the backend we are leaving
                 try
                 {
                     if (wantKAC)
-                        CleanupStockAlarms(); // going to KAC → remove our stock alarms
+                        CleanupStockAlarms(); // going to KAC -> remove our stock alarms
                     else
-                        CleanupKacAlarms();   // going to Stock → remove our KAC alarms
+                        CleanupKacAlarms();   // going to Stock -> remove our KAC alarms
                 }
                 catch (Exception ex)
                 {

@@ -39,8 +39,8 @@ namespace RealBattery
         }
 
         // Temperature -> upkeep multiplier (mirrors RealBattery.KeepWarmTempMultiplier).
-        // mode: "warm" -> 1 when cold, 0 when hot (LO→HI = 1→0)
-        //       "cryo" -> 0 when cold, 1 when hot (LO→HI = 0→1)
+        // mode: "warm" -> 1 when cold, 0 when hot (LO->HI = 1->0)
+        //       "cryo" -> 0 when cold, 1 when hot (LO->HI = 0->1)
         // When heat sim disabled, caller should skip or pass mode="false" (returns 0).
         private static float KeepWarmTempMulFrom(float tK, string mode, float lo, float hi)
         {
@@ -289,7 +289,7 @@ namespace RealBattery
             }
             else
             {
-                energySnapshot.ExpUT = 0; // not discharging or invalid -> no alarm
+                energySnapshot.ExpUT = -1; // explicitly suppressed: vessel not draining
             }
 
             energySnapshots[id] = energySnapshot;
@@ -345,7 +345,7 @@ namespace RealBattery
             {
                 Debug.LogWarning(
                     $"[RealBattery] ApplySnapshot: Using fallback delta from netEC_Gross " +
-                    $"(true/solar estimate unavailable) → netEC_Gross={snap.netEC_Gross:F3} EC/s"
+                    $"(true/solar estimate unavailable) -> netEC_Gross={snap.netEC_Gross:F3} EC/s"
                 );
 
                 deltaSC_vessel = (snap.netEC_Gross * deltaTime) / 3600.0;
@@ -671,7 +671,7 @@ namespace RealBattery
             snap.storedChargeAmount += deltaEnergy;
             snap.storedChargeAmount = Math.Max(0, Math.Min(snap.storedChargeMaxAmount, snap.storedChargeAmount));
 
-            Debug.Log($"[RealBattery] Updated snapshot for vessel '{vessel.vesselName}' → {snap.storedChargeAmount:F3}/{snap.storedChargeMaxAmount:F3} kWh");
+            Debug.Log($"[RealBattery] Updated snapshot for vessel '{vessel.vesselName}' -> {snap.storedChargeAmount:F3}/{snap.storedChargeMaxAmount:F3} kWh");
         }
 
         public static double SimulateSolar(Vessel vessel, double deltaTime, double hoursPerDay)
@@ -727,7 +727,7 @@ namespace RealBattery
             double avgECps = (snap.solarECproduced + solarECnow) / 2.0;
             double total_kWh = (avgECps * deltaTime) / 3600.0;
 
-            Debug.Log($"[RealBattery][SolarSim] AvgECps={avgECps:F3} EC/s → Total={total_kWh:F3} kWh");
+            Debug.Log($"[RealBattery][SolarSim] AvgECps={avgECps:F3} EC/s -> Total={total_kWh:F3} kWh");
 
             return total_kWh;
         }
@@ -778,7 +778,7 @@ namespace RealBattery
                     total_kWh = (avgECps * t) / 3600.0;
 
                     Debug.Log($"[RealBattery][SolarSim] Surface-Polar: lat={latAbs:F2}° ≥ {POLAR_LAT_THRESHOLD_DEG}°, " +
-                    $"blendedFrac={blendedFrac:P1} → AvgECps={avgECps:F3} EC/s, Δt={t:F1}s, Total={total_kWh:F3} kWh");
+                    $"blendedFrac={blendedFrac:P1} -> AvgECps={avgECps:F3} EC/s, Δt={t:F1}s, Total={total_kWh:F3} kWh");
                     return total_kWh;
                 }
             }
