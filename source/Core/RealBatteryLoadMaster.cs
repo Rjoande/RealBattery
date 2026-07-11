@@ -10,6 +10,19 @@ namespace RealBattery
     {
         private bool _deadBandFlushed = false; // Tracks whether we've flushed the dead band for non-fixed batteries in the current frame.
 
+        // Charge/discharge branch state, kept across ticks so the threshold check below can
+        // apply hysteresis (Schmitt trigger) instead of a bare zero-crossing comparison.
+        private enum EcLoadMode { Idle, Charging, Discharging }
+        private EcLoadMode _lastLoadMode = EcLoadMode.Idle;
+
+        // Hysteresis margin (fraction of vessel EC_maxAmount) around HighEClevel/LowEClevel.
+        // Background consumer noise (antennas, reaction wheels, etc.) can make EC_amount
+        // hover right at a threshold; without a margin the branch below flips every tick,
+        // causing lastECpower/GUI_power and the SystemHeat idle flux to jitter. Only gates
+        // which branch runs this tick - the EC_delta amount passed to XferECtoRealBattery
+        // is unchanged.
+        private const double EC_MODE_HYSTERESIS_FRACTION = 0.002; // 0.2% of EC_maxAmount
+
         protected override void OnStart()
         {
             base.OnStart();            
@@ -89,9 +102,55 @@ namespace RealBattery
 
                 double EC_delta_highLevel = EC_amount - EC_maxAmount * HighEClevel;  //amount of available EC for charging: 980 - 1000 * 0.95 =   30EC
                 double EC_delta_lowLevel =  EC_amount - EC_maxAmount * LowEClevel; //amount of missing EC for discharging:  500 - 1000 * 0.9  = -400EC
-                                
-                if (EC_delta_lowLevel < 0)
+
+                // -----------------------------------------------------------------
+                // CrateScale: chemistries that opt in scale their effective C-rate by
+                // the number of participating batteries, for this tick only (never
+                // persisted). "add" multiplies by n, "reduce" multiplies by 1/n with a
+                // 0.1x floor. Original Crate values are restored in the finally block.
+                // -----------------------------------------------------------------
+                int nScale = rbList.Count(rb => rb.CrateScale != "false" && !rb.BatteryDisabled);
+                var crateBackup = new Dictionary<RealBattery, float>();
+                if (nScale > 0)
                 {
+                    foreach (RealBattery rb in rbList)
+                    {
+                        if (rb.BatteryDisabled || rb.CrateScale == "false") continue;
+                        crateBackup[rb] = rb.Crate;
+                        if (rb.CrateScale == "add")
+                            rb.Crate = rb.Crate * nScale;
+                        else if (rb.CrateScale == "reduce")
+                            rb.Crate = (float)Math.Max(rb.Crate * 0.1, rb.Crate / nScale);
+                    }
+                }
+
+                // Schmitt-trigger branch selection: which side of the margin decides depends
+                // on the mode we were already in, so a value hovering right at the threshold
+                // doesn't flip the branch every tick.
+                double hysteresis = EC_maxAmount * EC_MODE_HYSTERESIS_FRACTION;
+                bool wantDischarge;
+                bool wantCharge;
+                switch (_lastLoadMode)
+                {
+                    case EcLoadMode.Discharging:
+                        wantDischarge = EC_delta_lowLevel < hysteresis;
+                        wantCharge = !wantDischarge && EC_delta_highLevel > hysteresis;
+                        break;
+                    case EcLoadMode.Charging:
+                        wantCharge = EC_delta_highLevel > -hysteresis;
+                        wantDischarge = !wantCharge && EC_delta_lowLevel < -hysteresis;
+                        break;
+                    default:
+                        wantDischarge = EC_delta_lowLevel < -hysteresis;
+                        wantCharge = !wantDischarge && EC_delta_highLevel > hysteresis;
+                        break;
+                }
+
+                try
+                {
+                if (wantDischarge)
+                {
+                    _lastLoadMode = EcLoadMode.Discharging;
                     // sort the list by SC_SOC for discharging and run discharge
                     rbList = rbList.OrderByDescending(rb => rb.part.GetResourcePriority())
                         .ThenByDescending(rb => rb.SC_SOC)
@@ -109,9 +168,10 @@ namespace RealBattery
                         EC_delta_lowLevel -= deltaSucked;
                         _deadBandFlushed = false;
                     } 
-                }                
-                else if (EC_delta_highLevel > 0)
+                }
+                else if (wantCharge)
                 {
+                    _lastLoadMode = EcLoadMode.Charging;
                     //now reverse cowgirl for charging
                     rbList = rbList.OrderByDescending(rb => rb.part.GetResourcePriority())
                         .ThenBy(rb => rb.SC_SOC)
@@ -132,6 +192,7 @@ namespace RealBattery
                 }
                 else
                 {
+                    _lastLoadMode = EcLoadMode.Idle;
                     // No net charging or discharging requested by levels.
                     // Still allow fixed-output batteries to push EC continuously.
                     bool anyFixed = false;
@@ -155,6 +216,13 @@ namespace RealBattery
                     if (!anyFixed)
                     RBLog.Verbose("RealBatteryLoadMaster: nothing to do in the else path");
                     _deadBandFlushed = true;
+                }
+                }
+                finally
+                {
+                    // Restore original C-rates so the scaling lasts only this tick.
+                    foreach (var kv in crateBackup)
+                        kv.Key.Crate = kv.Value;
                 }
             }
         }

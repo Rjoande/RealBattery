@@ -11,7 +11,7 @@ namespace RealBattery
         // --- Tuning knobs (configurable via MODULE fields / B9PS per subtype) --------
 
         [KSPField(isPersistant = false)]
-        public bool EvaRefurbishEnabled = true;        // Gate per-part/subtype
+        public bool EvaRefurbishEnabled = RBDefaults.EvaRefurbishEnabled;        // Gate per-part/subtype
 
         [KSPField(isPersistant = false)]
         public double EvaRefurbishRange = 2.5;         // Max EVA distance (m)
@@ -20,7 +20,7 @@ namespace RealBattery
         //public double SparePartsFlat = 0.0;            // If > 0, use a flat SpareParts cost
 
         [KSPField(isPersistant = false)]
-        public double SparePartsPerKWh = 10.0;         // Otherwise, scaled cost (per kWh to restore)
+        public double SparePartsPerKWh = RBDefaults.SparePartsPerKWh;         // Otherwise, scaled cost (per kWh to restore)
 
         [KSPField(isPersistant = false)]
         public bool BlockIfLatchedThermal = true;      // Thermal (latched by staging) cannot be serviced
@@ -36,7 +36,7 @@ namespace RealBattery
 
         // Minimum Engineer star level for refurbish/upgrade (from chemistry DB).
         [KSPField(isPersistant = false)]
-        public int EVAminLevel = 0;
+        public int EVAminLevel = RBDefaults.EVAminLevel;
 
         // --- UI Event (EVA only) -----------------------------------------------------
 

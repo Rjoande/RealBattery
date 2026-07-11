@@ -1,0 +1,4 @@
+E:\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v3\RealBattery\GameData\RealBattery\RealBattery.dll
+E:\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v3\RealBattery\obj\Release\RealBattery.csproj.AssemblyReference.cache
+E:\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v3\RealBattery\obj\Release\RealBattery.csproj.CoreCompileInputs.cache
+E:\Giochi\KSP\Mods\RealBattery\RealBatteryRecharged_v3\RealBattery\obj\Release\RealBattery.dll

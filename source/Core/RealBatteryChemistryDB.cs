@@ -117,6 +117,13 @@ namespace RealBattery
             node.TryGetValue("LifeDecay",            ref c.LifeDecay);
             node.TryGetValue("InfiniteCycles",       ref c.InfiniteCycles);
 
+            // --- v3.2.0 additions ---
+            node.TryGetValue("CrateScale",           ref c.CrateScale);
+
+            // RESOURCE_EXTRA sub-nodes (auxiliary resource flows); fully optional.
+            foreach (ConfigNode reNode in node.GetNodes("RESOURCE_EXTRA"))
+                c.ResourceExtras.Add(ResourceRequirement.Load(reNode));
+
             return c;
         }
     }

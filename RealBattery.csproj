@@ -73,6 +73,7 @@
     <Compile Include="source\AssemblyInfo.cs" />
     <Compile Include="source\Core\RealBatteryChemistry.cs" />
     <Compile Include="source\Core\RealBatteryChemistryDB.cs" />
+    <Compile Include="source\Core\RealBatteryDefaults.cs" />
     <Compile Include="source\Core\RealBatteryLoadMaster.cs" />
     <Compile Include="source\Core\RealBatterySettings.cs" />
     <Compile Include="source\Background Simulation\RealBatterySnapshotManager.cs" />

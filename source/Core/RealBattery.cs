@@ -2,6 +2,7 @@
 using KSP.Localization;
 using KSP.UI.Screens;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
@@ -40,6 +41,12 @@ namespace RealBattery
         // --- Thermal runaway tail model ---
         private const double RUNAWAY_TAU_SECONDS = 10.0; // exponential decay time constant
 
+        // --- GUI_power display smoothing ---
+        // Time constant (seconds) for the displayed charge/discharge power. Framerate- and
+        // magnitude-independent by design: settles within ~4 tau (a couple of seconds) of the
+        // real value regardless of session fps or battery DischargeRate.
+        private const double GUI_POWER_SMOOTH_TAU_S = 0.4;
+
         // --- Resource IDs (cached) ---
         private static readonly int SC_ID = PartResourceLibrary.Instance.GetDefinition("StoredCharge").id;
 
@@ -51,33 +58,36 @@ namespace RealBattery
         // --- Configuration knobs (cfg-driven; non-persistent) -----------------------
         // Only charge/discharge gates and curves
         [KSPField(isPersistant = false)] public bool moduleActive = true;        // hide PAW for non-battery subtypes
-        [KSPField(isPersistant = false)] public float HighEClevel = 0.95f;       // charge gate
-        [KSPField(isPersistant = false)] public float LowEClevel = 0.90f;        // discharge gate
-        [KSPField(isPersistant = false)] public float Crate = 1.0f;              // C-rate
-        [KSPField(isPersistant = false)] public double SelfDischargeRate = 0.01; // % per day
-        [KSPField(isPersistant = false)] public double CycleDurability = 1;      // cycles until wear
-        [KSPField(isPersistant = false)] public bool FixedOutput = false;        // thermal battery mode
+        [KSPField(isPersistant = false)] public float HighEClevel = RBDefaults.HighEClevel;       // charge gate
+        [KSPField(isPersistant = false)] public float LowEClevel = RBDefaults.LowEClevel;         // discharge gate
+        [KSPField(isPersistant = false)] public float Crate = RBDefaults.Crate;                   // C-rate
+        [KSPField(isPersistant = false)] public double SelfDischargeRate = RBDefaults.SelfDischargeRate; // % per day
+        [KSPField(isPersistant = false)] public double CycleDurability = RBDefaults.CycleDurability;     // cycles until wear
+        [KSPField(isPersistant = false)] public bool FixedOutput = RBDefaults.FixedOutput;        // thermal battery mode
         [KSPField(isPersistant = false)] public FloatCurve ChargeEfficiencyCurve = new FloatCurve();
         // Thermal model
-        [KSPField(isPersistant = false)] public double ThermalLoss = 0.01;      // kW per EC/s
-        [KSPField(isPersistant = false)] public float TempOptimal = 350f;       // K — target K signal for SystemHeat loop only
-        [KSPField(isPersistant = false)] public float TempOverheat = 450f;      // K — RB internal threshold (wear/runaway/PCM/cap)
-        [KSPField(isPersistant = false)] public float TempRunaway = 550f;       // K
-        [KSPField(isPersistant = false)] public double RunawayHeatFactor = 0.0; // <=0: use Crate
-        [KSPField(isPersistant = false)] public bool KeepWarm = false;          // heat-aware warmup/upkeep
-        [KSPField(isPersistant = false)] public bool SelfRunaway = false;       // spontaneous runaway
+        [KSPField(isPersistant = false)] public double ThermalLoss = RBDefaults.ThermalLoss;      // kW per EC/s
+        [KSPField(isPersistant = false)] public float TempOptimal = RBDefaults.TempOptimal;       // K — target K signal for SystemHeat loop only
+        [KSPField(isPersistant = false)] public float TempOverheat = RBDefaults.TempOverheat;     // K — RB internal threshold (wear/runaway/PCM/cap)
+        [KSPField(isPersistant = false)] public float TempRunaway = RBDefaults.TempRunaway;       // K
+        [KSPField(isPersistant = false)] public double RunawayHeatFactor = RBDefaults.RunawayHeatFactor; // <=0: use Crate
+        [KSPField(isPersistant = false)] public bool KeepWarm = false;          // heat-aware warmup/upkeep (legacy v2 bool)
+        [KSPField(isPersistant = false)] public bool SelfRunaway = RBDefaults.SelfRunaway;       // spontaneous runaway
 
         // --- v3 Chemistry DB fields -------------------------------------------------
         // ChemistryID: if non-empty, all parameters below are populated from the DB.
         // Falls back to inline cfg values when empty or ID not found (full v2 compat).
         [KSPField(isPersistant = false)] public string ChemistryID = "";
         // KeepWarmMode replaces the v2 bool KeepWarm; "false" | "warm" | "cryo"
-        [KSPField(isPersistant = false)] public string KeepWarmMode   = "false";
-        [KSPField(isPersistant = false)] public float  TempKeepWarmLo = 500f;          // K: lower upkeep threshold
-        [KSPField(isPersistant = false)] public float  TempKeepWarmHi = 600f;          // K: upper upkeep threshold
-        [KSPField(isPersistant = false)] public bool   InfiniteCycles = false;         // no charge/discharge wear (SMES)
-        [KSPField(isPersistant = false)] public bool   LifeDecay      = false;         // SDR decays BatteryLife, not SoC
-        [KSPField(isPersistant = false)] public double RunawayBaseChance = 0.0;        // per-chemistry RIP chance basis
+        [KSPField(isPersistant = false)] public string KeepWarmMode   = RBDefaults.KeepWarmMode;
+        [KSPField(isPersistant = false)] public float  TempKeepWarmLo = RBDefaults.TempKeepWarmLo;     // K: lower upkeep threshold
+        [KSPField(isPersistant = false)] public float  TempKeepWarmHi = RBDefaults.TempKeepWarmHi;     // K: upper upkeep threshold
+        [KSPField(isPersistant = false)] public bool   InfiniteCycles = RBDefaults.InfiniteCycles;     // no charge/discharge wear (SMES)
+        [KSPField(isPersistant = false)] public bool   LifeDecay      = RBDefaults.LifeDecay;          // SDR decays BatteryLife, not SoC
+        [KSPField(isPersistant = false)] public double RunawayBaseChance = RBDefaults.RunawayBaseChance; // per-chemistry RIP chance basis
+        // CrateScale: "false" | "add" | "reduce"; read by RealBatteryLoadMaster to scale
+        // Crate by the count of participating batteries. Not shown in PAW.
+        [KSPField(isPersistant = false)] public string CrateScale     = RBDefaults.CrateScale;
 
         // --- Capability / mode flags (persistent) ----------------------------------
         [KSPField(isPersistant = true)] public bool ActivationLatched = false;  // staged latch
@@ -141,7 +151,7 @@ namespace RealBattery
         // --- Staging integration ----------------------------------------------------
         [KSPField(isPersistant = true, guiActiveEditor = true, guiName = "#LOC_RB_StageArm", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         [UI_Toggle(disabledText = "#LOC_RB_StageArm_off", enabledText = "#LOC_RB_StageArm_on")]
-        public bool BatteryStaged = false;
+        public bool BatteryStaged = RBDefaults.BatteryStaged;
         [KSPField(isPersistant = true)] private bool StageFired = false;
         [KSPField(isPersistant = true)] public bool BatteryStagedUserSet = false;
         public override bool IsStageable() => BatteryStaged && !StageFired;
@@ -211,6 +221,9 @@ namespace RealBattery
         private bool   runawayExtinguished = false;   // chemical source depleted; apply short tail
 
         private string _lastAppliedChemistryID = null; // cache the last applied chemistry ID to avoid redundant DB lookups
+
+        // Auxiliary resource flows from the active chemistry (RESOURCE_EXTRA); empty when none.
+        private List<ResourceRequirement> _resourceExtras = new List<ResourceRequirement>();
 
         // True after we've sent an explicit zero-flux to SystemHeat because either
         // EnableHeatSimulation or UseSystemHeat is off. Prevents re-sending every FixedUpdate.
@@ -373,8 +386,12 @@ namespace RealBattery
 
             RBLog.Verbose("INF OnUpdate");
 
-            // for slowing down the charge/discharge status
-            double  statusLowPassTauRatio = 0.01;
+            // for slowing down the charge/discharge status. Time-based (not per-frame) so the
+            // real-world settle time stays ~constant regardless of framerate or power
+            // magnitude - a fixed per-frame ratio here used to take minutes to decay on
+            // heavy craft (low fps) or high-DischargeRate batteries (large starting value).
+            double  deltaTime = Math.Max(Time.deltaTime, 1e-4);
+            double  guiPowerSmoothRatio = 1.0 - Math.Exp(-deltaTime / GUI_POWER_SMOOTH_TAU_S);
             double  ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
 
             double  stored = part.Resources["StoredCharge"].amount;
@@ -385,7 +402,12 @@ namespace RealBattery
             float   tempK = GetCurrentTemperatureK();
             bool    isPrimary = !InfiniteCycles && ((CycleDurability <= 1.0) || (HighEClevel > 1));
 
-            GUI_power += statusLowPassTauRatio * (lastECpower - GUI_power);
+            GUI_power += guiPowerSmoothRatio * (lastECpower - GUI_power);
+
+            // Snap to exact zero once both the target and the smoothed value are negligible,
+            // instead of leaving an ever-shrinking float below the display threshold.
+            if (Math.Abs(lastECpower) < EPS && Math.Abs(GUI_power) < 0.001)
+                GUI_power = 0.0;
 
             // GUI
             if (isRunaway)
@@ -1045,6 +1067,11 @@ namespace RealBattery
             // This overrides every inline cfg value read above.
             ApplyChemistryFromDB();
 
+            // Inline RESOURCE_EXTRA support: when no ChemistryID is set the DB path never
+            // runs, so parse any RESOURCE_EXTRA sub-nodes straight from this module's cfg.
+            if (string.IsNullOrEmpty(ChemistryID))
+                LoadInlineResourceExtras();
+
             PartResource ElectricCharge = part.Resources.Get("ElectricCharge");
             PartResource StoredCharge = part.Resources.Get("StoredCharge");
 
@@ -1143,9 +1170,34 @@ namespace RealBattery
             LifeDecay             = chem.LifeDecay;
             InfiniteCycles        = chem.InfiniteCycles;
 
+            // v3.2.0 additions
+            CrateScale            = chem.CrateScale;
+            _resourceExtras       = chem.ResourceExtras ?? new List<ResourceRequirement>();
+
             BatteryTypeDisplayName = chem.displayName;
 
             RBLog.Verbose($"[RealBattery] Chemistry '{ChemistryID}' applied from DB on '{part?.partInfo?.title}'.");
+        }
+
+        // Parses RESOURCE_EXTRA sub-nodes for inline (non-ChemistryID) batteries directly
+        // from this module's prefab cfg. Reads part.partInfo.partConfig (available in both
+        // editor and flight) rather than the persisted node, which omits cfg-only sub-nodes.
+        private void LoadInlineResourceExtras()
+        {
+            _resourceExtras = new List<ResourceRequirement>();
+
+            ConfigNode partCfg = part?.partInfo?.partConfig;
+            if (partCfg == null) return;
+
+            ConfigNode rbModule = partCfg.GetNodes("MODULE")
+                .FirstOrDefault(n => n.GetValue("name") == nameof(RealBattery));
+            if (rbModule == null) return;
+
+            foreach (ConfigNode reNode in rbModule.GetNodes("RESOURCE_EXTRA"))
+                _resourceExtras.Add(ResourceRequirement.Load(reNode));
+
+            if (_resourceExtras.Count > 0)
+                RBLog.Verbose($"[LoadConfig] Loaded {_resourceExtras.Count} inline RESOURCE_EXTRA entr(ies) on '{part?.partInfo?.title}'.");
         }
 
 
@@ -1184,7 +1236,35 @@ namespace RealBattery
             if (!FixedOutput) DischargeRate *= EngBonus;
 
             double chargeLimit = InfiniteCycles ? ThermalCapFactor : ActualLife;
-            if (amount > 0 && SC_SOC < chargeLimit && !BatteryDisabled && !FixedOutput) // Charge battery
+
+            // Operation for this tick (mirrors the charge/discharge branch guards below).
+            bool charging    = amount > 0 && SC_SOC < chargeLimit && !BatteryDisabled && !FixedOutput;
+            bool discharging = (amount < 0 || FixedOutput) && SC_SOC > 0 && !BatteryDisabled;
+
+            // RESOURCE_EXTRA pre-flight gate — only for chemistries that actually define
+            // extras. Skipped entirely (no curve eval, no helper call) for the common
+            // no-extras battery, which is the vast majority.
+            if (_resourceExtras != null && _resourceExtras.Count > 0)
+            {
+                // Planned EC magnitude for this tick (upper bound of what the transfer can move),
+                // used to pre-flight RESOURCE_EXTRA inputs before any EC/SC is committed.
+                double plannedECabs = charging
+                    ? Math.Min(TimeWarp.fixedDeltaTime * DischargeRate * ChargeEfficiencyCurve.Evaluate((float)SC_SOC), amount)
+                    : (discharging
+                        ? (FixedOutput ? TimeWarp.fixedDeltaTime * DischargeRate
+                                       : Math.Min(TimeWarp.fixedDeltaTime * DischargeRate, -amount))
+                        : 0.0);
+
+                // Atomic gate: if any active input RESOURCE_EXTRA can't cover the planned transfer,
+                // bail before moving any EC/SC so the tick leaves vessel resource state untouched.
+                if (!ResourceExtraInputsAvailable(plannedECabs, charging, discharging))
+                {
+                    lastECpower = 0.0;
+                    return 0;
+                }
+            }
+
+            if (charging) // Charge battery
             {
                 double SOC_ChargeEfficiency = ChargeEfficiencyCurve.Evaluate((float)SC_SOC);
                 EC_delta = TimeWarp.fixedDeltaTime * DischargeRate * SOC_ChargeEfficiency;  // maximum amount of EC the battery can convert to SC, limited by current charge capacity
@@ -1198,7 +1278,7 @@ namespace RealBattery
 
                 RBLog.Verbose("INF charged");
             }
-            else if ((amount < 0 || FixedOutput) && SC_SOC > 0 && !BatteryDisabled)  // Discharge battery (or fixed output)
+            else if (discharging)  // Discharge battery (or fixed output)
             {
                 SC_delta = TimeWarp.fixedDeltaTime * DischargeRate / EC2SCratio;      // maximum amount of SC the battery can convert to EC
 
@@ -1233,6 +1313,45 @@ namespace RealBattery
                 RBLog.Verbose("INF no charge or discharge");
             }
 
+            // --- RESOURCE_EXTRA: chemistry-defined auxiliary resource flows ---
+            // Consume inputs / produce outputs in proportion to the EC actually moved this
+            // tick. Input availability was already gated up front by ResourceExtraInputsAvailable(),
+            // so no blocking is needed here (the transfer is already committed).
+            // Each RequestResource omits an explicit flow mode, so KSP applies the resource's
+            // own default flow mode (e.g. STAGE_PRIORITY_FLOW respects decoupler crossfeed,
+            // ALL_VESSEL stays vessel-wide). This keeps consumption consistent with the
+            // crossfeed-aware gate, and lets excess output spill (be dumped) when tanks are
+            // full or unreachable.
+            if (_resourceExtras != null && _resourceExtras.Count > 0 && Math.Abs(EC_delta) > EPS)
+            {
+                foreach (ResourceRequirement req in _resourceExtras)
+                {
+                    if (req == null || string.IsNullOrEmpty(req.name) || req.ratio <= 0.0)
+                        continue;
+
+                    // Active only when the entry's mode matches the current operation.
+                    bool active = (req.mode == "charge" && charging)
+                               || (req.mode == "discharge" && discharging);
+                    if (!active) continue;
+
+                    double requested = req.ratio * Math.Abs(EC_delta) / EC2SCratio;
+                    if (requested <= EPS) continue;
+
+                    if (req.type == "output")
+                    {
+                        // Negative request = inject into the vessel; excess (full/unreachable
+                        // tanks) is not stored and is effectively dumped.
+                        double produced = part.RequestResource(req.name, -requested);
+                        RBLog.Verbose($"[XferECtoRealBattery][ResourceExtra] output '{req.name}': requested={requested:F4}, received={(-produced):F4}");
+                    }
+                    else // "input"
+                    {
+                        double received = part.RequestResource(req.name, requested);
+                        RBLog.Verbose($"[XferECtoRealBattery][ResourceExtra] input '{req.name}': requested={requested:F4}, received={received:F4}");
+                    }
+                }
+            }
+
             // Count wear: for FixedOutput use SC actually consumed; otherwise EC accepted.
             // InfiniteCycles batteries skip wear accumulation entirely.
             double wearSC = FixedOutput
@@ -1252,6 +1371,42 @@ namespace RealBattery
             ApplyThermalEffects(EC_power);
 
             return EC_delta;
+        }
+
+        // Pre-flight check for RESOURCE_EXTRA inputs: returns false if any active input
+        // entry can't cover the planned transfer this tick. Non-consuming (uses
+        // GetConnectedResourceTotals) so the caller can bail before committing any EC/SC.
+        // GetConnectedResourceTotals uses each resource's default flow mode, so crossfeed
+        // barriers (e.g. a decoupler with resource transfer disabled) are respected: a
+        // resource stranded on a non-communicating stage reads as unavailable and blocks.
+        private bool ResourceExtraInputsAvailable(double plannedECabs, bool charging, bool discharging)
+        {
+            if (_resourceExtras == null || _resourceExtras.Count == 0 || plannedECabs <= EPS)
+                return true;
+
+            foreach (ResourceRequirement req in _resourceExtras)
+            {
+                if (req == null || req.type != "input" || string.IsNullOrEmpty(req.name) || req.ratio <= 0.0)
+                    continue;
+
+                bool active = (req.mode == "charge" && charging)
+                           || (req.mode == "discharge" && discharging);
+                if (!active) continue;
+
+                double required = req.ratio * plannedECabs / EC2SCratio;
+                if (required <= EPS) continue;
+
+                PartResourceDefinition def = PartResourceLibrary.Instance.GetDefinition(req.name);
+                if (def == null) continue; // unknown resource: don't block on it
+
+                part.GetConnectedResourceTotals(def.id, out double avail, out _);
+                if (avail < required * (1.0 - EPS))
+                {
+                    RBLog.Verbose($"[XferECtoRealBattery][ResourceExtra] input '{req.name}' short: need {required:F4}, have {avail:F4} — transfer cancelled.");
+                    return false;
+                }
+            }
+            return true;
         }
         private void ApplyThermalEffects(double EC_power)
         {

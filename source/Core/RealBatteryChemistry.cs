@@ -1,7 +1,33 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RealBattery
 {
+    // ============================================================================
+    //  ResourceRequirement  [v3.2.0]
+    //  One auxiliary resource flow tied to battery charge/discharge, parsed from a
+    //  RESOURCE_EXTRA sub-node of REALBATTERY_CHEMISTRY. Fully optional in cfg.
+    // ============================================================================
+    public class ResourceRequirement
+    {
+        public string name  = "";          // resource name
+        public double ratio = 0.0;         // units per EC/s of actual transfer
+        public string mode  = "discharge"; // "charge" | "discharge"
+        public string type  = "input";     // "input" | "output"
+
+        // Parses one RESOURCE_EXTRA node. Shared by the chemistry-DB loader and the
+        // inline-cfg path so both stay in sync. All fields optional (TryGetValue).
+        public static ResourceRequirement Load(ConfigNode node)
+        {
+            var req = new ResourceRequirement();
+            node.TryGetValue("name",  ref req.name);
+            node.TryGetValue("ratio", ref req.ratio);
+            node.TryGetValue("mode",  ref req.mode);
+            node.TryGetValue("type",  ref req.type);
+            return req;
+        }
+    }
+
     // ============================================================================
     //  RealBatteryChemistry  [v3]
     //  Plain data object (POCO) that holds all parameters for one chemistry entry.
@@ -22,39 +48,50 @@ namespace RealBattery
         public string name        = "";
         public string displayName = "";
 
+        // Defaults below mirror RBDefaults (canonical single source of truth) so the
+        // chemistry-DB fallback set can never drift from the inline-cfg KSPField set.
+
         // --- Electrical ---
-        public float      HighEClevel           = 0.95f;
-        public float      LowEClevel            = 0.90f;
-        public float      Crate                 = 1.0f;
+        public float      HighEClevel           = RBDefaults.HighEClevel;
+        public float      LowEClevel            = RBDefaults.LowEClevel;
+        public float      Crate                 = RBDefaults.Crate;
         public FloatCurve ChargeEfficiencyCurve = new FloatCurve();
 
         // --- Degradation ---
-        public double CycleDurability     = 1000.0;
-        public double SelfDischargeRate   = 0.01;
-        public bool   EvaRefurbishEnabled = true;
-        public double SparePartsPerKWh    = 10.0;
-        public int    EVAminLevel         = 0;
+        public double CycleDurability     = RBDefaults.CycleDurability;
+        public double SelfDischargeRate   = RBDefaults.SelfDischargeRate;
+        public bool   EvaRefurbishEnabled = RBDefaults.EvaRefurbishEnabled;
+        public double SparePartsPerKWh    = RBDefaults.SparePartsPerKWh;
+        public int    EVAminLevel         = RBDefaults.EVAminLevel;
 
         // --- Thermal ---
-        public double ThermalLoss       = 0.15;
-        public float  TempOverheat      = 435f;
-        public float  TempRunaway       = 535f;
-        public float  TempOptimal       = 300f;  // operational target K communicated to SystemHeat loop
-        public double RunawayHeatFactor = 0.0;
+        public double ThermalLoss       = RBDefaults.ThermalLoss;
+        public float  TempOverheat      = RBDefaults.TempOverheat;
+        public float  TempRunaway       = RBDefaults.TempRunaway;
+        public float  TempOptimal       = RBDefaults.TempOptimal;  // operational target K communicated to SystemHeat loop
+        public double RunawayHeatFactor = RBDefaults.RunawayHeatFactor;
 
         // --- Behavior flags ---
-        public bool   FixedOutput    = false;
-        public bool   BatteryStaged  = false;
+        public bool   FixedOutput    = RBDefaults.FixedOutput;
+        public bool   BatteryStaged  = RBDefaults.BatteryStaged;
 
         // KeepWarmMode: "false" | "warm" | "cryo"
-        public string KeepWarmMode   = "false";
-        public float  TempKeepWarmLo = 500f;
-        public float  TempKeepWarmHi = 600f;
+        public string KeepWarmMode   = RBDefaults.KeepWarmMode;
+        public float  TempKeepWarmLo = RBDefaults.TempKeepWarmLo;
+        public float  TempKeepWarmHi = RBDefaults.TempKeepWarmHi;
 
-        public bool   SelfRunaway       = false;
-        public double RunawayBaseChance = 0.0;
+        public bool   SelfRunaway       = RBDefaults.SelfRunaway;
+        public double RunawayBaseChance = RBDefaults.RunawayBaseChance;
 
-        public bool   LifeDecay      = false;
-        public bool   InfiniteCycles = false;
+        public bool   LifeDecay      = RBDefaults.LifeDecay;
+        public bool   InfiniteCycles = RBDefaults.InfiniteCycles;
+
+        // --- v3.2.0 additions ---
+        // Auxiliary resource flows (RESOURCE_EXTRA sub-nodes); empty when none defined.
+        public List<ResourceRequirement> ResourceExtras = new List<ResourceRequirement>();
+
+        // CrateScale: "false" (no scaling) | "add" | "reduce"; how this battery's
+        // C-rate scales with the count of participating batteries on the vessel.
+        public string CrateScale = RBDefaults.CrateScale;
     }
 }
