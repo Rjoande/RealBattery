@@ -1,0 +1,7 @@
+// RealBatteryExpansion — VRFB — loading tip (migrated from core LoadingTips.ltp)
+// Overwrite = false → appends to the LoadingTipsPlus pool without wiping other tips.
+LOADINGTOOLTIPSPLUS
+{
+    Overwrite = false
+    ToolTip = #LOC_RB_Tip_VRFB
+}
