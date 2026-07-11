@@ -1,5 +1,28 @@
 # Changelog
 
+## v3.2.0
+
+### Major Changes
+- **RealBattery Expansion (new optional package):** the four exotic chemistries — *Vanadium Redox Flow (VRFB)*, *Liquid Metal (Mg‖Sb)*, *Superconducting (SMES)*, and *Long-lived Isotopic (Ho-166m)* — have been moved out of the core mod into a separate, fully removable **RealBatteryExpansion** package. The core mod now ships the 13 standard chemistries; install the Expansion to add the exotic tier. Each chemistry lives in its own self-contained folder (definitions, patches, localization, and assets), so the Expansion can be added or removed cleanly without affecting the core mod.
+- New **Quantum Energy Teleportation** battery type added: similar to a SMES, but for smaller parts and uses additive C-rate scaling (see below).
+- **Auxiliary resource flows (`RESOURCE_EXTRA`):** battery chemistries can now require or produce additional resources during charge or discharge. If an input resource runs short the transfer is blocked atomically: no EC or StoredCharge moves. *(For modders: supported in both `REALBATTERY_CHEMISTRY` nodes and legacy inline `MODULE` configs.)*
+- **C-rate vessel scaling (`CrateScale`):** chemistries can opt into automatic C-rate scaling based on how many batteries of the same type are active on the vessel (`add` multiplies, `reduce` divides).
+
+### Minor Improvements
+- Fixed an erroneous EVA upgrade path where **VRFB incorrectly upgraded into SMES**. Both are now standalone tiers, selected directly rather than reached by upgrade.
+- The **Zebra → Mg‖Sb** EVA upgrade path is now provided by the Expansion, and is available only when it is installed (the core mod leaves Zebra as a terminal tier).
+- Fixed a missing decal-label description on the **Mg‖Sb** battery (it referenced a non-existent text key).
+- Reworked battery decal labels to use one texture per design instead of a shared texture atlas.
+- Chemistry parameter defaults are now defined in a single place internally; the inline-config and chemistry-DB fallback sets previously diverged on a handful of thermal and wear fields.
+- Fixed `Extra_AlternatorFix.cfg` incorrectly stripping the alternator from air-breathing engines (e.g. Juno) when DangIt is installed.
+- Fixed the charge/discharge status flickering between Charging/Discharging/Idle on vessels with multiple batteries, caused by the vessel-wide power level hovering right at the charge/discharge threshold.
+- Fixed the charge/discharge power readout taking up to several minutes to settle back to zero after a load stopped drawing power (worse on high-capacity batteries and low-framerate vessels); it now settles within a few seconds regardless of framerate or battery size.
+- Fixed a broken Li_poly localization string.
+
+### Compatibility Notes
+- Existing saves remain compatible, and the Expansion can be installed alongside an existing RealBattery setup.
+- **If you remove the Expansion**, parts currently using an exotic chemistry (VRFB / Mg‖Sb / SMES / Ho-166m) will lose those subtypes — keep the Expansion installed if your craft rely on them.
+
 ## v3.1.0
 
 ### Major Changes
