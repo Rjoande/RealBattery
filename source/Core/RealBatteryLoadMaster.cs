@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 using UnityEngine;
 
@@ -23,70 +22,80 @@ namespace RealBattery
         // is unchanged.
         private const double EC_MODE_HYSTERESIS_FRACTION = 0.002; // 0.2% of EC_maxAmount
 
+        // Static sort comparisons for the discharge/charge participant ordering below (P3):
+        // avoids the per-tick OrderBy...ToList() allocation chain in favor of an in-place
+        // List<T>.Sort(). Not guaranteed stable on ties (unlike LINQ's OrderBy), but a 3-way tie
+        // on priority+SOC+rate makes the batteries functionally interchangeable anyway.
+        private static readonly Comparison<RealBattery> DischargeOrderComparison = (a, b) =>
+        {
+            int c = b.part.GetResourcePriority().CompareTo(a.part.GetResourcePriority());
+            if (c != 0) return c;
+            c = b.SC_SOC.CompareTo(a.SC_SOC);
+            if (c != 0) return c;
+            return b.Crate.CompareTo(a.Crate);
+        };
+        private static readonly Comparison<RealBattery> ChargeOrderComparison = (a, b) =>
+        {
+            int c = b.part.GetResourcePriority().CompareTo(a.part.GetResourcePriority());
+            if (c != 0) return c;
+            c = a.SC_SOC.CompareTo(b.SC_SOC); // ascending: fill the least-charged battery first
+            if (c != 0) return c;
+            return b.Crate.CompareTo(a.Crate);
+        };
+
         protected override void OnStart()
         {
-            base.OnStart();            
+            base.OnStart();
 
             GameEvents.onVesselChange.Add(ReadAllRealBatteryModules);
             GameEvents.onVesselStandardModification.Add(ReadAllRealBatteryModules);
             GameEvents.onVesselWasModified.Add(ReadAllRealBatteryModules);
+            GameEvents.onVesselCrewWasModified.Add(ReadAllRealBatteryModules);
 
             ReadAllRealBatteryModules();
         }
-        
+
         private void OnDestroy()
         {
             GameEvents.onVesselChange.Remove(ReadAllRealBatteryModules);
             GameEvents.onVesselStandardModification.Remove(ReadAllRealBatteryModules);
             GameEvents.onVesselWasModified.Remove(ReadAllRealBatteryModules);
+            GameEvents.onVesselCrewWasModified.Remove(ReadAllRealBatteryModules);
         }
 
         private List<RealBattery> rbList = new List<RealBattery>();
         public void ReadAllRealBatteryModules(Vessel gameEventVessel = null)
         {
-            RBLog.Verbose("[LoadMaster] INF ReadAllRealBatteryModules");
-            RBLog.Verbose("[LoadMaster] INF ReadAllRealBatteryModules vesselName: " + vessel.GetDisplayName());
-
             if (vessel == null || vessel.Parts == null)
-            {
-                //nothing to do
                 return;
-            }
 
             if (!vessel.loaded)
                 return;
 
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[ReadAllRealBatteryModules] vessel='{vessel.GetDisplayName()}'");
+
             rbList = vessel.FindPartModulesImplementing<RealBattery>();
-        }           
+
+            // Cache the max Engineer specialist level once per vessel structural/crew change
+            // instead of every battery re-scanning all vessel parts on every EngineerBonus()
+            // call (O(batteries x parts) per tick otherwise). Pushed to each battery directly
+            // since the LoadMaster already holds the up-to-date rbList here.
+            int engLvl = Mathf.Clamp(ModuleEnergyEstimator.GetMaxSpecialistLevel(vessel, "Engineer"), 0, 5);
+            foreach (RealBattery rb in rbList)
+                rb.CachedEngineerLevel = engLvl;
+        }
 
         public void FixedUpdate()
         {
-            RBLog.Verbose("[LoadMaster] INF FixedUpdate vesselName: " + vessel.GetDisplayName());
-            if (!HighLogic.LoadedSceneIsFlight)
-            {
-                RBLog.Verbose("[LoadMaster] INF return because LoadedSceneIsFlight");
+            if (!HighLogic.LoadedSceneIsFlight || vessel == null || !vessel.loaded)
                 return;
-            }
-            
-            if (vessel == null)
-            {
-                RBLog.Verbose("[LoadMaster] INF return because vessel == null");
-                return;
-            }
-
-            if (!vessel.loaded)
-            {
-                RBLog.Verbose("[LoadMaster] INF return because loaded");
-                return;
-            }
 
             // get vessel wide EC status (missing or available)
             vessel.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double EC_amount, out double EC_maxAmount);
 
-            
-            RBLog.Verbose("[LoadMaster] INF FixedUpdate EC_maxAmount: " + EC_maxAmount);
-            RBLog.Verbose("[LoadMaster] INF FixedUpdate EC_amount: " + EC_amount);
-            RBLog.Verbose("[LoadMaster] INF FixedUpdate rbList.Count: " + rbList.Count);
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[FixedUpdate] vessel='{vessel.GetDisplayName()}' EC={EC_amount:F1}/{EC_maxAmount:F1}, batteries={rbList.Count}");
 
             if (EC_maxAmount > 0 && rbList.Count != 0)
             {
@@ -94,22 +103,40 @@ namespace RealBattery
                 // on one battery doesn't block charging for the whole vessel.
                 // LowEClevel: use the highest among active batteries (most conservative) so
                 // a battery with an unusually low threshold doesn't force premature discharge.
-                var activeBatteries = rbList.Where(rb => !rb.BatteryDisabled).ToList();
-                var refSource = activeBatteries.Any() ? activeBatteries : rbList;
-
-                double HighEClevel = refSource.OrderBy(rb => rb.HighEClevel).First().HighEClevel;
-                double LowEClevel  = refSource.OrderByDescending(rb => rb.LowEClevel).First().LowEClevel;
+                // Falls back to scanning ALL batteries if none are enabled. Single pass, no
+                // allocations (replaces the former Where().ToList() + two OrderBy().First()).
+                double highEnabled = double.MaxValue, lowEnabled = double.MinValue;
+                double highAll = double.MaxValue, lowAll = double.MinValue;
+                bool anyEnabled = false;
+                int nScale = 0;
+                foreach (RealBattery rbScan in rbList)
+                {
+                    if (rbScan.HighEClevel < highAll) highAll = rbScan.HighEClevel;
+                    if (rbScan.LowEClevel > lowAll) lowAll = rbScan.LowEClevel;
+                    if (!rbScan.BatteryDisabled)
+                    {
+                        anyEnabled = true;
+                        if (rbScan.HighEClevel < highEnabled) highEnabled = rbScan.HighEClevel;
+                        if (rbScan.LowEClevel > lowEnabled) lowEnabled = rbScan.LowEClevel;
+                        if (rbScan.CrateScale != "false") nScale++;
+                    }
+                }
+                double HighEClevel = anyEnabled ? highEnabled : highAll;
+                double LowEClevel  = anyEnabled ? lowEnabled : lowAll;
 
                 double EC_delta_highLevel = EC_amount - EC_maxAmount * HighEClevel;  //amount of available EC for charging: 980 - 1000 * 0.95 =   30EC
                 double EC_delta_lowLevel =  EC_amount - EC_maxAmount * LowEClevel; //amount of missing EC for discharging:  500 - 1000 * 0.9  = -400EC
 
                 // -----------------------------------------------------------------
-                // CrateScale: chemistries that opt in scale their effective C-rate by
-                // the number of participating batteries, for this tick only (never
-                // persisted). "add" multiplies by n, "reduce" multiplies by 1/n with a
-                // 0.1x floor. Original Crate values are restored in the finally block.
+                // CrateScale: chemistries that opt in scale their effective C-rate by the
+                // number of participating batteries, for this tick only (never persisted).
+                // Original Crate values are restored in the finally block. (nScale computed
+                // in the scan above.) Both curves are neutral (m=1) at n=1 and use each
+                // battery's own CrateScaleFactor (f) as the shared steepness/asymptote param
+                // (plan M5/T5.2, chosen at STOP 5a over the old ×n / ÷n-with-floor curves):
+                //   "add"    — saturating: m(n) = 1 + (f-1)*(n-1)/(n-1+f), asymptote f
+                //   "reduce" — hyperbolic: m(n) = f/(n-1+f), decays smoothly towards 0
                 // -----------------------------------------------------------------
-                int nScale = rbList.Count(rb => rb.CrateScale != "false" && !rb.BatteryDisabled);
                 var crateBackup = new Dictionary<RealBattery, float>();
                 if (nScale > 0)
                 {
@@ -117,10 +144,11 @@ namespace RealBattery
                     {
                         if (rb.BatteryDisabled || rb.CrateScale == "false") continue;
                         crateBackup[rb] = rb.Crate;
+                        float f = Math.Max(0.01f, rb.CrateScaleFactor);
                         if (rb.CrateScale == "add")
-                            rb.Crate = rb.Crate * nScale;
+                            rb.Crate = rb.Crate * (1f + (f - 1f) * (nScale - 1) / (nScale - 1 + f));
                         else if (rb.CrateScale == "reduce")
-                            rb.Crate = (float)Math.Max(rb.Crate * 0.1, rb.Crate / nScale);
+                            rb.Crate = rb.Crate * (f / (nScale - 1 + f));
                     }
                 }
 
@@ -152,40 +180,24 @@ namespace RealBattery
                 {
                     _lastLoadMode = EcLoadMode.Discharging;
                     // sort the list by SC_SOC for discharging and run discharge
-                    rbList = rbList.OrderByDescending(rb => rb.part.GetResourcePriority())
-                        .ThenByDescending(rb => rb.SC_SOC)
-                        .ThenByDescending(rb => rb.Crate)
-                        .ToList();
+                    rbList.Sort(DischargeOrderComparison);
 
                     foreach (RealBattery rb in rbList)
                     {
-                        RBLog.Verbose("[LoadMaster] INF EC_delta_lowLevel < 0");
-                        RBLog.Verbose(String.Format("{0:F1} - {1:F1} - {2:F1} - {3:F1}", EC_delta_highLevel, EC_delta_lowLevel, EC_amount, EC_maxAmount));
                         double deltaSucked = rb.XferECtoRealBattery(EC_delta_lowLevel);
-
-                        RBLog.Verbose("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
-
                         EC_delta_lowLevel -= deltaSucked;
                         _deadBandFlushed = false;
-                    } 
+                    }
                 }
                 else if (wantCharge)
                 {
                     _lastLoadMode = EcLoadMode.Charging;
                     //now reverse cowgirl for charging
-                    rbList = rbList.OrderByDescending(rb => rb.part.GetResourcePriority())
-                        .ThenBy(rb => rb.SC_SOC)
-                        .ThenByDescending(rb => rb.Crate)
-                        .ToList();
+                    rbList.Sort(ChargeOrderComparison);
 
                     foreach (RealBattery rb in rbList)
                     {
-                        RBLog.Verbose("[LoadMaster] INF EC_delta_highLevel > 0");
-                        RBLog.Verbose(String.Format("{0:F1} - {1:F1} - {2:F1} - {3:F1}", EC_delta_highLevel, EC_delta_lowLevel, EC_amount, EC_maxAmount));
                         double deltaSucked = rb.XferECtoRealBattery(EC_delta_highLevel);
-
-                        RBLog.Verbose("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
-
                         EC_delta_highLevel -= deltaSucked;
                         _deadBandFlushed = false;
                     }
@@ -195,16 +207,12 @@ namespace RealBattery
                     _lastLoadMode = EcLoadMode.Idle;
                     // No net charging or discharging requested by levels.
                     // Still allow fixed-output batteries to push EC continuously.
-                    bool anyFixed = false;
                     foreach (RealBattery rb in rbList)
                     {
                         if (rb.FixedOutput && rb.SC_SOC > 0 && !rb.BatteryDisabled)
                         {
-                            anyFixed = true;
-                            RBLog.Verbose("[LoadMaster] Call FixedOutput push");
                             // Pass EC_delta_highLevel (>= 0 here) — rb will discharge anyway when FixedOutput is true.
                             double deltaSucked = rb.XferECtoRealBattery(EC_delta_highLevel);
-                            RBLog.Verbose("RealBatteryLoadMaster: deltaSucked: " + deltaSucked.ToString());
                             EC_delta_highLevel -= deltaSucked;
                         }
                         else if (!rb.FixedOutput && !_deadBandFlushed)
@@ -213,8 +221,6 @@ namespace RealBattery
                             rb.XferECtoRealBattery(0);
                         }
                     }
-                    if (!anyFixed)
-                    RBLog.Verbose("RealBatteryLoadMaster: nothing to do in the else path");
                     _deadBandFlushed = true;
                 }
                 }

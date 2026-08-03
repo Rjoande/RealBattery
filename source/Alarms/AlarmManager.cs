@@ -22,7 +22,7 @@ namespace RealBattery
     // ---------- Logging helpers ----------
     internal static class RBAlarmUtil
     {
-        public static void Dbg(string msg) => Debug.Log($"[RealBattery][Alarm][DBG] {msg}");
+        public static void Dbg(string msg) { if (RBLog.VerboseEnabled) Debug.Log($"[RealBattery][Alarm][DBG] {msg}"); }
         public static void Log(string msg) => Debug.Log($"[RealBattery][Alarm] {msg}");
         public static void Warn(string msg) => Debug.LogWarning($"[RealBattery][Alarm][WARN] {msg}");
         public static void Err(string msg) => Debug.LogError($"[RealBattery][Alarm][ERR] {msg}");
@@ -164,7 +164,15 @@ namespace RealBattery
     backend.Delete(vesselId);
             }
 
-internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
+        // Vessels confirmed (this session) to have no RealBatteryVesselModule/REALBATTERY_ENERGY
+        // data reachable via ProtoVessel — skips the expensive protoVessel.Save() serialization
+        // on subsequent checks for vessels that will never have RB data (debris, other mods'
+        // probes, flags, etc.). Safe: GetBestEffortSnapshot always checks the cheap in-RAM path
+        // first, so a vessel that later gets loaded/unpacked (and thus a real snapshot) is picked
+        // up there before this cache is ever consulted (P6).
+        private static readonly HashSet<Guid> _knownNoRbVessels = new HashSet<Guid>();
+
+        internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
         {
             // 1) Try RAM snapshot (BackgroundSimulator)
             var mem = BackgroundSimulator.GetEnergySnapshot(v.id);
@@ -181,7 +189,8 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
                     FromProto = false
                 };
             }
-            // 2) Fallback: ProtoVessel serialization
+            // 2) Fallback: ProtoVessel serialization (skip if already confirmed empty)
+            if (_knownNoRbVessels.Contains(v.id)) return null;
             return TryReadSnapshotFromProtoVessel(v);
         }
 
@@ -203,10 +212,20 @@ internal static RBLiteSnapshot GetBestEffortSnapshot(Vessel v)
                         rbVm = m; break;
                     }
                 }
-                if (rbVm == null) { RBAlarmUtil.Dbg($"Proto ok but no MODULE RealBatteryVesselModule for '{v.vesselName}'."); return null; }
+                if (rbVm == null)
+                {
+                    RBAlarmUtil.Dbg($"Proto ok but no MODULE RealBatteryVesselModule for '{v.vesselName}'.");
+                    _knownNoRbVessels.Add(v.id);
+                    return null;
+                }
 
                 var rb = rbVm.GetNode("REALBATTERY_ENERGY");
-                if (rb == null) { RBAlarmUtil.Dbg($"MODULE found but no REALBATTERY_ENERGY node for '{v.vesselName}'."); return null; }
+                if (rb == null)
+                {
+                    RBAlarmUtil.Dbg($"MODULE found but no REALBATTERY_ENERGY node for '{v.vesselName}'.");
+                    _knownNoRbVessels.Add(v.id);
+                    return null;
+                }
 
                 double sc = SafeParse(rb, "storedChargeAmount", 0);
                 double net = SafeParse(rb, "netEC_Gross", 0);

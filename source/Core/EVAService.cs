@@ -56,6 +56,16 @@ namespace RealBattery
                 return;
             }
 
+            // Guard: thermal runaway in progress. Servicing here is far too dangerous, and a
+            // "full replacement" reset (WearCounter/BatteryLife/SC restored) must never leave a
+            // freshly-repaired cell inheriting an active isRunaway/forcedRunawayActive latch —
+            // it would just keep heating the just-restored capacity.
+            if (isRunaway || forcedRunawayActive)
+            {
+                Msg("#LOC_RB_EVARepair_Runaway");
+                return;
+            }
+
             // Guard: battery must be disabled before servicing
             if (!BatteryDisabled) { Msg("#LOC_RB_EVARepair_TurnOff"); return; }
 
@@ -151,10 +161,21 @@ namespace RealBattery
                   groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public void EvaUpgradeChemistry()
         {
-            // Guard: global setting
-            if (!RealBatterySettings.EnableEVARefurbush) { Msg("#LOC_RB_EVARepair_Disabled"); return; }
+            // Guard: global setting (mirrors EvaRefurbish — EvaRefurbishEnabled = false gates
+            // both refurbish and upgrade, per project decision; upgrade is additionally gated
+            // per-subtype via EVAupgrade = "none").
+            if (!EvaRefurbishEnabled || !RealBatterySettings.EnableEVARefurbush) { Msg("#LOC_RB_EVARepair_Disabled"); return; }
             if (!HighLogic.LoadedSceneIsFlight) return;
             if (TimeWarp.CurrentRate > 1.0f) { Msg("#LOC_RB_EVARepair_Timewarp"); return; }
+
+            // Guard: thermal runaway in progress (see EvaRefurbish for the rationale — a
+            // chemistry switch resets WearCounter/BatteryLife/ThermalCapFactor but must not let
+            // the new subtype inherit an active runaway/forcedRunawayActive latch).
+            if (isRunaway || forcedRunawayActive)
+            {
+                Msg("#LOC_RB_EVARepair_Runaway");
+                return;
+            }
 
             // Guard: battery must be disabled before servicing
             if (!BatteryDisabled) { Msg("#LOC_RB_EVARepair_TurnOff"); return; }
@@ -276,6 +297,8 @@ namespace RealBattery
                 RBLog.Info("[RB_AfterOnStart] EVA servicing disabled, hiding all events.");
                 Events[nameof(EvaRefurbish)].active = false;
                 Events[nameof(EvaRefurbish)].guiActiveUnfocused = false;
+                Events[nameof(EvaUpgradeChemistry)].active = false;
+                Events[nameof(EvaUpgradeChemistry)].guiActiveUnfocused = false;
                 return;
             }
 

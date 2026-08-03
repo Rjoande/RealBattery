@@ -119,6 +119,7 @@ namespace RealBattery
 
             // --- v3.2.0 additions ---
             node.TryGetValue("CrateScale",           ref c.CrateScale);
+            node.TryGetValue("CrateScaleFactor",     ref c.CrateScaleFactor);
 
             // RESOURCE_EXTRA sub-nodes (auxiliary resource flows); fully optional.
             foreach (ConfigNode reNode in node.GetNodes("RESOURCE_EXTRA"))

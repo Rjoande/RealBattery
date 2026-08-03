@@ -50,6 +50,18 @@ namespace RealBattery
             return mode == "cryo" ? t : 1f - t;
         }
 
+        // Mirrors RealBattery.ReadPartVolumeL(): reads the RBbaseVolume cfg key set by MM
+        // patches; 0 if absent or unparseable.
+        private static double ReadPartVolumeL(Part part)
+        {
+            if (part?.partInfo?.partConfig != null &&
+                part.partInfo.partConfig.HasValue("RBbaseVolume") &&
+                double.TryParse(part.partInfo.partConfig.GetValue("RBbaseVolume"),
+                    System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double v))
+                return v;
+            return 0.0;
+        }
+
 
         private static HashSet<Guid> vesselsNeedingRecalculation = new HashSet<Guid>();
         private static Dictionary<Guid, VesselSnapshot> vesselSnapshots = new Dictionary<Guid, VesselSnapshot>();
@@ -66,7 +78,8 @@ namespace RealBattery
         {
             if (vessel == null || !vessel.loaded) return;
 
-            Debug.Log($"[RealBattery] CaptureSnapshot called in scene {HighLogic.LoadedScene} — vessel.loaded={vessel.loaded}, vessel.packed={vessel.packed}");
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[CaptureSnapshot] scene={HighLogic.LoadedScene}, vessel='{vessel.vesselName}', packed={vessel.packed}");
 
             Guid id = vessel.id;
             double currentUT = Planetarium.GetUniversalTime();
@@ -108,9 +121,7 @@ namespace RealBattery
                         partName = part.partInfo.name,
                         VesselECproducedPerSecond = partECprod,
                         VesselECconsumedPerSecond = partECcons
-                        
                     });
-                    Debug.Log($"[RealBattery] PartSnapshot created.");
                 }
 
                 if (part.Modules.Contains("RealBattery"))
@@ -128,10 +139,7 @@ namespace RealBattery
                     }
 
                     if (!isEnabled)
-                    {
-                        Debug.Log($"[RealBattery] Skipping disabled battery in part '{part.partInfo.title}'");
                         continue;
-                    }
 
                     if (pm is RealBattery rb && isEnabled)
                     {
@@ -155,7 +163,6 @@ namespace RealBattery
                         {
                             dischargeRate = rate;
                             totalDischargeRate += rate;
-                            Debug.Log($"[RealBattery] Read DischargeRate={rate:F3} EC/s from part '{part.partInfo.title}'");
                         }
                     }
 
@@ -189,25 +196,35 @@ namespace RealBattery
 
                     if (keepWarmMode != "false" && dischargeRate > 1e-6)
                     {
-                        // Base upkeep (warmup and operational share same baseline in BG)
-                        double upkeep = dischargeRate * RealBatterySettings.KeepWarmFrac; // EC/s nominal
-
-                        if (RealBatterySettings.EnableHeatSimulation)
+                        // Cryo waste-heat-mode batteries draw zero EC upkeep — cooling is driven
+                        // by a SystemHeat flux instead, both loaded and in background. Mirrors
+                        // RealBattery.UsesCryoWasteHeat().
+                        bool usesCryoWasteHeat = keepWarmMode == "cryo" && RealBatterySettings.UseCryoWasteHeatMode;
+                        if (!usesCryoWasteHeat)
                         {
-                            // Try precise SystemHeat loop temperature; fallback to coarse 0.5×
-                            if (TryGetSystemHeatTemp(part, out float tK))
+                            // Volume-based scaling, mirroring RealBattery.KeepWarmECperSec(): base
+                            // on part volume (RBbaseVolume) when available, otherwise fall back to
+                            // StoredCharge capacity — same fallback the loaded sim uses.
+                            double volumeL = ReadPartVolumeL(part);
+                            double scalingBase = volumeL > 0.0 ? volumeL : (sc?.maxAmount ?? 0.0);
+                            double upkeep = scalingBase * RealBatterySettings.KeepWarmFrac; // EC/s nominal
+
+                            if (RealBatterySettings.EnableHeatSimulation)
                             {
-                                float mul = KeepWarmTempMulFrom(tK, keepWarmMode, tempKeepWarmLo, tempKeepWarmHi);
-                                upkeep *= mul;
+                                // Try precise SystemHeat loop temperature; fallback to coarse 0.5×
+                                if (TryGetSystemHeatTemp(part, out float tK))
+                                {
+                                    float mul = KeepWarmTempMulFrom(tK, keepWarmMode, tempKeepWarmLo, tempKeepWarmHi);
+                                    upkeep *= mul;
+                                }
+                                else
+                                {
+                                    // Fallback when loop temp is unavailable in background
+                                    upkeep *= 0.5;
+                                }
                             }
-                            else
-                            {
-                                // Fallback when loop temp is unavailable in background
-                                upkeep *= 0.5;
-                            }
+                            totalECconsumed += upkeep;
                         }
-                        totalECconsumed += upkeep;
-                        Debug.Log($"[RealBattery][BG] KeepWarm ({keepWarmMode}) upkeep +{upkeep:F3} EC/s on '{part.partInfo?.title}'");
                     }
                 }
             }
@@ -224,7 +241,8 @@ namespace RealBattery
                 double ratio = Math.Abs(realDischargeEC / netEC_Gross);
                 double correctedEC = netEC_Gross * ratio;
 
-                Debug.Log($"[RealBattery] Correcting netEC_Gross for vessel '{vessel.vesselName}' — before: {netEC_Gross:F3} EC/s, after: {correctedEC:F3} EC/s (ratio={ratio:F3})");
+                if (RBLog.VerboseEnabled)
+                    RBLog.Verbose($"[CaptureSnapshot] Corrected netEC_Gross for '{vessel.vesselName}': {netEC_Gross:F3} -> {correctedEC:F3} EC/s (ratio={ratio:F3})");
 
                 netEC_Gross = correctedEC;
             }
@@ -234,7 +252,8 @@ namespace RealBattery
                 double ratio = Math.Abs(realDischargeEC / netEC_True);
                 double correctedEC = netEC_True * ratio;
 
-                Debug.Log($"[RealBattery] Correcting netEC_True for vessel '{vessel.vesselName}' — before: {netEC_True:F3} EC/s, after: {correctedEC:F3} EC/s (ratio={ratio:F3})");
+                if (RBLog.VerboseEnabled)
+                    RBLog.Verbose($"[CaptureSnapshot] Corrected netEC_True for '{vessel.vesselName}': {netEC_True:F3} -> {correctedEC:F3} EC/s (ratio={ratio:F3})");
 
                 netEC_True = correctedEC;
             }
@@ -294,16 +313,13 @@ namespace RealBattery
 
             energySnapshots[id] = energySnapshot;
 
-            Debug.Log($"[RealBattery] CaptureSnapshot '{vessel.vesselName}': netEC_Gross={energySnapshot.netEC_Gross:F3}, netEC_True={energySnapshot.netEC_True:F3}, solar~{solarECproduced:F3} EC/s");
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[CaptureSnapshot] '{vessel.vesselName}': netEC_Gross={energySnapshot.netEC_Gross:F3}, netEC_True={energySnapshot.netEC_True:F3}, solar~{solarECproduced:F3} EC/s");
         }
 
         public static void ApplySnapshot(Vessel vessel)
         {
-            if (!RealBatterySettings.EnableBackgroundSimulation)
-            {
-                Debug.Log("[RealBattery] Background simulation disabled — ApplySnapshot skipped.");
-                return;
-            }
+            if (!RealBatterySettings.EnableBackgroundSimulation) return;
 
             int maxSpecialistLevel = ModuleEnergyEstimator.GetMaxSpecialistLevel(vessel, "Engineer");
             double EngBonus = 0.95 + 0.06 * maxSpecialistLevel;
@@ -315,11 +331,7 @@ namespace RealBattery
             double currentTime = Planetarium.GetUniversalTime();
             double deltaTime = currentTime - snap.timestamp;
 
-            if (deltaTime < 60.0)
-            {
-                Debug.Log($"[RealBattery] ApplySnapshot skipped (Δt too small)");
-                return;
-            }
+            if (deltaTime < 60.0) return; // too small an interval to be worth simulating
 
             // --- Tunables / epsilons ---
             const double EPS = 1e-6;   // generic numeric epsilon
@@ -334,17 +346,16 @@ namespace RealBattery
 
                 deltaSC_solar = SimulateSolar(vessel, deltaTime, hoursPerDay);
 
-            Debug.Log($"[RealBattery][ApplySnapshot] Solar contribution computed: {deltaSC_solar:F3} kWh");
-
             // Net vessel delta (kWh) to distribute additively among (eligible) batteries
             double deltaSC_vessel = deltaSC_true + deltaSC_solar;
 
-            Debug.Log($"[RealBattery] ApplySnapshot debug: netEC_True={snap.netEC_True:F3}, netEC_solarEst={deltaSC_solar * 3600.0 / deltaTime:F3}, netEC_ProdRate={snap.netEC_Gross:F3}, deltaSC_vessel={deltaSC_vessel:F3} kWh");
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[ApplySnapshot] netEC_True={snap.netEC_True:F3}, solar={deltaSC_solar:F3} kWh, netEC_Gross={snap.netEC_Gross:F3}, deltaSC_vessel={deltaSC_vessel:F3} kWh");
 
             if (Math.Abs(deltaSC_vessel) < EPS && Math.Abs(snap.netEC_Gross) > EPS)
             {
-                Debug.LogWarning(
-                    $"[RealBattery] ApplySnapshot: Using fallback delta from netEC_Gross " +
+                RBLog.Warn(
+                    $"[ApplySnapshot] Using fallback delta from netEC_Gross " +
                     $"(true/solar estimate unavailable) -> netEC_Gross={snap.netEC_Gross:F3} EC/s"
                 );
 
@@ -383,13 +394,9 @@ namespace RealBattery
                 }
             }
 
-            if (totalCapacity <= CAP_EPS || distribBatteries.Count == 0)
-            {
-                Debug.Log("[RealBattery] No eligible batteries found to apply snapshot.");
-                return;
-            }
+            if (totalCapacity <= CAP_EPS || distribBatteries.Count == 0) return;
 
-            Debug.Log($"[RealBattery] ApplySnapshot for vessel '{vessel.vesselName}': Δt = {deltaTime:F1} s since last snapshot");
+            RBLog.Info($"[ApplySnapshot] '{vessel.vesselName}': Δt={deltaTime:F0}s, Δ={deltaSC_vessel:F3} kWh");
 
             // Decide vessel intent based on the delta actually being distributed
             bool vesselWantsCharge = (deltaSC_vessel > EPS);
@@ -401,7 +408,20 @@ namespace RealBattery
             bool boundOrSurface = vessel != null && (vessel.LandedOrSplashed || (!initEscape && !finalEscape));
             bool deepSpaceCruise = !boundOrSurface;
             bool protectFloatCharge = deepSpaceCruise && RealBatterySettings.DeepSpaceProtection;
-            double cycleWear = Math.Max(0.0, Math.Abs(snap.netEC_True));
+
+            // Cycle wear represents the energy actually cycled (charged by day, discharged by
+            // night) over the elapsed background period — not an instantaneous power (EC/s)
+            // reused directly as if it were an energy (kWh), independent of how long the period
+            // lasted. darkFrac approximates the unlit fraction of the period: 0.5 on the surface
+            // (matches the fixed day/night split assumed by SimulateSolar_Planet), and
+            // snap.orbitalShadowFrac in orbit.
+            bool isSurfaceVessel = vessel.LandedOrSplashed;
+            double darkFrac = isSurfaceVessel ? 0.5 : Clamp(snap.orbitalShadowFrac, 0.0, 1.0);
+            double cycleWearTotal = Math.Abs(snap.netEC_True) * deltaTime * darkFrac / 3600.0; // kWh, vessel-level
+            if (cycleWearTotal > EPS)
+                RBLog.Verbose($"[ApplySnapshot] Cycle wear (vessel-level): {cycleWearTotal:F5} kWh " +
+                              $"(|netEC_True|={Math.Abs(snap.netEC_True):F3} EC/s, deltaTime={deltaTime:F1}s, darkFrac={darkFrac:P0}) " +
+                              $"for vessel '{vessel.vesselName}', distributed pro-quota by capacity share.");
             bool appliedCycleWearThisTick = false;
 
             // Pass 1: charge/discharge
@@ -426,19 +446,20 @@ namespace RealBattery
                             rb.WearCounter += Math.Abs(applied) / EngBonus;
                             rb.UpdateBatteryLife();
                         }
-                        Debug.Log($"[RealBattery] Charged '{sc.part.partInfo.title}': +{applied:F3} kWh @ {efficiency:P0} eff");
+                        if (RBLog.VerboseEnabled)
+                            RBLog.Verbose($"[ApplySnapshot] Charged '{sc.part.partInfo.title}': +{applied:F3} kWh @ {efficiency:P0} eff");
                     }
 
                     // === Wear if a charge/discharge cycle has been simulated (non-perma-sunlight) ===
-                    if (snap.netEC_True < 0 && boundOrSurface && cycleWear > EPS)
+                    if (snap.netEC_True < 0 && boundOrSurface && cycleWearTotal > EPS)
                     {
+                        double cycleWearShare = cycleWearTotal * share; // pro-quota by capacity, same as the charge distribution above
                         if (!rb.InfiniteCycles)
                         {
-                            rb.WearCounter += cycleWear / EngBonus;
+                            rb.WearCounter += cycleWearShare / EngBonus;
                             rb.UpdateBatteryLife();
                         }
                         appliedCycleWearThisTick = true; // prevent self-discharge this tick
-                        Debug.Log($"[RealBattery] Cycle wear on '{sc.part.partInfo.title}': +{cycleWear:F5} kWh (surface/bound orbit)");
                     }
 
                     // === Float-charge if battery already at or near full ===
@@ -454,12 +475,9 @@ namespace RealBattery
                             double cycleAmount = lossPerSecond * (deltaTime * timeFractionFull);
                             rb.WearCounter += cycleAmount / EngBonus;
                             rb.UpdateBatteryLife();
-                            Debug.Log($"[RealBattery] Float-charge simulated on '{sc.part.partInfo.title}': +{cycleAmount:F5} kWh wear over {timeFractionFull:P0} of background time");
+                            if (RBLog.VerboseEnabled)
+                                RBLog.Verbose($"[ApplySnapshot] Float-charge simulated on '{sc.part.partInfo.title}': +{cycleAmount:F5} kWh wear over {timeFractionFull:P0} of background time");
                         }
-                    }
-                    else if (sc.amount >= virtualCap - EPS && protectFloatCharge)
-                    {
-                        Debug.Log($"[RealBattery] Float-charge wear skipped on '{sc.part.partInfo.title}' (Deep Space Protection active).");
                     }
                 }
 
@@ -477,7 +495,8 @@ namespace RealBattery
                             rb.WearCounter += Math.Abs(applied) / EngBonus;
                             rb.UpdateBatteryLife();
                         }
-                        Debug.Log($"[RealBattery] Discharged '{sc.part.partInfo.title}': {applied:F3} kWh");
+                        if (RBLog.VerboseEnabled)
+                            RBLog.Verbose($"[ApplySnapshot] Discharged '{sc.part.partInfo.title}': {applied:F3} kWh");
                     }
                 }
             }
@@ -534,7 +553,8 @@ namespace RealBattery
                         double lifeDecayPerSec = rb.SelfDischargeRate / (hoursPerDay * 3600.0);
                         rb.BatteryLife = Math.Max(0.0, rb.BatteryLife - lifeDecayPerSec * deltaTime);
                         rb.UpdateBatteryLife();
-                        Debug.Log($"[RealBattery][BG] LifeDecay on '{sc.part.partInfo?.title}': BatteryLife={rb.BatteryLife:F6}");
+                        if (RBLog.VerboseEnabled)
+                            RBLog.Verbose($"[ApplySnapshot] LifeDecay on '{sc.part.partInfo?.title}': BatteryLife={rb.BatteryLife:F6}");
                     }
                     continue; // skip SoC self-discharge for LifeDecay cells
                 }
@@ -542,15 +562,12 @@ namespace RealBattery
                 // --- Standard self-discharge ---
                 if (sc.amount <= EPS) continue;
 
-                // Non-rechargeable "primary" heuristic
-                bool isPrimary = rb.CycleDurability <= 1 || rb.ChargeEfficiencyCurve.Evaluate(0f) <= EPS;
-
                 bool idle = !vesselWantsCharge && !vesselWantsDischarge;
                 bool shouldSelfDischarge =
                     (!isEnabled) ||                                 // disabled -> always self-discharge
                     (!appliedCycleWearThisTick && (                 // only if no cycle wear this tick
-                        (isPrimary && !vesselWantsDischarge) ||     // primary: unless actively discharging
-                        (!isPrimary && idle)                        // rechargeable: only when truly idle
+                        (rb.IsPrimary && !vesselWantsDischarge) ||  // primary: unless actively discharging
+                        (!rb.IsPrimary && idle)                     // rechargeable: only when truly idle
                     ));
 
                 if (!shouldSelfDischarge) continue;
@@ -565,28 +582,15 @@ namespace RealBattery
                 if (applied > EPS)
                 {
                     sc.amount = newAmount;
-                    string kind = isEnabled ? "Self-discharge" : "Autoself-discharge (disabled)";
-                    Debug.Log($"[RealBattery] {kind} on '{sc.part.partInfo.title}': -{applied:F4} kWh");
+                    if (RBLog.VerboseEnabled)
+                    {
+                        string kind = isEnabled ? "Self-discharge" : "Autoself-discharge (disabled)";
+                        RBLog.Verbose($"[ApplySnapshot] {kind} on '{sc.part.partInfo.title}': -{applied:F4} kWh");
+                    }
                 }
             }
 
-            // Final logs
-            foreach (var (sc, rb, isEnabled, _) in allBatteries)
-            {
-                double ActualLife = RealBatterySettings.EnableBatteryWear ? rb.BatteryLife : 1.0;
-                Debug.Log(
-                    $"[RealBattery] Applied StoredCharge to part '{sc.part.partInfo.title}': " +
-                    $"{sc.amount:F3}/{sc.maxAmount:F3} kWh | " +
-                    $"SOC={rb.SC_SOC:P1}, Enabled={isEnabled}, " +
-                    $"NetΔ={(deltaSC_vessel >= 0 ? "+" : "")}{deltaSC_vessel:F3} kWh, " +
-                    $"Eff@SOC={rb.ChargeEfficiencyCurve.Evaluate((float)rb.SC_SOC):P1}, " +
-                    $"Eff@100%={rb.ChargeEfficiencyCurve.Evaluate(1.0f):P1}, " +
-                    $"BatteryLife={ActualLife:P0}, Wear={rb.WearCounter:F2} kWh with EngBonus={EngBonus:F2}"
-                );
-            }
-
             snap.timestamp = currentTime;
-            Debug.Log($"[RealBattery] ApplySnapshot executed on vessel '{vessel.vesselName}'.");
         }
 
         public static VesselEnergySnapshot GetEnergySnapshot(Guid id)
@@ -599,11 +603,12 @@ namespace RealBattery
             if (snap != null)
             {
                 energySnapshots[snap.vesselId] = snap;
-                Debug.Log($"[RealBattery][OnLoad] Restored snapshot: NetEC={snap.netEC_Gross:F3}");
+                if (RBLog.VerboseEnabled)
+                    RBLog.Verbose($"[RestoreEnergySnapshot] NetEC={snap.netEC_Gross:F3}");
             }
             else
             {
-                Debug.LogWarning("[RealBattery] Attempted to restore null snapshot");
+                RBLog.Warn("[RestoreEnergySnapshot] Attempted to restore a null snapshot");
             }
         }
 
@@ -615,11 +620,7 @@ namespace RealBattery
             double currentUT = Planetarium.GetUniversalTime();
             double deltaTime = currentUT - snap.timestamp;
 
-            if (deltaTime <= 0)
-            {
-                Debug.Log("[RealBattery] DeltaTime <= 0, skipping UpdateEnergySnapshot.");
-                return;
-            }
+            if (deltaTime <= 0) return;
 
             double deltaEnergy = 0;
             double hoursPerDay = RealBatterySettings.GetHoursPerDay();
@@ -629,21 +630,20 @@ namespace RealBattery
                 // Simulate maintenance (floatcharge): if producing but the batteries are full -> maintenance cycles
                 double cycleFraction = 0.001; // 0.1% of capacity per snapshot
                 double simulatedWearKWh = snap.storedChargeMaxAmount * cycleFraction;
-                deltaEnergy = 0; // no actual energy change, but the log records it
+                deltaEnergy = 0; // no actual energy change
 
-                Debug.Log($"[RealBattery] Float-charge simulation active (background): +{simulatedWearKWh:F3} kWh wear equivalent");
+                if (RBLog.VerboseEnabled)
+                    RBLog.Verbose($"[UpdateEnergySnapshot] Float-charge simulation active: +{simulatedWearKWh:F3} kWh wear equivalent");
             }
             else if (snap.netEC_Gross > 0.00001)
             {
                 double effectiveRate = Math.Min(snap.netEC_Gross, snap.totalDischargeRate);
                 deltaEnergy = (effectiveRate * deltaTime) / 3600.0;
-                Debug.Log($"[RealBattery] Background charging: +{deltaEnergy:F3} kWh (rate {effectiveRate:F2} EC/s)");
             }
             else if (snap.netEC_Gross < -0.00001 && snap.totalDischargeRate > 0)
             {
                 double effectiveRate = Math.Min(Math.Abs(snap.netEC_Gross), snap.totalDischargeRate);
                 deltaEnergy = -(effectiveRate * deltaTime) / 3600.0;
-                Debug.Log($"[RealBattery] Background discharging: {deltaEnergy:F3} kWh (rate {effectiveRate:F2} EC/s)");
             }
             else
             {
@@ -665,13 +665,18 @@ namespace RealBattery
 
                 double lossEnergy = (snap.storedChargeMaxAmount * selfDischargeSOCperDay * deltaTime) / (hoursPerDay * 3600.0);
                 deltaEnergy = -lossEnergy;
-                Debug.Log($"[RealBattery] Background self-discharge: -{lossEnergy:F3} kWh");
             }
 
             snap.storedChargeAmount += deltaEnergy;
             snap.storedChargeAmount = Math.Max(0, Math.Min(snap.storedChargeMaxAmount, snap.storedChargeAmount));
 
-            Debug.Log($"[RealBattery] Updated snapshot for vessel '{vessel.vesselName}' -> {snap.storedChargeAmount:F3}/{snap.storedChargeMaxAmount:F3} kWh");
+            // Advance the timestamp: this call already consumed [snap.timestamp, currentUT) for
+            // its estimate. Whoever mutates snap state owns advancing its clock — a second call
+            // (or ApplySnapshot afterwards) must see a fresh interval, not re-consume this one.
+            snap.timestamp = currentUT;
+
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[UpdateEnergySnapshot] '{vessel.vesselName}' -> {snap.storedChargeAmount:F3}/{snap.storedChargeMaxAmount:F3} kWh");
         }
 
         public static double SimulateSolar(Vessel vessel, double deltaTime, double hoursPerDay)
@@ -695,23 +700,22 @@ namespace RealBattery
             bool initEscape = snap.isEscape;
             bool finalEscape = vessel.orbit.ApA > vessel.mainBody.sphereOfInfluence;
 
-            Debug.Log($"[RealBattery][SolarSim] InitBody={snap.mainBodyName} (escape={initEscape}), FinalBody={vessel.mainBody.name} (escape={finalEscape}), Δt={deltaTime:F1}s");
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[SimulateSolar] InitBody={snap.mainBodyName} (escape={initEscape}), FinalBody={vessel.mainBody.name} (escape={finalEscape}), Δt={deltaTime:F1}s");
 
             // Scenario selection
             if (vessel.LandedOrSplashed || (!initEscape && !finalEscape))
             {
                 // Surface mode: always simulate using initial orbit snapshot
-                Debug.Log($"[RealBattery][SolarSim] Vessel '{vessel.vesselName}' stayed on {vessel.mainBody.name}, simulating night/day cycle...");
                 total_kWh = SimulateSolar_Planet(vessel, deltaTime);
             }
             else if (initBody == initStarIdx || finalBody == finalStarIdx || initEscape || finalEscape)
             {
-                Debug.Log($"[RealBattery][SolarSim] Vessel '{vessel.vesselName}' has been in heliocentric orbit and/or changed SOI, ignoring shadow phases...");
                 total_kWh = SimulateSolar_Sun(vessel, deltaTime);
             }
             else
             {
-                Debug.LogWarning($"[RealBattery][SolarSim] No matching scenario found, defaulting to rough solar output...");
+                RBLog.Warn("[SimulateSolar] No matching scenario found, defaulting to rough solar output.");
                 total_kWh = snap.solarECproduced;
             }
 
@@ -721,13 +725,14 @@ namespace RealBattery
         private static double SimulateSolar_Sun(Vessel vessel, double deltaTime)
         {
             var snap = energySnapshots[vessel.id];
-            
+
             double solarECnow = ModuleEnergyEstimator.SolarPanelsBaseOutput(vessel);
 
             double avgECps = (snap.solarECproduced + solarECnow) / 2.0;
             double total_kWh = (avgECps * deltaTime) / 3600.0;
 
-            Debug.Log($"[RealBattery][SolarSim] AvgECps={avgECps:F3} EC/s -> Total={total_kWh:F3} kWh");
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[SimulateSolar_Sun] AvgECps={avgECps:F3} EC/s -> Total={total_kWh:F3} kWh");
 
             return total_kWh;
         }
@@ -737,18 +742,18 @@ namespace RealBattery
         {
             var snap = energySnapshots[vessel.id];
 
-            // Resolve correct star for surface day/night and orbital eclipse logic.
-            //CelestialBody sun = ResolveStarForBody(vessel.mainBody, out _);
-            
-                
-                // If the snapshot was taken with orbital naming, remap to surface naming.
+            // Resolve correct star for surface day/night and orbital eclipse logic
+            // (multistar/Kopernicus-aware; falls back to Planetarium.fetch.Sun internally).
+            CelestialBody sun = ResolveStarForBody(vessel.mainBody, out _);
+
+            // If the snapshot was taken with orbital naming, remap to surface naming.
             if (vessel.LandedOrSplashed && (snap.startPhase == IllumPhase.Sunlit || snap.startPhase == IllumPhase.Shadow))
             {
                 // Remap labels and (optionally) refresh tToTransition & period for surface consistency
-                snap.startPhase = (SolarElevationRad(vessel, Planetarium.fetch.Sun) > 0.0) ? IllumPhase.Day : IllumPhase.Night;
+                snap.startPhase = (SolarElevationRad(vessel, sun) > 0.0) ? IllumPhase.Day : IllumPhase.Night;
 
                 // Optional but recommended for full coherence if state changed since capture:
-                snap.tToTransition = TimeToSurfaceTransition(vessel, Planetarium.fetch.Sun, Math.Max(vessel.mainBody.rotationPeriod, 1.0));
+                snap.tToTransition = TimeToSurfaceTransition(vessel, sun, Math.Max(vessel.mainBody.rotationPeriod, 1.0));
                 snap.period = Math.Max(vessel.mainBody.rotationPeriod, 1.0);
             }
 
@@ -777,8 +782,9 @@ namespace RealBattery
                     double avgECps = snap.solarECproduced * blendedFrac;
                     total_kWh = (avgECps * t) / 3600.0;
 
-                    Debug.Log($"[RealBattery][SolarSim] Surface-Polar: lat={latAbs:F2}° ≥ {POLAR_LAT_THRESHOLD_DEG}°, " +
-                    $"blendedFrac={blendedFrac:P1} -> AvgECps={avgECps:F3} EC/s, Δt={t:F1}s, Total={total_kWh:F3} kWh");
+                    if (RBLog.VerboseEnabled)
+                        RBLog.Verbose($"[SimulateSolar_Planet] Surface-Polar: lat={latAbs:F2}° ≥ {POLAR_LAT_THRESHOLD_DEG}°, " +
+                            $"blendedFrac={blendedFrac:P1} -> AvgECps={avgECps:F3} EC/s, Δt={t:F1}s, Total={total_kWh:F3} kWh");
                     return total_kWh;
                 }
             }
@@ -793,7 +799,8 @@ namespace RealBattery
 
             double Ecycle_kWh = (snap.solarECproduced * litFracCycle * P) / 3600.0;
 
-            Debug.Log($"[RealBattery][SolarSim] Orbit/Surface: period={P:F1}s | litFracCycle={litFracCycle:P1} | Ecycle={Ecycle_kWh:F3} kWh | fullCycles={N} | remainder={r:F1}s");
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[SimulateSolar_Planet] period={P:F1}s | litFracCycle={litFracCycle:P1} | Ecycle={Ecycle_kWh:F3} kWh | fullCycles={N} | remainder={r:F1}s");
 
             double rem_kWh = 0.0;
             double rem = r;
@@ -810,7 +817,8 @@ namespace RealBattery
                 double segEnergy = isLit ? (snap.solarECproduced * seg) / 3600.0 : 0.0;
                 rem_kWh += segEnergy;
 
-                Debug.Log($"[RealBattery][SolarSim] seg={seg:F1}s | Lit={isLit} | EnergyThisSeg={segEnergy:F4} kWh");
+                if (RBLog.VerboseEnabled)
+                    RBLog.Verbose($"[SimulateSolar_Planet] seg={seg:F1}s | Lit={isLit} | EnergyThisSeg={segEnergy:F4} kWh");
 
                 rem -= seg;
                 // Flip phase appropriately based on context
@@ -827,7 +835,8 @@ namespace RealBattery
             }
 
             total_kWh = N * Ecycle_kWh + rem_kWh;
-            Debug.Log($"[RealBattery][SolarSim] Orbit/Surface total={total_kWh:F3} kWh");
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[SimulateSolar_Planet] total={total_kWh:F3} kWh");
             return total_kWh;
         }
 
@@ -882,11 +891,9 @@ namespace RealBattery
                 double fracShadow = theta / Math.PI;
                 orbitalShadowFrac = Clamp(fracShadow, 0.0, 1.0);
 
-                // Current phase: analytic eclipse test (line of sight to Sun behind body)
-                startPhase = IsInEclipse(vessel, body, sun) ? IllumPhase.Shadow : IllumPhase.Sunlit;
-
-                // Time to next boundary (approx. circular): distance in angle / mean motion
-                tToTransition = TimeToOrbitalTransition(vessel, body, sun);
+                // Phase and time-to-transition derived from the same in-plane frame, so they
+                // can never disagree with each other (see OrbitalIlluminationStatus).
+                OrbitalIlluminationStatus(vessel, body, sun, out startPhase, out tToTransition);
             }
         }
 
@@ -927,83 +934,81 @@ namespace RealBattery
         }
 
 
-// Returns true if vessel is behind the body w.r.t the Sun (umbra test)
-private static bool IsInEclipse(Vessel v, CelestialBody body, CelestialBody sun)
+        // Computes the current Sunlit/Shadow phase and the time to the next terminator crossing
+        // for an orbiting vessel, from a single self-consistent in-plane frame.
+        //
+        // Fixes three bugs present in the previous split IsInEclipse/TimeToOrbitalTransition
+        // implementation (2026-07-14):
+        //   - IsInEclipse tested the angle to the SUB-solar direction (sun.position - body.position)
+        //     and called that "eclipse" — it actually flagged the fully-lit side and missed the
+        //     real umbra entirely.
+        //   - The orbital frame was built from Orbit.GetOrbitNormal(), which is expressed in KSP's
+        //     internal orbit frame (Y/Z swapped vs. world space) and was mixed directly with
+        //     world-space vectors (r_world, antiSun) without conversion, making theta_now
+        //     essentially arbitrary relative to the real geometry.
+        //   - The true-anomaly-based dt from Orbit.GetDTforTrueAnomaly() was only rejected on
+        //     NaN/Infinity/negative, not on dt > one period, so a bad frame could yield a
+        //     time-to-transition larger than the orbital period itself.
+        //
+        // Deriving both phase and timing from the same theta_now/phi here means they can never
+        // contradict each other, which the old split implementation didn't guarantee either.
+        private static void OrbitalIlluminationStatus(Vessel v, CelestialBody body, CelestialBody sun,
+            out IllumPhase phase, out double tToTransition)
         {
-            Vector3d r = v.GetWorldPos3D() - body.position;     // vessel from body center
-            Vector3d s = sun.position - body.position;          // sun from body center
+            Vector3d r_world = v.GetWorldPos3D() - body.position;          // vessel position, body frame
+            Vector3d antiSun = (body.position - sun.position).normalized;  // anti-sun direction from body
 
-            double rMag = r.magnitude;
-            double sMag = s.magnitude;
-            if (rMag < 1.0 || sMag < 1.0) return false;
-
-            // angle between r and s
-            double cosang = Vector3d.Dot(r, s) / (rMag * sMag);
-            cosang = Clamp(cosang, -1.0, 1.0);
-            double ang = Math.Acos(cosang);
-
-            // eclipse if ang < asin(R / |r|)
-            double limit = Math.Asin(Clamp(body.Radius / rMag, 0.0, 1.0));
-            return ang < limit;
-        }
-
-        // Time to next Sunlit/Shadow boundary assuming near-circular motion
-        private static double TimeToOrbitalTransition(Vessel v, CelestialBody body, CelestialBody sun)
-        {
-            // --- 1) Frame construction in orbital plane ---
-            Vector3d r_world = v.GetWorldPos3D() - body.position;          // vessel position in body frame
-            Vector3d h = v.orbit.GetOrbitNormal().normalized;               // orbit plane normal
-            Vector3d antiSun = (body.position - sun.position).normalized;   // anti-sun direction from body
-            Vector3d aProj = antiSun - Vector3d.Dot(antiSun, h) * h;        // project anti-sun onto orbit plane
-            if (aProj.sqrMagnitude< 1e-12)
+            // Orbit normal from the actual world-space state vectors (position × velocity), not
+            // Orbit.GetOrbitNormal() — see note above. Cross(h, X) for any in-plane X points 90°
+            // ahead of X in the direction of motion, which is what makes theta_now (below) grow
+            // forward in time regardless of KSP's internal frame conventions.
+            Vector3d h = Vector3d.Cross(r_world, v.obt_velocity);
+            if (h.sqrMagnitude < 1e-12)
             {
-                // High beta-angle: no eclipse expected; return a very large time.
-                return double.PositiveInfinity;
+                // Degenerate (near-radial) state vector; treat as always lit.
+                phase = IllumPhase.Sunlit;
+                tToTransition = double.PositiveInfinity;
+                return;
             }
-            Vector3d e1 = aProj.normalized;                 // 0° = anti-sun projected
-            Vector3d e2 = Vector3d.Cross(h, e1);            // 90° = prograde direction in-plane
+            h = h.normalized;
 
-            // --- 2) Current in-plane angle from anti-sun axis ---
+            Vector3d aProj = antiSun - Vector3d.Dot(antiSun, h) * h;       // anti-sun projected onto orbit plane
+            if (aProj.sqrMagnitude < 1e-12)
+            {
+                // High beta-angle: sun direction ~perpendicular to the orbit plane, no eclipse expected.
+                phase = IllumPhase.Sunlit;
+                tToTransition = double.PositiveInfinity;
+                return;
+            }
+            Vector3d e1 = aProj.normalized;                 // 0° = anti-sun projected (shadow center)
+            Vector3d e2 = Vector3d.Cross(h, e1);            // 90° ahead, in the direction of motion
+
+            // Current in-plane angle from the anti-sun axis (0 = deepest shadow, ±π = sub-solar point).
             double x = Vector3d.Dot(r_world, e1);
             double y = Vector3d.Dot(r_world, e2);
             double theta_now = Math.Atan2(y, x);            // [-π, π]
 
-            // --- 3) Shadow half-angle φ (use current radius) ---
+            // Shadow half-angle φ (use current radius).
             double rmag = Math.Max(r_world.magnitude, body.Radius + 1.0);
             double phi = Math.Asin(Clamp(body.Radius / rmag, 0.0, 1.0));    // [0..π/2]
 
-            // --- 4) Angular advance to the next terminator (forward) ---
-            // Terminators are at +φ and -φ in this frame.
-            double d1 = WrapTo2Pi(phi - theta_now);         // advance to +φ
-            double d2 = WrapTo2Pi(-phi - theta_now);        // advance to -φ
-            double dTheta = Math.Min(d1, d2);               // smallest positive advance
+            // In shadow iff within the umbra half-angle of the anti-sun axis.
+            phase = (Math.Abs(theta_now) < phi) ? IllumPhase.Shadow : IllumPhase.Sunlit;
 
-            // --- 5) Convert Δθ to forward time via true anomaly if possible ---
-            // For circular or near-circular orbits, Δθ ≈ Δ(true anomaly).
-            double TA_now = v.orbit.trueAnomaly;            // radians
-            double TA_tgt = WrapTo2Pi(TA_now + dTheta);
-            double ut = Planetarium.GetUniversalTime();
+            // Angular advance to the next terminator (+φ or -φ), forward in the direction of motion.
+            double d1 = WrapTo2Pi(phi - theta_now);
+            double d2 = WrapTo2Pi(-phi - theta_now);
+            double dTheta = Math.Min(d1, d2);
 
-            // Try high-fidelity conversion first (KSP Orbit API). If not available, fallback to mean motion.
-            double dt;
-            try
-            {
-                // Some KSP versions expose GetDTforTrueAnomaly(ta, UT) or timeToTrueAnomaly(ta).
-                // Prefer GetDTforTrueAnomaly if present because it handles eccentric orbits correctly.
-                dt = v.orbit.GetDTforTrueAnomaly(TA_tgt, ut);
-                if (double.IsNaN(dt) || double.IsInfinity(dt) || dt< 0)
-                    throw new Exception("GetDTforTrueAnomaly returned invalid dt");
-            }
-            catch
-            {
-                // Fallback: assume circular motion at mean motion n = 2π/P.
-                double P = Math.Max(v.orbit.period, 1.0);
-                double n = 2.0 * Math.PI / P;               // rad/s
-                dt = dTheta / Math.Max(n, 1e-6);
-            }
-
-            // Safety clamp (avoid zero-length segments due to numeric noise)
-            return Math.Max(dt, 1e-3);
+            // Convert to time via mean motion. The whole illumination model already assumes a
+            // circular approximation elsewhere (orbitalShadowFrac from asin(R/a), fixed
+            // alternating lit/dark segments in SimulateSolar_Planet), so a true-anomaly-based
+            // conversion doesn't add real accuracy here and risks wrapping past a full period.
+            // Clamp to at most one period as a hard safety bound.
+            double P = Math.Max(v.orbit.period, 1.0);
+            double n = 2.0 * Math.PI / P;
+            double dt = dTheta / Math.Max(n, 1e-6);
+            tToTransition = Math.Max(1e-3, Math.Min(dt, P));
         }
 
         // Wrap to [0, 2π)

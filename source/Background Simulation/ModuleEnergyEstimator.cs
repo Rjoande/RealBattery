@@ -1,4 +1,4 @@
-﻿// RealBattery Background EC Simulator – refined estimation of module EC usage/production
+// RealBattery Background EC Simulator – refined estimation of module EC usage/production
 // This version includes logic for:
 // - Command modules (with hibernation)
 // - ResourceConverter & Harvester (specialist bonus)
@@ -35,17 +35,7 @@ namespace RealBattery
                 // Command
                 if (module is ModuleCommand command)
                 {
-                    double multiplier = 1.0;
-
-                    if (command.hibernation)
-                    {
-                        multiplier = command.hibernationMultiplier;
-                        Debug.Log($"[RealBattery] ModuleCommand on '{part.partInfo.title}' is HIBERNATING — multiplier = {multiplier:F2}");
-                    }
-                    else
-                    {
-                        Debug.Log($"[RealBattery] ModuleCommand on '{part.partInfo.title}' is ACTIVE — no multiplier");
-                    }
+                    double multiplier = command.hibernation ? command.hibernationMultiplier : 1.0;
 
                     foreach (var res in command.resHandler.inputResources)
                     {
@@ -53,7 +43,6 @@ namespace RealBattery
                         {
                             double rate = res.rate * multiplier;
                             partECconsumed += rate;
-                            Debug.Log($"[RealBattery] ModuleCommand EC consumption: base={res.rate:F3}, adjusted={rate:F3} EC/s on '{part.partInfo.title}'");
                         }
                     }
                 }
@@ -61,15 +50,12 @@ namespace RealBattery
                 // ResourceConverter
                 if (module is ModuleResourceConverter converter && converter.IsActivated)
                 {
-                    Debug.Log($"[RealBattery] ResourceConverter on '{part.partInfo.title}' — Active: {converter.IsActivated}, UseSpecialistBonus: {converter.UseSpecialistBonus}");
-
                     double factor = 1.0;
                     if (converter.UseSpecialistBonus)
                     {
                         string trait = module.moduleName == "SnackProcessor" ? "Scientist" : "Engineer";
                         int maxLevel = ModuleEnergyEstimator.GetMaxSpecialistLevel(part.vessel, trait);
                         factor = converter.SpecialistEfficiencyFactor * maxLevel + converter.SpecialistBonusBase;
-                        Debug.Log($"[RealBattery] Specialist bonus factor calculated ({trait}, level {maxLevel}): {factor:F3}");
                     }
 
                     double eff = 1.0;
@@ -83,7 +69,6 @@ namespace RealBattery
                         {
                             double rate = input.Ratio * factor * eff;
                             partECconsumed += rate;
-                            Debug.Log($"[RealBattery] Converter '{part.partInfo.title}' — EC: -{rate:F3} EC/s (eff={eff:F2})");
                         }
                     }
                     foreach (var output in converter.outputList)
@@ -99,14 +84,11 @@ namespace RealBattery
                 // ResourceHarvester
                 if (module is ModuleResourceHarvester harvester && harvester.IsActivated)
                 {
-                    Debug.Log($"[RealBattery] Found ModuleResourceHarvester on '{part.partInfo.title}' — Active: {harvester.IsActivated}, status: {harvester.status}, UseSpecialistBonus: {harvester.UseSpecialistBonus}");
-                                        
                     double factor = 1.0;
                     if (harvester.UseSpecialistBonus)
                     {
                         int maxLevel = ModuleEnergyEstimator.GetMaxSpecialistLevel(part.vessel, "Engineer") + 1;
                         factor = harvester.SpecialistEfficiencyFactor * maxLevel + harvester.SpecialistBonusBase;
-                        Debug.Log($"[RealBattery] Specialist bonus factor calculated (Engineer, level {maxLevel-1}): {factor:F3}");
                     }
 
                     double eff = 1.0;
@@ -145,7 +127,6 @@ namespace RealBattery
 
                         double rate = maxRate * frac;
                         partECconsumed += rate;
-                        Debug.Log($"[RealBattery] Radiator '{part.partInfo.title}' — EC: -{rate:F3} EC/s (frac={frac:F2})");
                     }
                 }
 
@@ -157,10 +138,7 @@ namespace RealBattery
                     if (TryGetField<bool>(lab, "isOperational", out var op)) running &= op;
 
                     if (running)
-                    {
                         partECconsumed += lab.powerRequirement;
-                        Debug.Log($"[RealBattery] ScienceLab '{part.partInfo.title}' — EC: -{lab.powerRequirement:F3} EC/s");
-                    }
                 }
 
                 // Light
@@ -169,10 +147,7 @@ namespace RealBattery
                     foreach (var res in light.resHandler.inputResources)
                     {
                         if (res.name == "ElectricCharge")
-                        {
                             partECconsumed += res.rate;
-                            Debug.Log($"[RealBattery] ModuleLight (ON): -{res.rate:F3} EC/s from '{part.partInfo.title}'");
-                        }
                     }
                 }
 
@@ -182,10 +157,7 @@ namespace RealBattery
                     foreach (var res in gen.resHandler.outputResources)
                     {
                         if (res.name == "ElectricCharge" && res.rate > 0)
-                        {
                             partECproduced += res.rate;
-                            Debug.Log($"[RealBattery] ModuleGenerator: +{res.rate:F3} EC/s from '{part.partInfo.title}'");
-                        }
                     }
                 }
 
@@ -209,15 +181,8 @@ namespace RealBattery
                         foreach (var res in module.resHandler.inputResources)
                         {
                             if (res.name == "ElectricCharge" && res.rate > 0)
-                            {
                                 partECconsumed += res.rate;
-                                Debug.Log($"[RealBattery] SCANsat '{part.partInfo.title}' — Scanning ON — EC: -{res.rate:F3} EC/s");
-                            }
                         }
-                    }
-                    else
-                    {
-                        Debug.Log($"[RealBattery] SCANsat '{part.partInfo.title}' — not scanning or no EC use");
                     }
                 }
 
@@ -254,10 +219,7 @@ namespace RealBattery
                                             continue;
 
                                         if (double.TryParse(boilNode.GetValue("CoolingCost"), out double cost))
-                                        {
                                             partECconsumed += cost;
-                                            Debug.Log($"[RealBattery] CryoTank '{part.partInfo.title}' — CoolingCost: -{cost:F3} EC/s (for {fuel})");
-                                        }
                                     }
                                 }
                             }
@@ -285,10 +247,7 @@ namespace RealBattery
                     catch { }
 
                     if (enabled && cost > 0)
-                    {
                         partECconsumed += cost;
-                        Debug.Log($"[RealBattery] {module.moduleName} '{part.partInfo.title}' — Enabled, EC: -{cost:F3} EC/s");
-                    }
                 }
 
                 if (module.moduleName == "ModuleSpaceDustScanner")
@@ -304,14 +263,7 @@ namespace RealBattery
                     catch { }
 
                     if (enabled && powerCost > 0)
-                    {
                         partECconsumed += powerCost;
-                        Debug.Log($"[RealBattery] SpaceDustScanner '{part.partInfo.title}' — EC consumption: -{powerCost:F3} EC/s (Enabled)");
-                    }
-                    else
-                    {
-                        Debug.Log($"[RealBattery] SpaceDustScanner '{part.partInfo.title}' — not scanning or PowerCost = 0");
-                    }
                 }
 
                 if (module.moduleName == "ModuleAntimatterTank")
@@ -327,10 +279,7 @@ namespace RealBattery
                     catch { }
 
                     if (enabled && cost > 0)
-                    {
                         partECconsumed += cost;
-                        Debug.Log($"[RealBattery] AntimatterTank '{part.partInfo.title}' — EC consumption: -{cost:F3} EC/s");
-                    }
                 }
 
                 if (module.moduleName == "FusionReactor")
@@ -346,10 +295,7 @@ namespace RealBattery
                     catch { }
 
                     if (enabled && ecRate > 0)
-                    {
                         partECproduced += ecRate;
-                        Debug.Log($"[RealBattery] FusionReactor '{part.partInfo.title}' — EC production: +{ecRate:F3} EC/s");
-                    }
                 }
 
                 if (module.moduleName == "ModuleSystemHeatFissionReactor")
@@ -383,10 +329,7 @@ namespace RealBattery
                                     }
 
                                     if (maxOutput > 0)
-                                    {
                                         partECproduced += maxOutput;
-                                        Debug.Log($"[RealBattery] FissionReactor '{part.partInfo.title}' — estimated max EC: +{maxOutput:F3} EC/s (from ElectricalGeneration curve)");
-                                    }
                                 }
                             }
                         }
@@ -409,10 +352,7 @@ namespace RealBattery
                     chargeRate *= 0.7;
 
                     if (isActive && chargeRate > 0)
-                    {
                         partECproduced += chargeRate;
-                        Debug.Log($"[RealBattery] PETTurbine '{part.partInfo.title}' — EC production: +{chargeRate:F3} EC/s");
-                    }
                 }
             }
         }
@@ -433,9 +373,11 @@ namespace RealBattery
                 if (kopStar != null) starBody = kopStar;
                 luminosity = kopLum/1360;
             }
-            
-            // 1/r^2 w.r.t Kerbin SMA as reference (same as current estimator)
-            double refDist = FlightGlobals.GetBodyByName("Kerbin")?.orbit?.semiMajorAxis ?? 13599840256.0;
+
+            // 1/r^2 w.r.t the homeworld's SMA as reference (same as current estimator).
+            // Uses the actual home body rather than a hardcoded "Kerbin" name, so renamed/replaced
+            // homeworlds (GPP, Beyond Home, RSS, etc.) still get the correct reference distance.
+            double refDist = FlightGlobals.GetHomeBody()?.orbit?.semiMajorAxis ?? 13599840256.0;
             // vessel.distanceToSun always refers to Planetarium.fetch.Sun, so compute distance to the resolved star.
             double currDist = (vessel.GetWorldPos3D() - starBody.position).magnitude;
             double invSqrScale = Math.Pow(refDist / Math.Max(currDist, 1.0), 2.0);
@@ -477,8 +419,6 @@ namespace RealBattery
 
                     // Simple incidence penalty for non-tracking panels
                     if (!panel.isTracking) rate *= 0.5;
-                                        
-                    Debug.Log($"[RealBattery] SolarPanel '{part.partInfo.title}' rough prod: +{rate:F3} EC/s");
 
                     totalPVECps += rate;
                 }
@@ -489,7 +429,8 @@ namespace RealBattery
             // Apply Kopernicus star luminosity scaling (Kerbol = 1).
             totalPVECps *= luminosity;
 
-            Debug.Log($"[RealBattery] SolarPanelsBaseOutput for '{vessel.vesselName}': {logPVECps} raw EC/s at {currDist/refDist:F3} AU from {kopStar.displayName} ({luminosity:F3}x luminosity) = {totalPVECps:F3} EC/s");
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[SolarPanelsBaseOutput] '{vessel.vesselName}': {logPVECps} raw EC/s at {currDist/refDist:F3} AU from {starBody.displayName} ({luminosity:F3}x luminosity) = {totalPVECps:F3} EC/s");
 
             return totalPVECps;
         }

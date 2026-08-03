@@ -93,5 +93,11 @@ namespace RealBattery
         // CrateScale: "false" (no scaling) | "add" | "reduce"; how this battery's
         // C-rate scales with the count of participating batteries on the vessel.
         public string CrateScale = RBDefaults.CrateScale;
+
+        // Steepness/asymptote parameter shared by both CrateScale curves (see
+        // RealBatteryLoadMaster.FixedUpdate). "add" saturates towards ×CrateScaleFactor as n
+        // grows; "reduce" decays towards 0 with CrateScaleFactor controlling how many cells it
+        // takes to get there. Neutral at n=1 (m=1) regardless of the value.
+        public float CrateScaleFactor = RBDefaults.CrateScaleFactor;
     }
 }

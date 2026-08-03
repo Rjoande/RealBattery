@@ -14,5 +14,8 @@
     ],
     "recommends": [
         { "name" : "DynamicBatteryStorage" }
-    ]    
+    ],
+    "suggests": [
+        { "name" : "HarmonyKSP" }
+    ]
 }

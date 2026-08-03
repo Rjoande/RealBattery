@@ -1,14 +1,17 @@
 # Changelog
 
-## v3.2.0
+## v3.3.0
 
 ### Major Changes
 - **RealBattery Expansion (new optional package):** the four exotic chemistries — *Vanadium Redox Flow (VRFB)*, *Liquid Metal (Mg‖Sb)*, *Superconducting (SMES)*, and *Long-lived Isotopic (Ho-166m)* — have been moved out of the core mod into a separate, fully removable **RealBatteryExpansion** package. The core mod now ships the 13 standard chemistries; install the Expansion to add the exotic tier. Each chemistry lives in its own self-contained folder (definitions, patches, localization, and assets), so the Expansion can be added or removed cleanly without affecting the core mod.
 - New **Quantum Energy Teleportation** battery type added: similar to a SMES, but for smaller parts and uses additive C-rate scaling (see below).
 - **Auxiliary resource flows (`RESOURCE_EXTRA`):** battery chemistries can now require or produce additional resources during charge or discharge. If an input resource runs short the transfer is blocked atomically: no EC or StoredCharge moves. *(For modders: supported in both `REALBATTERY_CHEMISTRY` nodes and legacy inline `MODULE` configs.)*
-- **C-rate vessel scaling (`CrateScale`):** chemistries can opt into automatic C-rate scaling based on how many batteries of the same type are active on the vessel (`add` multiplies, `reduce` divides).
+- **C-rate vessel scaling (`CrateScale`):** chemistries can opt into automatic C-rate scaling based on how many batteries of the same type are active on the vessel (`add` saturates towards a configurable multiplier, `reduce` decays smoothly towards zero — both level off instead of growing/collapsing without bound).
+- **Bon Voyage compatibility:** Bon Voyage's rover autopilot can now see and drain RealBattery's `StoredCharge` correctly, either natively (pending a pull request to Bon Voyage /L) or, until that lands, via an optional `RealBatteryBVBridge.dll` companion plugin (requires HarmonyKSP, only active if both Bon Voyage and HarmonyKSP are installed). See the README for details. Replaces the old unofficial custom-DLL patch, which is now deprecated.
+- **Power reporting contract for third-party mods (`RealBatteryPowerLedger`):** mods that track their own background/offline energy accounting (e.g. an autopilot driving a rover while the vessel is unloaded) can now report energy consumed back to RealBattery, which applies the `StoredCharge` drain, wear, and `BatteryLife` on their behalf — no need to know any of RealBattery's internals. See `source/RealBatteryPowerLedger.md` and the copy-paste `RealBatteryPowerLedgerWrapper.cs` template for integrators.
 
 ### Minor Improvements
+- Fixed a memory leak: vessels that never entered physics range during a session (debris, unloaded craft, flags, etc.) left a dead `onVesselGoOffRails` event subscription behind on every scene change. Replaced with the native per-vessel `VesselModule` lifecycle hook, which makes the leak structurally impossible rather than patching around it.
 - Fixed an erroneous EVA upgrade path where **VRFB incorrectly upgraded into SMES**. Both are now standalone tiers, selected directly rather than reached by upgrade.
 - The **Zebra → Mg‖Sb** EVA upgrade path is now provided by the Expansion, and is available only when it is installed (the core mod leaves Zebra as a terminal tier).
 - Fixed a missing decal-label description on the **Mg‖Sb** battery (it referenced a non-existent text key).

@@ -44,5 +44,6 @@ namespace RealBattery
         public const bool   LifeDecay         = false;
         public const bool   InfiniteCycles    = false;
         public const string CrateScale        = "false";
+        public const float  CrateScaleFactor  = 3.0f;
     }
 }

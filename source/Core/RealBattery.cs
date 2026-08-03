@@ -19,9 +19,11 @@ namespace RealBattery
         // --- Resource ratios / conversions ---
         public const double EC2SCratio = 3600;      // 3600 EC = 1 SC = 1 kWh
 
-        // Cryo waste heat flux per liter of battery volume (W/L).
-        // Empirically matched to CryoTanks' CoolingHeatCost.
-        private const float CRYO_WASTE_HEAT_W_PER_L = 0.00002f;
+        // Cryo waste heat flux per liter of battery volume (W/L). Empirically matched to
+        // CryoTanks' CoolingHeatCost. Moved to RealBatteryTuning.CryoWasteHeatPerL (T3.5) so the
+        // T3b calibration protocol can test candidate values via an optional cfg override,
+        // without recompiling; RealBatteryTuning.DEFAULT_CRYO_WASTE_HEAT_W_PER_L holds the same
+        // 0.00002f value as the compiled-in default.
 
         // Volume-based warmup scaling: reference volume (L) at which nominal duration = 60 s.
         private const double WARMUP_VOL_REF = 200.0;
@@ -47,8 +49,41 @@ namespace RealBattery
         // real value regardless of session fps or battery DischargeRate.
         private const double GUI_POWER_SMOOTH_TAU_S = 0.4;
 
+        // --- SystemHeat smoothFlux smoothing ---
+        // Time constant (seconds) equivalent to the old per-tick ratio (0.01 at the reference
+        // 50 Hz / 0.02 s physics tick: tau = fixedDeltaTime / ratio = 0.02 / 0.01 = 2.0 s).
+        // Time-based like GUI_POWER_SMOOTH_TAU_S above: identical settle time at warp 1x,
+        // correct (framerate/timewarp-independent) elsewhere.
+        private const double SMOOTH_FLUX_TAU_S = 2.0;
+
         // --- Resource IDs (cached) ---
-        private static readonly int SC_ID = PartResourceLibrary.Instance.GetDefinition("StoredCharge").id;
+        // Lazy-resolved on first access (not a static-field initializer): a missing
+        // CommunityResourcePack dependency would otherwise NRE inside the type initializer,
+        // surfacing as a cryptic TypeInitializationException that takes down every RealBattery
+        // module on load. Here it instead logs one clear diagnostic and disables charge/discharge
+        // cleanly via ScResourceMissing (checked at the top of XferECtoRealBattery).
+        private static int? _scIdCache;
+        private static bool ScResourceMissing;
+        private static int SC_ID
+        {
+            get
+            {
+                if (_scIdCache.HasValue) return _scIdCache.Value;
+
+                PartResourceDefinition def = PartResourceLibrary.Instance.GetDefinition("StoredCharge");
+                if (def == null)
+                {
+                    RBLog.Error("[RealBattery] StoredCharge resource definition not found — is CommunityResourcePack installed? Charge/discharge disabled for all RealBattery parts.");
+                    ScResourceMissing = true;
+                    _scIdCache = 0;
+                }
+                else
+                {
+                    _scIdCache = def.id;
+                }
+                return _scIdCache.Value;
+            }
+        }
 
 
         // ============================================================================
@@ -88,6 +123,8 @@ namespace RealBattery
         // CrateScale: "false" | "add" | "reduce"; read by RealBatteryLoadMaster to scale
         // Crate by the count of participating batteries. Not shown in PAW.
         [KSPField(isPersistant = false)] public string CrateScale     = RBDefaults.CrateScale;
+        // Steepness/asymptote shared by both CrateScale curves — see RealBatteryLoadMaster.
+        [KSPField(isPersistant = false)] public float  CrateScaleFactor = RBDefaults.CrateScaleFactor;
 
         // --- Capability / mode flags (persistent) ----------------------------------
         [KSPField(isPersistant = true)] public bool ActivationLatched = false;  // staged latch
@@ -125,7 +162,8 @@ namespace RealBattery
 
         // --- Telemetry / Editor preview --------------------------------------------
         [KSPField(isPersistant = false)] public double lastECpower = 0; // +charge / -discharge
-        [KSPField(isPersistant = true, guiActiveEditor = true, guiName = "#LOC_RB_DischargeRate", guiUnits = "#LOC_RB_guiUnitsECs", guiFormat = "F2", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
+        // Recomputed every use (StoredCharge.maxAmount * Crate * ...) — no need to persist (I7).
+        [KSPField(isPersistant = false, guiActiveEditor = true, guiName = "#LOC_RB_DischargeRate", guiUnits = "#LOC_RB_guiUnitsECs", guiFormat = "F2", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
         public double DischargeRate = 0.0;
         private double GUI_power = 0;
         [KSPField(isPersistant = false, guiActiveEditor = true, guiName = "#LOC_RB_ChargeRate", guiUnits = "#LOC_RB_guiUnitsECs", groupName = "RealBatteryInfo", groupDisplayName = "#LOC_RB_PAWgroup")]
@@ -184,6 +222,28 @@ namespace RealBattery
         // Physical part volume in liters (from RBbaseVolume cfg key set by MM patches); 0 if absent.
         private double _rbVolume = 0.0;
 
+        // --- Cached BaseField references (P5) ---------------------------------------
+        // Resolved once in OnStart; used by ModuleActiveHideUI/EnforceNonDisableableLatch and
+        // other hot-path (OnUpdate/FixedUpdate) PAW field updates instead of repeated
+        // Fields["..."] dictionary lookups every tick.
+        private BaseField _fBatteryDisabled;
+        private BaseField _fBatteryTypeDisplayName;
+        private BaseField _fBatteryChargeStatus;
+        private BaseField _fBatterySOCStatus;
+        private BaseField _fBatteryTimeTo;
+        private BaseField _fBatteryHealthStatus;
+        private BaseField _fDischargeRate;
+        private BaseField _fChargeInfoEditor;
+        private BaseField _fBatteryStaged;
+        private BaseField _fSimulationMode;
+        private BaseField _fLastECpower;
+
+        // Guards onFieldChanged/GameEvents subscriptions wired in OnStart (F3): if OnStart ever
+        // re-runs on the same instance (e.g. a revert-to-editor / re-init path), this prevents
+        // stacking duplicate subscriptions that would otherwise fire their handlers once per
+        // accumulated registration instead of once per actual event.
+        private bool _uiHandlersWired = false;
+
         // Effective warmup/shutdown duration for this part; cached at phase start by EffectiveWarmupSeconds().
         private double _keepWarmDuration = 60.0;
 
@@ -194,6 +254,19 @@ namespace RealBattery
         // True when this cryo battery should use the CryoTanks-like waste heat model instead of EC upkeep.
         private bool UsesCryoWasteHeat() =>
             KeepWarmMode == "cryo" && RealBatterySettings.UseCryoWasteHeatMode;
+
+        // True for non-rechargeable ("primary") batteries: unifies the two heuristics that used
+        // to live separately in OnUpdate() and BackgroundSimulator.ApplySnapshot(). Three
+        // independent signals, any of which marks a chemistry as primary:
+        //   - CycleDurability <= 1.0: wear model treats it as consumed after one full cycle.
+        //   - HighEClevel > 1: the charge gate is unreachable, so charging never engages
+        //     (e.g. TBat, AgOx, NukeCell all set this explicitly).
+        //   - ChargeEfficiencyCurve.Evaluate(0f) <= EPS: charge efficiency is zero at empty SOC,
+        //     so it can't meaningfully recharge even if the two flags above weren't set (covers
+        //     inline/user-defined chemistries that only zero out the curve).
+        // Public: used by both this module (OnUpdate) and BackgroundSimulator (rb.IsPrimary).
+        public bool IsPrimary =>
+            CycleDurability <= 1.0 || HighEClevel > 1f || ChargeEfficiencyCurve.Evaluate(0f) <= (float)EPS;
 
         // --- KeepWarm / Controlled Shutdown state machine --------------------------
         // Tracks current thermal runaway state (true while active, cleared when extinguished)
@@ -230,6 +303,14 @@ namespace RealBattery
         // Reset when both settings are on again, so toggles work symmetrically.
         private bool _shSilenced = false;
 
+        // Physics-tick de-dup guard for the InfiniteCycles thermal cap block in
+        // ApplyThermalEffects: PartModule.FixedUpdate (this force-tick) and
+        // VesselModule.FixedUpdate (RealBatteryLoadMaster -> XferECtoRealBattery) can both
+        // land in the same physics step with no guaranteed order, which would otherwise apply
+        // the cap severity/heat twice in one tick. Time.fixedTime is constant across all
+        // FixedUpdate calls within a single physics step, so equality means "already done".
+        private double _lastInfCycleCapFixedTime = -1.0;
+
 
 
         // ============================================================================
@@ -245,6 +326,20 @@ namespace RealBattery
             //    systemHeat = part?.Modules?.GetModule<ModuleSystemHeat>();
             if (RealBatterySettings.UseSystemHeat && systemHeat == null)
                 systemHeat = SystemHeatBridge.GetModule(part);
+
+            // 0.5) Cache BaseField references used in hot paths (P5) — resolved once here
+            // instead of repeated Fields["..."] dictionary lookups every tick.
+            _fBatteryDisabled = Fields[nameof(BatteryDisabled)];
+            _fBatteryTypeDisplayName = Fields[nameof(BatteryTypeDisplayName)];
+            _fBatteryChargeStatus = Fields[nameof(BatteryChargeStatus)];
+            _fBatterySOCStatus = Fields[nameof(BatterySOCStatus)];
+            _fBatteryTimeTo = Fields[nameof(BatteryTimeTo)];
+            _fBatteryHealthStatus = Fields[nameof(BatteryHealthStatus)];
+            _fDischargeRate = Fields[nameof(DischargeRate)];
+            _fChargeInfoEditor = Fields[nameof(ChargeInfoEditor)];
+            _fBatteryStaged = Fields[nameof(BatteryStaged)];
+            _fSimulationMode = Fields[nameof(SimulationMode)];
+            _fLastECpower = Fields[nameof(lastECpower)];
 
             // 1) Load config & basic UI gating
             LoadConfig();
@@ -271,19 +366,23 @@ namespace RealBattery
 
             // 4) Staging wiring + PAW handlers
             ApplyStagingState();
-            if (HighLogic.LoadedSceneIsEditor)
-                GameEvents.onEditorShipModified.Add(OnEditorShipModified);
-            // Re-enforce latch when user flips BatteryDisabled in PAW (Editor & Flight).
-            var disabledField = Fields[nameof(BatteryDisabled)];
-            if (disabledField?.uiControlFlight != null)
-                disabledField.uiControlFlight.onFieldChanged += (f, o) => { EnforceNonDisableableLatch(); };
-            if (disabledField?.uiControlEditor != null)
-                disabledField.uiControlEditor.onFieldChanged += (f, o) => { EnforceNonDisableableLatch(); };
-            // Keep stageability in sync when BatteryStaged changes (Editor & Flight).
-            WireStagedToggleHandlers();
+            if (!_uiHandlersWired)
+            {
+                _uiHandlersWired = true;
+
+                if (HighLogic.LoadedSceneIsEditor)
+                    GameEvents.onEditorShipModified.Add(OnEditorShipModified);
+                // Re-enforce latch when user flips BatteryDisabled in PAW (Editor & Flight).
+                if (_fBatteryDisabled?.uiControlFlight != null)
+                    _fBatteryDisabled.uiControlFlight.onFieldChanged += (f, o) => { EnforceNonDisableableLatch(); };
+                if (_fBatteryDisabled?.uiControlEditor != null)
+                    _fBatteryDisabled.uiControlEditor.onFieldChanged += (f, o) => { EnforceNonDisableableLatch(); };
+                // Keep stageability in sync when BatteryStaged changes (Editor & Flight).
+                WireStagedToggleHandlers();
+            }
 
             // 5) Editor simulation mode (options + default fix)
-            if (Fields["SimulationMode"].uiControlEditor is UI_ChooseOption simModeUI)
+            if (_fSimulationMode.uiControlEditor is UI_ChooseOption simModeUI)
             {
                 string idle = Localizer.Format("#LOC_RB_SimMode_Idle");
                 string disch = Localizer.Format("#LOC_RB_SimMode_Discharge");
@@ -374,8 +473,10 @@ namespace RealBattery
             {
                 _lastAppliedChemistryID = ChemistryID;
                 ApplyChemistryFromDB();
-            }
+                // moduleActive only changes via a chemistry/subtype switch, not every tick —
+                // no need to re-apply PAW visibility outside this branch (P5).
                 ModuleActiveHideUI();
+            }
 
             if (HighLogic.LoadedSceneIsEditor)
             {
@@ -394,13 +495,12 @@ namespace RealBattery
             double  guiPowerSmoothRatio = 1.0 - Math.Exp(-deltaTime / GUI_POWER_SMOOTH_TAU_S);
             double  ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
 
-            double  stored = part.Resources["StoredCharge"].amount;
-            double  capacity = part.Resources["StoredCharge"]?.maxAmount ?? 0.0;
-            double  max = part.Resources["StoredCharge"].maxAmount * ActualLife;
+            PartResource storedChargeRes = part.Resources.Get("StoredCharge");
+            double  stored = storedChargeRes?.amount ?? 0.0;
+            double  capacity = storedChargeRes?.maxAmount ?? 0.0;
+            double  max = capacity * ActualLife;
             double  deltaSC = GUI_power > 0 ? max - stored : stored;
             double  timeInSeconds = (deltaSC * EC2SCratio) / Math.Abs(GUI_power);
-            float   tempK = GetCurrentTemperatureK();
-            bool    isPrimary = !InfiniteCycles && ((CycleDurability <= 1.0) || (HighEClevel > 1));
 
             GUI_power += guiPowerSmoothRatio * (lastECpower - GUI_power);
 
@@ -431,7 +531,8 @@ namespace RealBattery
             else
             {
                 part.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double EC_amount, out double EC_maxAmount);
-                BatteryChargeStatus = Localizer.Format("#LOC_RB_INF_idle", (EC_amount / EC_maxAmount * 100).ToString("F1"));
+                double ecPct = EC_maxAmount > EPS ? (EC_amount / EC_maxAmount * 100.0) : 0.0;
+                BatteryChargeStatus = Localizer.Format("#LOC_RB_INF_idle", ecPct.ToString("F1"));
             }
 
             BatterySOCStatus = $"{(SC_SOC * 100):F0}%";
@@ -443,7 +544,7 @@ namespace RealBattery
                     "#LOC_RB_BatteryHealth_efficiency",
                     $"{(ThermalCapFactor * 100):F0}");
             }
-            else if (!isPrimary && RealBatterySettings.EnableBatteryWear && capacity > EPS)
+            else if (!IsPrimary && RealBatterySettings.EnableBatteryWear && capacity > EPS)
             {
                 double cyclesLeft = Math.Max(0.0, CycleDurability - (WearCounter / (capacity * 2)));
                 string cyclesFmt = (cyclesLeft < 10.0) ? cyclesLeft.ToString("F2") : cyclesLeft.ToString("F0");
@@ -460,20 +561,16 @@ namespace RealBattery
             {
                 bool GUIdischarging = GUI_power < -0.001;
 
-                Fields["BatteryTimeTo"].guiName = GUIdischarging ? "#LOC_RB_TimeTo" : "#LOC_RB_TimeToCharge";
+                _fBatteryTimeTo.guiName = GUIdischarging ? "#LOC_RB_TimeTo" : "#LOC_RB_TimeToCharge";
                 BatteryTimeTo = FormatTimeSpan(TimeSpan.FromSeconds(timeInSeconds));
             }
             else
             {
-                Fields["BatteryTimeTo"].guiName = "#LOC_RB_TimeTo";
+                _fBatteryTimeTo.guiName = "#LOC_RB_TimeTo";
                 BatteryTimeTo = "-";
             }
 
             RBLog.Verbose($"[RealBattery] GUI_power update: lastECpower={lastECpower:F3}, GUI_power={GUI_power:F3}, Δt={TimeWarp.fixedDeltaTime:F3}");
-
-            // Runaway trigger while OFF or idle: if temperature exceeds TempRunaway, force a thermal pass up to battery death.
-            if (isRunaway || (InfiniteCycles && tempK > TempOverheat-10)) 
-                ApplyThermalEffects(0.0);
 
             // Register with SystemHeat even when disabled, so the loop uses our TempOptimal target
             if (RealBatterySettings.EnableHeatSimulation && RealBatterySettings.UseSystemHeat && ((BatteryDisabled && !isRunaway) || (!BatteryDisabled && keepWarmActive)))
@@ -494,6 +591,7 @@ namespace RealBattery
             {
                 _lastAppliedChemistryID = ChemistryID;
                 ApplyChemistryFromDB();
+                ModuleActiveHideUI();
             }
 
             double ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
@@ -797,6 +895,17 @@ namespace RealBattery
                     }
                 }
 
+                // Force-tick thermal effects for batteries idle/disabled while hot: keeps runaway
+                // heat/wear and the InfiniteCycles thermal cap advancing even when
+                // XferECtoRealBattery isn't called this tick (e.g. disabled battery, or idle
+                // within the charge/discharge dead-band). Physics-rate only — this used to run
+                // from OnUpdate() at render rate, making wear/heat accumulation framerate-
+                // dependent. During runaway, XferECtoRealBattery exits before reaching
+                // ApplyThermalEffects, so no overlap guard is needed for that branch; the
+                // InfiniteCycles branch is guarded internally (see _lastInfCycleCapFixedTime).
+                if (isRunaway || (InfiniteCycles && tempK > TempOverheat - 10f))
+                    ApplyThermalEffects(0.0);
+
                 // stop thermal flux if battery is spent after runaway
                 if (RealBatterySettings.UseSystemHeat && systemHeat != null)
                 {
@@ -842,23 +951,21 @@ namespace RealBattery
                 DischargeRate = StoredCharge.maxAmount * Crate;
                 lastECpower = sign * DischargeRate;
 
-                Fields["lastECpower"].SetValue(lastECpower, this);
+                _fLastECpower.SetValue(lastECpower, this);
 
                 // Push live DischargeRate to PAW (Editor)
-                Fields[nameof(DischargeRate)].SetValue(DischargeRate, this);
+                _fDischargeRate.SetValue(DischargeRate, this);
 
                 double chargeAtSOC0 = DischargeRate * ChargeEfficiencyCurve.Evaluate(0f);
                 string chargeStr = chargeAtSOC0.ToString("F2");
                 if (ChargeInfoEditor != chargeStr)
                 {
                     ChargeInfoEditor = chargeStr;
-                    Fields[nameof(ChargeInfoEditor)].SetValue(ChargeInfoEditor, this);
+                    _fChargeInfoEditor.SetValue(ChargeInfoEditor, this);
                 }
 
                 ApplyThermalEffects(lastECpower);
             }
-
-            ModuleActiveHideUI();
         }
 
         private void OnEditorShipModified(ShipConstruct ship)
@@ -881,6 +988,7 @@ namespace RealBattery
             BatteryDisabled = false;
             StageFired = true;
             part.stagingOn = false; // consume this stage
+            ApplyStagingState(); // refresh stage icon/stack now that this stage fired
 
             RBLog.Info($"[RealBattery] Staged activation: Battery enabled on '{part.partInfo?.title}'");
 
@@ -894,7 +1002,6 @@ namespace RealBattery
             // Branch A: multi-chemistry part (has B9PS batterySwitch) — generic tooltip
             bool hasB9Switch = part?.Modules != null &&
                 part.Modules.OfType<ModuleB9PartSwitch>().Any(m => m.moduleID == "batterySwitch");
-            Debug.Log($"[RB GetInfo] hasB9Switch = {hasB9Switch}"); // DEBUG
             if (hasB9Switch)
             {
                 double vol = ReadPartVolumeL();
@@ -905,21 +1012,18 @@ namespace RealBattery
 
             // Branch B: single-chemistry part — resolve title/description
             ConfigNode partCfg = part?.partInfo?.partConfig;
-            Debug.Log($"[RB GetInfo] partCfg = {(partCfg == null ? "null" : "found")}"); // DEBUG
             string title = null, descDetail = null, descSummary = null;
 
             if (partCfg != null)
             {
-                ConfigNode rbModule = partCfg.GetNodes("MODULE") // DEBUG
-                    .FirstOrDefault(n => n.GetValue("name") == "RealBattery"); // DEBUG
+                ConfigNode rbModule = partCfg.GetNodes("MODULE")
+                    .FirstOrDefault(n => n.GetValue("name") == "RealBattery");
 
                 // Try ChemistryID → look up raw node in GameDatabase
                 string chemId = rbModule?.GetValue("ChemistryID");
-                Debug.Log($"[RB GetInfo] chemId = {(string.IsNullOrEmpty(chemId) ? "null/empty" : chemId)}"); // DEBUG
                 if (!string.IsNullOrEmpty(chemId) && GameDatabase.Instance != null)
                 {
                     ConfigNode[] nodes = GameDatabase.Instance.GetConfigNodes("REALBATTERY_CHEMISTRY");
-                    bool matchFound = false;
                     if (nodes != null)
                     {
                         foreach (ConfigNode n in nodes)
@@ -929,12 +1033,10 @@ namespace RealBattery
                                 title       = n.GetValue("title");
                                 descDetail  = n.GetValue("descriptionDetail");
                                 descSummary = n.GetValue("descriptionSummary");
-                                matchFound  = true;
                                 break;
                             }
                         }
                     }
-                    Debug.Log($"[RB GetInfo] GameDatabase nodes found = {nodes?.Length ?? 0}, match = {matchFound}"); // DEBUG
                 }
 
                 // Fallback: inline fields in MODULE { name = RealBattery }
@@ -944,13 +1046,11 @@ namespace RealBattery
                     descDetail = rbModule?.GetValue("descriptionDetail");
                 if (string.IsNullOrEmpty(descSummary))
                     descSummary = rbModule?.GetValue("descriptionSummary");
-                Debug.Log($"[RB GetInfo] after fallback — title={title ?? "null"}, descDetail={descDetail ?? "null"}, descSummary={descSummary ?? "null"}"); // DEBUG
             }
 
             // No useful data → fall back to generic tooltip
             if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(descDetail) && string.IsNullOrEmpty(descSummary))
             {
-                Debug.Log("[RB GetInfo] returning branch: generic (no useful data)"); // DEBUG
                 double vol = ReadPartVolumeL();
                 return vol > 0.0
                     ? Localizer.Format("#LOC_RB_VAB_Info", vol.ToString("F1"))
@@ -983,7 +1083,6 @@ namespace RealBattery
                   .Append(Localizer.Format("#LOC_RB_VAB_Info_Volume", volume.ToString("F1")));
             }
 
-            Debug.Log("[RB GetInfo] returning branch: assembled (Branch B)"); // DEBUG
             return sb.ToString();
         }
 
@@ -1109,7 +1208,7 @@ namespace RealBattery
                 partWin.displayDirty = true;
             }
 
-            Fields["ChargeInfoEditor"].guiActiveEditor = (DischargeRate * ChargeEfficiencyCurve.Evaluate(0f) > 0);
+            _fChargeInfoEditor.guiActiveEditor = (DischargeRate * ChargeEfficiencyCurve.Evaluate(0f) > 0);
 
             if (ChargeEfficiencyCurve != null && ChargeEfficiencyCurve.Curve != null)
             {
@@ -1161,7 +1260,16 @@ namespace RealBattery
             // Behavior flags
             FixedOutput           = chem.FixedOutput;
             if (!BatteryStagedUserSet)
-                BatteryStaged     = chem.BatteryStaged;
+            {
+                // chem.BatteryStaged is assigned directly (not via the PAW toggle), so the
+                // onFieldChanged handler in WireStagedToggleHandlers never fires for it — call
+                // ApplyStagingState() here whenever it actually changes the value, otherwise the
+                // staging icon/arming state goes stale until the part is reloaded.
+                bool prevBatteryStaged = BatteryStaged;
+                BatteryStaged = chem.BatteryStaged;
+                if (BatteryStaged != prevBatteryStaged)
+                    ApplyStagingState();
+            }
             KeepWarmMode          = chem.KeepWarmMode;
             TempKeepWarmLo        = chem.TempKeepWarmLo;
             TempKeepWarmHi        = chem.TempKeepWarmHi;
@@ -1172,6 +1280,7 @@ namespace RealBattery
 
             // v3.2.0 additions
             CrateScale            = chem.CrateScale;
+            CrateScaleFactor      = chem.CrateScaleFactor;
             _resourceExtras       = chem.ResourceExtras ?? new List<ResourceRequirement>();
 
             BatteryTypeDisplayName = chem.displayName;
@@ -1206,6 +1315,12 @@ namespace RealBattery
         // ============================================================================
         public double XferECtoRealBattery(double amount)
         {
+            if (ScResourceMissing)
+            {
+                lastECpower = 0.0;
+                return 0.0; // CommunityResourcePack missing — StoredCharge resource unavailable, see SC_ID
+            }
+
             if (KeepWarmMode != "false" && (keepWarmActive || controlledShutdownActive))
             {
                 lastECpower = 0.0;
@@ -1271,10 +1386,19 @@ namespace RealBattery
 
                 EC_delta = part.RequestResource(PartResourceLibrary.ElectricityHashcode, Math.Min(EC_delta, amount));
 
-                EC_power = EC_delta / TimeWarp.fixedDeltaTime;
-
                 SC_delta = -EC_delta / EC2SCratio;                  // SC_delta = -1EC / 10EC/SC * 0.9 = -0.09SC
-                SC_delta = part.RequestResource(SC_ID, SC_delta);   //issue: we might "overfill" the battery and should give back some EC
+                SC_delta = part.RequestResource(SC_ID, SC_delta);   // actual SC accepted (negative); may fall short of the request if the battery is near full
+
+                // Overfill guard: if the battery couldn't accept the full planned SC (near-full
+                // capacity), give back the unconverted EC to the network instead of destroying it.
+                double excessEC = EC_delta + SC_delta * EC2SCratio;
+                if (excessEC > EPS)
+                {
+                    part.RequestResource(PartResourceLibrary.ElectricityHashcode, -excessEC);
+                    EC_delta -= excessEC;
+                }
+
+                EC_power = EC_delta / TimeWarp.fixedDeltaTime;
 
                 RBLog.Verbose("INF charged");
             }
@@ -1364,7 +1488,7 @@ namespace RealBattery
             }
 
             //update SOC field for usage in other modules (load balancing)
-            SC_SOC = part.Resources["StoredCharge"].amount / part.Resources["StoredCharge"].maxAmount;
+            SC_SOC = StoredCharge.maxAmount > 0 ? StoredCharge.amount / StoredCharge.maxAmount : 0.0;
 
             lastECpower = EC_power;
 
@@ -1540,28 +1664,15 @@ namespace RealBattery
 
                     if (!isRunaway) flux /= EngBonus;
 
-                    if (useSH && systemHeat != null)
-                    {
-                        // Keep the existing smoothing/scaling behavior
-                        flux *= 0.01f;
-                        float tau = 0.01f;
-                        smoothFlux += tau * (flux - smoothFlux);
-                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", TempOptimal, smoothFlux, true);
-                        RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux ACTIVE {(isRunaway ? "(Runaway) " : "")}(SystemHeat): {smoothFlux:F2} W @ target={TempOptimal:F0} K (loop={tempK:F1} K)");
-                    }
-                    else
-                    {
-                        part.AddThermalFlux(flux);
-                        RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux ACTIVE {(isRunaway ? "(Runaway) " : "")}(stock): {flux:F2} W (part={tempK:F1} K)");
-                    }
+                    SendThermalFlux("RealBattery", flux, smooth: true, tempK, isRunaway ? "ACTIVE (Runaway)" : "ACTIVE");
                 }
                 else if (useSH && systemHeat != null)
                 {
                     // Battery idle: no heat injected, but keep the operating target declared
-                    // so the loop doesn't collapse toward 0 K between active cycles.
+                    // so the loop doesn't collapse toward 0 K between active cycles (SystemHeat
+                    // only — stock has no equivalent "declare idle" concept).
                     smoothFlux = 0f;
-                    SystemHeatBridge.AddFlux(systemHeat, "RealBattery", TempOptimal, 0f, true);
-                    RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux IDLE: 0 W -> no EC transfer, loop={tempK:F1} K, target={TempOptimal:F0} K");
+                    SendThermalFlux("RealBattery", 0f, smooth: false, tempK, "IDLE");
                 }
             }
 
@@ -1572,10 +1683,18 @@ namespace RealBattery
 
             // --- InfiniteCycles thermal cap (replaces classic wear/runaway path for these batteries) ---
             // Skip during warmup/shutdown: ThermalCapFactor is owned by the state machine ramps in those
-            // phases. The OnUpdate force-tick would otherwise race against FixedUpdate at display framerate.
+            // phases.
             if (InfiniteCycles && sc != null && RealBatterySettings.EnableBatteryWear
                 && !keepWarmActive && !controlledShutdownActive)
             {
+                // De-dup guard: the FixedUpdate force-tick and a same-tick XferECtoRealBattery
+                // call (via RealBatteryLoadMaster, a separate VesselModule with no guaranteed
+                // FixedUpdate ordering relative to this PartModule) can both reach this block in
+                // the same physics step. Only apply the cap once per physics tick.
+                if (_lastInfCycleCapFixedTime == Time.fixedTime)
+                    return;
+                _lastInfCycleCapFixedTime = Time.fixedTime;
+
                 if (tempK > TempOverheat)
                 {
                     float range = Mathf.Max(Mathf.Min(TempOverheat - TempOptimal, TempRunaway - TempOverheat), 1f);
@@ -1591,13 +1710,14 @@ namespace RealBattery
                     SC_SOC = sc.maxAmount > 0 ? sc.amount / sc.maxAmount : 0.0;
 
                     // Additional heat proportional to severity (linear, unlike the exponential
-                    // used in the classic path — appropriate for InfiniteCycles physics)
-                    float heatBoost = severity * TimeWarp.fixedDeltaTime * (float)sc.maxAmount;
-                    if (useSH && systemHeat != null)
-                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery",
-                            TempOptimal, heatBoost * (float)ThermalLoss * 0.01f, true);
-                    else
-                        part.AddThermalFlux(heatBoost * (float)ThermalLoss);
+                    // used in the classic path — appropriate for InfiniteCycles physics).
+                    // Pure power term, not scaled by fixedDeltaTime: previously
+                    // severity * fixedDeltaTime * sc.maxAmount was an energy-per-tick term used
+                    // directly as a power, so it scaled up with timewarp. The 0.02 coefficient
+                    // preserves the exact previous value at the reference 50 Hz / 0.02 s physics
+                    // tick (warp 1x), but the term no longer depends on the actual timestep.
+                    float heatBoost = severity * (float)sc.maxAmount * 0.02f;
+                    SendThermalFlux("RealBattery", heatBoost * (float)ThermalLoss, smooth: false, tempK, "InfCycleCap");
 
                     RBLog.Verbose($"[ApplyThermalEffects] InfiniteCycles thermal cap: " +
                                   $"severity={severity:F2}, cap={ThermalCapFactor:F3}, " +
@@ -1646,6 +1766,47 @@ namespace RealBattery
             // --- Automatic shutdown on overheat (if PCM unlocked) or toast alert ---
             HandleOverheatUX(tempK);
         }
+
+        // Sends thermal output to the active backend (SystemHeat if enabled and available,
+        // otherwise stock part.AddThermalFlux), unifying what used to be duplicated per call site
+        // with two different conventions. Preserves each backend's exact prior numeric behavior:
+        //   - SystemHeat: fluxKW is scaled x0.01 (empirical tuning factor, unchanged) before being
+        //     sent. When smooth=true, the scaled value is ramped through the smoothFlux state via
+        //     a time-based exponential (SMOOTH_FLUX_TAU_S) instead of being sent directly — this
+        //     is the "active charge/discharge" path. When smooth=false, the scaled value is sent
+        //     as-is without touching smoothFlux — this is the InfiniteCycles thermal-cap path,
+        //     which never interacted with the main flux's smoothing state. Callers that need a
+        //     hard reset (silencing, idle) should set smoothFlux = 0f themselves before calling
+        //     with fluxKW = 0f, smooth = false.
+        //   - Stock: fluxKW is sent as-is via part.AddThermalFlux — no scaling, never smoothed.
+        // tempK/logTag are only used for the verbose log line.
+        private void SendThermalFlux(string sourceId, float fluxKW, bool smooth, float tempK, string logTag)
+        {
+            bool useSH = RealBatterySettings.UseSystemHeat && systemHeat != null;
+            if (useSH)
+            {
+                float scaled = fluxKW * 0.01f;
+                float toSend;
+                if (smooth)
+                {
+                    double ratio = 1.0 - Math.Exp(-TimeWarp.fixedDeltaTime / SMOOTH_FLUX_TAU_S);
+                    smoothFlux += (float)ratio * (scaled - smoothFlux);
+                    toSend = smoothFlux;
+                }
+                else
+                {
+                    toSend = scaled;
+                }
+                SystemHeatBridge.AddFlux(systemHeat, sourceId, TempOptimal, toSend, true);
+                RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux {logTag} (SystemHeat): {toSend:F2} W @ target={TempOptimal:F0} K (loop={tempK:F1} K)");
+            }
+            else
+            {
+                part.AddThermalFlux(fluxKW);
+                RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux {logTag} (stock): {fluxKW:F2} W (part={tempK:F1} K)");
+            }
+        }
+
         public void UpdateBatteryLife()
         {
             if (!HighLogic.LoadedSceneIsFlight) return;
@@ -1757,7 +1918,6 @@ namespace RealBattery
                 PCMUnlocked = true;
                 BMSUnlocked = true;
                 advBMSUnlocked = true;
-                Debug.Log($"[Tech] Game mode is set to SANDBOX. All fields unlocked.");
             }
             else
             {
@@ -1767,87 +1927,59 @@ namespace RealBattery
                 var advBMS = PartLoader.getPartInfoByName("RB.advBMS");
 
                 if (SOCGauge != null && ResearchAndDevelopment.Instance != null)
-                {
                     SOCGaugeUnlocked = ResearchAndDevelopment.PartModelPurchased(SOCGauge);
-                    Debug.Log($"[Tech] Found AvailablePart '{SOCGauge.name}', Unlocked = {SOCGaugeUnlocked}");
-                }
 
                 if (PCM != null && ResearchAndDevelopment.Instance != null)
-                {
                     PCMUnlocked = ResearchAndDevelopment.PartModelPurchased(PCM);
-                    Debug.Log($"[Tech] Found AvailablePart '{PCM.name}', Unlocked = {PCMUnlocked}");
-                }
 
                 if (BMS != null && ResearchAndDevelopment.Instance != null)
-                {
                     BMSUnlocked = ResearchAndDevelopment.PartModelPurchased(BMS);
-                    Debug.Log($"[Tech] Found AvailablePart '{BMS.name}', Unlocked = {BMSUnlocked}");
-                }
 
                 if (advBMS != null && ResearchAndDevelopment.Instance != null)
-                {
                     advBMSUnlocked = ResearchAndDevelopment.PartModelPurchased(advBMS);
-                    Debug.Log($"[Tech] Found AvailablePart '{advBMS.name}', Unlocked = {advBMSUnlocked}");
-                }
-
-                if (ResearchAndDevelopment.Instance == null)
-                    Debug.Log($"[Tech] ResearchAndDevelopment.Instance returned NULL");
             }
 
             // --- Fetch PAW fields (guarded) ---
-            BaseField fSOCStatus = Fields["BatterySOCStatus"];
-            BaseField fTimeTo = Fields["BatteryTimeTo"];
-            BaseField fLife = Fields["BatteryHealthStatus"];
+            BaseField fSOCStatus = _fBatterySOCStatus;
+            BaseField fTimeTo = _fBatteryTimeTo;
+            BaseField fLife = _fBatteryHealthStatus;
 
             // --- Apply visibility (Editor + Flight). Keep it symmetric unless you want editor-only behavior. ---
             if (fSOCStatus != null)
-            {
-                // SOC gauge only with RB.SOCGauge unlocked
-                fSOCStatus.guiActive = SOCGaugeUnlocked;
-                Debug.Log($"[Tech] Field '{fSOCStatus.name}' is {(fSOCStatus.guiActive ? "active" : "NOT active")}.");
-            }
+                fSOCStatus.guiActive = SOCGaugeUnlocked; // SOC gauge only with RB.SOCGauge unlocked
 
             if (fTimeTo != null)
-            {
-                // Time-to requires RB.BMS
-                fTimeTo.guiActive = BMSUnlocked;
-                Debug.Log($"[Tech] Field '{fTimeTo.name}' is {(fTimeTo.guiActive ? "active" : "NOT active")}.");
-            }
+                fTimeTo.guiActive = BMSUnlocked; // Time-to requires RB.BMS
 
             if (fLife != null)
-            {
-                // SOH/Life requires RB.advBMS
-                fLife.guiActive = advBMSUnlocked;
-                Debug.Log($"[Tech] Field '{fLife.name}' is {(fLife.guiActive ? "active" : "NOT active")}.");
-            }
+                fLife.guiActive = advBMSUnlocked; // SOH/Life requires RB.advBMS
 
             // Automatic overheat protection: unlocked together with PCM
             PreventOverheat = PCMUnlocked;
-            Debug.Log($"[Tech] PreventOverheat set to {PreventOverheat} (PCMUnlocked={PCMUnlocked})");
         }
         private void ModuleActiveHideUI()
         {
-            Fields["BatteryDisabled"].guiActive = moduleActive;
-            Fields["BatteryDisabled"].guiActiveEditor = moduleActive;
+            _fBatteryDisabled.guiActive = moduleActive;
+            _fBatteryDisabled.guiActiveEditor = moduleActive;
 
-            Fields["BatteryTypeDisplayName"].guiActive = moduleActive;
-            Fields["BatteryTypeDisplayName"].guiActiveEditor = moduleActive;
+            _fBatteryTypeDisplayName.guiActive = moduleActive;
+            _fBatteryTypeDisplayName.guiActiveEditor = moduleActive;
 
-            Fields["BatteryChargeStatus"].guiActive = moduleActive;
+            _fBatteryChargeStatus.guiActive = moduleActive;
 
             // Tech-gated fields must not be forced visible here.
             // Only force them OFF when the module is inactive.
             if (!moduleActive)
             {
-                Fields["BatterySOCStatus"].guiActive = moduleActive;
-                Fields["BatteryTimeTo"].guiActive = moduleActive;
-                Fields["BatteryHealthStatus"].guiActive = moduleActive;
+                _fBatterySOCStatus.guiActive = moduleActive;
+                _fBatteryTimeTo.guiActive = moduleActive;
+                _fBatteryHealthStatus.guiActive = moduleActive;
             }
-            
-            Fields["DischargeRate"].guiActiveEditor = moduleActive;
-            Fields["ChargeInfoEditor"].guiActiveEditor = moduleActive;
-            Fields["BatteryStaged"].guiActiveEditor = moduleActive;
-            Fields["SimulationMode"].guiActiveEditor = moduleActive;
+
+            _fDischargeRate.guiActiveEditor = moduleActive;
+            _fChargeInfoEditor.guiActiveEditor = moduleActive;
+            _fBatteryStaged.guiActiveEditor = moduleActive;
+            _fSimulationMode.guiActiveEditor = moduleActive;
         }
         private void EnforceNonDisableableLatch()
         {
@@ -1870,14 +2002,13 @@ namespace RealBattery
             }
 
             // UI/PAW: make the toggle read-only after latch in flight (still visible for status).
-            var disabledField = Fields[nameof(BatteryDisabled)];
-            if (disabledField != null)
+            if (_fBatteryDisabled != null)
             {
                 // Editor remains configurable pre-flight; flight is locked post-latch.
                 if (HighLogic.LoadedSceneIsFlight && ActivationLatched)
                 {
-                    if (disabledField.uiControlFlight != null)
-                    disabledField.uiControlFlight.controlEnabled = false; // greyed out
+                    if (_fBatteryDisabled.uiControlFlight != null)
+                        _fBatteryDisabled.uiControlFlight.controlEnabled = false; // greyed out
                 }
             }
         }
@@ -1886,15 +2017,14 @@ namespace RealBattery
         // ============================================================================
         //  HELPERS
         // ============================================================================
-        private double EngineerBonus()
-        {
-            int EngLvl = 0;
-            var vessel = this.vessel;
-            if (vessel != null)
-                EngLvl = Mathf.Clamp(ModuleEnergyEstimator.GetMaxSpecialistLevel(this.vessel, "Engineer"), 0, 5);
-            double EngBonus = 0.95 + 0.06 * EngLvl;
-            return EngBonus;
-        }
+        // Pushed by RealBatteryLoadMaster (vessel-level) on structural/crew-change events,
+        // instead of each battery independently scanning all vessel parts every tick.
+        public int CachedEngineerLevel = 0;
+
+        // internal (not private): also called by RealBatteryPowerLedger.ReportConsumedEc so the
+        // wear credited through the public ledger can never drift out of sync with the live
+        // sim's own formula.
+        internal double EngineerBonus() => 0.95 + 0.06 * CachedEngineerLevel;
         private float GetCurrentTemperatureK()
         {
             // --- SystemHeat branch ---
@@ -1933,8 +2063,13 @@ namespace RealBattery
         {
             if (BatteryStaged)
             {
+                // KSP 1.12 stagingIcon only accepts the stock DefaultIcons enum (no custom
+                // texture via cfg). FUEL_TANK is a generic-storage silhouette, kept for standard
+                // batteries to avoid changing the icon players already see; FixedOutput (thermal)
+                // batteries get RCS_TANK instead purely to be visually distinguishable in the
+                // stage list at a glance — neither name implies the resource actually consumed.
                 if (string.IsNullOrEmpty(part.stagingIcon))
-                    part.stagingIcon = "FUEL_TANK";
+                    part.stagingIcon = FixedOutput ? "RCS_TANK" : "FUEL_TANK";
                 part.stagingOn = true;
             }
             else
@@ -1943,22 +2078,23 @@ namespace RealBattery
             }
             part.UpdateStageability(true, true);
 
-            // Force staging panel rebuild in editor (safe: event-driven, not per-frame)
-            if (HighLogic.LoadedSceneIsEditor)
-                StageManager.Instance?.SortIcons(true);
+            // Force stage-stack icon rebuild. StageManager is the same singleton used for both
+            // the editor and flight staging lists (SortIcons has no scene-restricted overload),
+            // so this refresh applies in both — event-driven (arm/disarm/fire/chemistry change),
+            // never per-frame.
+            StageManager.Instance?.SortIcons(true);
         }
         private void WireStagedToggleHandlers()
         {
-            var stagedField = Fields[nameof(BatteryStaged)];
-            if (stagedField?.uiControlEditor != null)
-                stagedField.uiControlEditor.onFieldChanged += (f, o) =>
+            if (_fBatteryStaged?.uiControlEditor != null)
+                _fBatteryStaged.uiControlEditor.onFieldChanged += (f, o) =>
                 {
                     BatteryStagedUserSet = true;
                     ApplyStagingState();
                 };
 
-            if (stagedField?.uiControlFlight != null)
-                stagedField.uiControlFlight.onFieldChanged += (f, o) =>
+            if (_fBatteryStaged?.uiControlFlight != null)
+                _fBatteryStaged.uiControlFlight.onFieldChanged += (f, o) =>
                 {
                     BatteryStagedUserSet = true;
                     ApplyStagingState();
@@ -2008,7 +2144,8 @@ namespace RealBattery
             return Math.Max(1.0, Math.Min(WARMUP_MAX_S, 60.0 * Math.Sqrt(_rbVolume / WARMUP_VOL_REF)));
         }
         // Injects a fixed waste heat flux into SystemHeat for cryo batteries in waste heat mode.
-        // Flux = _rbVolume × CRYO_WASTE_HEAT_W_PER_L × phase (0..1), ramping with warmup/shutdown.
+        // Flux = _rbVolume × RealBatteryTuning.CryoWasteHeatPerL × phase (0..1), ramping with
+        // warmup/shutdown.
         private bool _lastCryoWHMActive = false;
         private void TickCryoWasteHeat()
         {
@@ -2039,7 +2176,7 @@ namespace RealBattery
             else
                 phase = 1f;
 
-            float wasteW = Mathf.Clamp01(phase) * (float)_rbVolume * CRYO_WASTE_HEAT_W_PER_L;
+            float wasteW = Mathf.Clamp01(phase) * (float)_rbVolume * RealBatteryTuning.CryoWasteHeatPerL;
             SystemHeatBridge.AddFlux(systemHeat, "RealBattery_Cryo", TempOptimal, wasteW, true);
             RBLog.Verbose($"[TickCryoWasteHeat] wasteW={wasteW:F3} W, phase={phase:F2}, vol={_rbVolume:F1} L");
         }

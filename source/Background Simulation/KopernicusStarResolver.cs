@@ -60,10 +60,14 @@ namespace RealBattery
                             // Found star candidate
                             starBody = cur;
 
-                            // Read luminosity (optional; default 1.0)
-                            luminosity = ReadLuminosityOrDefault(kopBodyNode, 1.0);
+                            // Read luminosity (optional; default 1360.0 — see ReadLuminosityOrDefault)
+                            luminosity = ReadLuminosityOrDefault(kopBodyNode, 1360.0);
 
                             _cache[startBody.bodyName] = (starBody.bodyName, luminosity, true);
+
+                            if (RBLog.VerboseEnabled)
+                                RBLog.Verbose($"[KopernicusStarResolver] Resolved star {starBody.bodyName} with {luminosity}x luminosity");
+
                             return true;
                         }
                     }
@@ -71,8 +75,6 @@ namespace RealBattery
 
                 cur = cur.referenceBody;
             }
-
-            Debug.Log($"[RealBattery] [KopernicusStarResolver] Resolved star {starBody.bodyName} with {luminosity}x luminosity");
 
             // Not found
             _cache[startBody.bodyName] = (null, 1.0, false);

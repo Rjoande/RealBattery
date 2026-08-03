@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 
 namespace RealBattery
@@ -7,28 +7,6 @@ namespace RealBattery
     public class RealBatterySnapshotManager : MonoBehaviour
     {
         private Vessel lastActiveVessel;
-
-        public void Awake()
-        {
-            // Run before Start(), useful for restoring data
-            foreach (Vessel vessel in FlightGlobals.Vessels)
-            {
-                if (vessel != null && BackgroundSimulator.HasSnapshot(vessel.id))
-                {
-                    var snap = BackgroundSimulator.GetEnergySnapshot(vessel.id);
-                    if (snap != null)
-                    {
-                        BackgroundSimulator.RestoreEnergySnapshot(snap);
-                        Debug.Log
-                        (
-                            $"[RealBattery][OnLoad] Restored snapshot: " +
-                            $"netEC_Gross={snap.netEC_Gross:F3} EC/s, " +
-                            $"netEC_True={snap.netEC_True:F3} EC/s"
-                        );
-                    }
-                }
-            }
-        }
 
         public void Start()
         {
@@ -39,8 +17,6 @@ namespace RealBattery
 
             StartCoroutine(DelayedApplyAllSnapshots());
             StartCoroutine(DelayedCaptureAll());
-
-            Debug.Log("[RealBattery] Snapshot manager initialized.");
         }
 
         public void OnDestroy()
@@ -55,10 +31,7 @@ namespace RealBattery
             foreach (var vessel in FlightGlobals.VesselsLoaded)
             {
                 if (vessel != null)
-                {
                     BackgroundSimulator.CaptureSnapshot(vessel);
-                    Debug.Log($"[RealBattery] Snapshot captured on game save for vessel '{vessel.vesselName}'.");
-                }
             }
         }
 
@@ -69,10 +42,7 @@ namespace RealBattery
             {
                 Vessel vessel = FlightGlobals.ActiveVessel;
                 if (vessel != null)
-                {
                     BackgroundSimulator.CaptureSnapshot(vessel);
-                    Debug.Log($"[RealBattery] Snapshot captured on scene switch for vessel '{vessel.vesselName}'.");
-                }
             }
         }
 
@@ -80,10 +50,7 @@ namespace RealBattery
         private void OnVesselSwitching(Vessel from, Vessel to)
         {
             if (from != null)
-            {
                 BackgroundSimulator.CaptureSnapshot(from);
-                Debug.Log($"[RealBattery] Snapshot captured before vessel switch (from '{from.vesselName}').");
-            }
         }
 
         // After changing ships, remember the new one active (to avoid double saving)
@@ -103,7 +70,6 @@ namespace RealBattery
                 {
                     if (vessel != null && BackgroundSimulator.HasSnapshot(vessel.id))
                     {
-                        Debug.Log($"[RealBattery] Applying snapshot to vessel '{vessel.vesselName}' after scene load...");
                         BackgroundSimulator.ApplySnapshot(vessel);
                         BackgroundSimulator.UpdateEnergySnapshot(vessel);  // optional but recommended
                     }
@@ -133,7 +99,6 @@ namespace RealBattery
             yield return new WaitForSeconds(0.2f); // extra security
 
             BackgroundSimulator.CaptureSnapshot(vessel);
-            Debug.Log($"[RealBattery] Delayed snapshot captured for vessel '{vessel.vesselName}' after unpack.");
         }
     }
 }

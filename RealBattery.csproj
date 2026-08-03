@@ -26,7 +26,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>GameData\RealBattery\</OutputPath>
+    <OutputPath>GameData\RealBattery\plugin\</OutputPath>
     <DefineConstants>
     </DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -75,7 +75,9 @@
     <Compile Include="source\Core\RealBatteryChemistryDB.cs" />
     <Compile Include="source\Core\RealBatteryDefaults.cs" />
     <Compile Include="source\Core\RealBatteryLoadMaster.cs" />
+    <Compile Include="source\Core\RealBatteryPowerLedger.cs" />
     <Compile Include="source\Core\RealBatterySettings.cs" />
+    <Compile Include="source\Core\RealBatteryTuning.cs" />
     <Compile Include="source\Background Simulation\RealBatterySnapshotManager.cs" />
     <Compile Include="source\Background Simulation\RealBatteryVesselModule.cs" />
     <Compile Include="source\Core\SystemHeatBridge.cs" />
@@ -85,9 +87,8 @@
     <None Include="GameData\RealBattery\RealBattery.version" />
     <None Include="source\RealBattery.netkan" />
     <None Include="source\run_netkan.bat" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="GameData\RealBattery\RealBattery.dll" />
+    <None Include="source\RealBatteryPowerLedgerWrapper.cs" />
+    <None Include="source\RealBatteryPowerLedger.md" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />

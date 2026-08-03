@@ -52,18 +52,28 @@ namespace RealBattery
         public static bool EnableVerboseLoadLogs => D?.enableVerboseLoadLogs ?? false;
 
         // ----- External mods availability -----
+        // Lazily cached: the set of loaded assemblies is fixed for the whole game session, so
+        // this only needs to walk AssemblyLoader.loadedAssemblies once instead of on every call
+        // (SystemHeatAvailable in particular is read from several hot paths per battery per tick).
+        private static bool? _systemHeatAvailable;
         public static bool SystemHeatAvailable
         {
             get
             {
-                try { return AssemblyLoader.loadedAssemblies.Any(a => a.name == "SystemHeat"); }
-                catch { return false; }
+                if (_systemHeatAvailable.HasValue) return _systemHeatAvailable.Value;
+                try { _systemHeatAvailable = AssemblyLoader.loadedAssemblies.Any(a => a.name == "SystemHeat"); }
+                catch { _systemHeatAvailable = false; }
+                return _systemHeatAvailable.Value;
             }
         }
+
+        private static bool? _kacInstalled;
         public static bool KACIsInstalled()
         {
-            try { return AssemblyLoader.loadedAssemblies.Any(a => a.name == "KerbalAlarmClock"); }
-            catch { return false; }
+            if (_kacInstalled.HasValue) return _kacInstalled.Value;
+            try { _kacInstalled = AssemblyLoader.loadedAssemblies.Any(a => a.name == "KerbalAlarmClock"); }
+            catch { _kacInstalled = false; }
+            return _kacInstalled.Value;
         }
 
         // ----- Utilities (logging) -----
