@@ -12,6 +12,7 @@
 
 ### Minor Improvements
 - Fixed a memory leak: vessels that never entered physics range during a session (debris, unloaded craft, flags, etc.) left a dead `onVesselGoOffRails` event subscription behind on every scene change. Replaced with the native per-vessel `VesselModule` lifecycle hook, which makes the leak structurally impossible rather than patching around it.
+- Fixed the staging toggle needing a vessel reload to take effect after switching chemistry/subtype, and a residual staging icon lingering after activation. Thermal (fixed-output) batteries now use a distinct staging icon from rechargeable batteries.
 - Fixed an erroneous EVA upgrade path where **VRFB incorrectly upgraded into SMES**. Both are now standalone tiers, selected directly rather than reached by upgrade.
 - The **Zebra → Mg‖Sb** EVA upgrade path is now provided by the Expansion, and is available only when it is installed (the core mod leaves Zebra as a terminal tier).
 - Fixed a missing decal-label description on the **Mg‖Sb** battery (it referenced a non-existent text key).
