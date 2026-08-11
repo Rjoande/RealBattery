@@ -18,8 +18,22 @@
 
     Contract reference: RealBatteryPowerLedger.cs (source/Core/RealBatteryPowerLedger.cs) and
     RealBatteryPowerLedger.md (this folder) in the RealBattery repo. ContractVersion this
-    wrapper targets: 1. All methods speak plain ElectricCharge (EC) units — RealBattery's
+    wrapper targets: 3. All methods speak plain ElectricCharge (EC) units — RealBattery's
     internal StoredCharge resource and its EC<->SC ratio are not your concern.
+
+    The five ContractVersion-2 read methods (GetMaxEc, GetEffectiveMaxEc, GetNetEcPerSecGross,
+    GetNetEcPerSecTrue, GetSecondsToEmpty) and the ContractVersion-3 addition (GetNetEcPerSecLive)
+    are bound only if the installed RealBattery reports a high-enough ContractVersion, and return
+    0.0 like everything else in this wrapper when unbound — NOTE this collapses the real
+    contract's NaN ("no data yet")/PositiveInfinity ("never runs out") sentinels (see
+    RealBatteryPowerLedger.md) down to a single 0.0. If your mod needs to tell those apart,
+    reference RealBattery.dll directly instead of going through this wrapper.
+
+    GetNetEcPerSecLive vs. GetNetEcPerSecGross/True: if your prop/readout only ever cares about
+    the vessel the player is currently flying (e.g. an RPM/MAS IVA prop), prefer
+    GetNetEcPerSecLive — it's the true instantaneous rate for a loaded vessel, not a
+    periodically-recaptured background estimate. GetNetEcPerSecGross/True remain the only source
+    for a vessel that isn't currently loaded.
 
     IMPORTANT — this is a REPORTING contract, not a command one: ReportConsumedEc tells
     RealBattery "I consumed this much energy", it does not ask RealBattery to hand energy over.
@@ -42,6 +56,16 @@ namespace RealBattery
         private static Func<Vessel, double> _getDischargeableEcPerSec;
         private static Func<Vessel, double> _getAvailableEc;
         private static Func<Vessel, double, double, double> _reportConsumedEc;
+
+        // ContractVersion 2 (optional — null on an older RealBattery install)
+        private static Func<Vessel, double> _getMaxEc;
+        private static Func<Vessel, double> _getEffectiveMaxEc;
+        private static Func<Vessel, double> _getNetEcPerSecGross;
+        private static Func<Vessel, double> _getNetEcPerSecTrue;
+        private static Func<Vessel, double> _getSecondsToEmpty;
+
+        // ContractVersion 3 (optional — null on an older RealBattery install)
+        private static Func<Vessel, double> _getNetEcPerSecLive;
 
         /// <summary>
         /// Resolves RealBatteryPowerLedger via reflection. Call once (e.g. from a
@@ -70,6 +94,17 @@ namespace RealBattery
                 _getAvailableEc = Bind<Func<Vessel, double>>(ledgerType, "GetAvailableEc");
                 _reportConsumedEc = Bind<Func<Vessel, double, double, double>>(ledgerType, "ReportConsumedEc");
 
+                // Optional: only present on ContractVersion >= 2. Bind() already returns null
+                // (not throws) for a method that doesn't exist, so this is safe against older installs.
+                _getMaxEc = Bind<Func<Vessel, double>>(ledgerType, "GetMaxEc");
+                _getEffectiveMaxEc = Bind<Func<Vessel, double>>(ledgerType, "GetEffectiveMaxEc");
+                _getNetEcPerSecGross = Bind<Func<Vessel, double>>(ledgerType, "GetNetEcPerSecGross");
+                _getNetEcPerSecTrue = Bind<Func<Vessel, double>>(ledgerType, "GetNetEcPerSecTrue");
+                _getSecondsToEmpty = Bind<Func<Vessel, double>>(ledgerType, "GetSecondsToEmpty");
+
+                // Optional: only present on ContractVersion >= 3.
+                _getNetEcPerSecLive = Bind<Func<Vessel, double>>(ledgerType, "GetNetEcPerSecLive");
+
                 Installed = _getDischargeableEcPerSec != null && _getAvailableEc != null && _reportConsumedEc != null;
             }
             catch
@@ -83,6 +118,18 @@ namespace RealBattery
         public static double GetDischargeableEcPerSec(Vessel vessel) => Installed ? _getDischargeableEcPerSec(vessel) : 0.0;
         public static double GetAvailableEc(Vessel vessel) => Installed ? _getAvailableEc(vessel) : 0.0;
         public static double ReportConsumedEc(Vessel vessel, double ecConsumed, double deltaTimeSeconds) => Installed ? _reportConsumedEc(vessel, ecConsumed, deltaTimeSeconds) : 0.0;
+
+        // ContractVersion 2. Return 0.0 both when RealBattery isn't installed and when an
+        // older (v1) RealBattery is installed without these methods — same "safe default,
+        // never throws" contract as everything else in this wrapper.
+        public static double GetMaxEc(Vessel vessel) => _getMaxEc != null ? _getMaxEc(vessel) : 0.0;
+        public static double GetEffectiveMaxEc(Vessel vessel) => _getEffectiveMaxEc != null ? _getEffectiveMaxEc(vessel) : 0.0;
+        public static double GetNetEcPerSecGross(Vessel vessel) => _getNetEcPerSecGross != null ? _getNetEcPerSecGross(vessel) : 0.0;
+        public static double GetNetEcPerSecTrue(Vessel vessel) => _getNetEcPerSecTrue != null ? _getNetEcPerSecTrue(vessel) : 0.0;
+        public static double GetSecondsToEmpty(Vessel vessel) => _getSecondsToEmpty != null ? _getSecondsToEmpty(vessel) : 0.0;
+
+        // ContractVersion 3.
+        public static double GetNetEcPerSecLive(Vessel vessel) => _getNetEcPerSecLive != null ? _getNetEcPerSecLive(vessel) : 0.0;
 
         private static TDelegate Bind<TDelegate>(Type type, string methodName) where TDelegate : class
         {

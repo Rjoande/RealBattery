@@ -1,4 +1,4 @@
-# RealBattery Power Ledger (ContractVersion 1)
+# RealBattery Power Ledger (ContractVersion 3)
 
 For third-party mods that manage their **own** background/offline energy accounting (e.g. a
 rover autopilot that keeps driving while the vessel is unloaded, or any mod that simulates
@@ -36,23 +36,77 @@ vessel was *not* loaded, or independently of KSP's live resource flow.
 
 ## Reference
 
-| Method | Returns |
-|---|---|
-| `GetDischargeableEcPerSec(Vessel vessel)` | Sum of rated discharge rate (EC/s), already derated |
-| `GetAvailableEc(Vessel vessel)` | Currently stored energy (EC) |
-| `ReportConsumedEc(Vessel vessel, double ecConsumed, double deltaTimeSeconds)` | EC actually covered |
+| Method | Returns | Since |
+|---|---|---|
+| `GetDischargeableEcPerSec(Vessel vessel)` | Sum of rated discharge rate (EC/s), already derated | v1 |
+| `GetAvailableEc(Vessel vessel)` | Currently stored energy (EC) | v1 |
+| `ReportConsumedEc(Vessel vessel, double ecConsumed, double deltaTimeSeconds)` | EC actually covered | v1 |
+| `GetMaxEc(Vessel vessel)` | Nominal (rated) capacity (EC), undiminished by wear/thermal | v2 |
+| `GetEffectiveMaxEc(Vessel vessel)` | Usable-now capacity (EC), derated by wear + `ThermalCapFactor` | v2 |
+| `GetNetEcPerSecGross(Vessel vessel)` | Net vessel EC balance including solar (EC/s, negative = draining) | v2 |
+| `GetNetEcPerSecTrue(Vessel vessel)` | Net vessel EC balance excluding solar — conservative/worst-case | v2 |
+| `GetSecondsToEmpty(Vessel vessel)` | Seconds to depletion at the current gross rate | v2 |
+| `GetNetEcPerSecLive(Vessel vessel)` | True instantaneous net EC/s for a *loaded* vessel, no snapshot involved | v3 |
 
-All three only consider **eligible** RealBattery parts: not `BatteryDisabled`, not `FixedOutput`
-(one-shot thermal batteries don't participate in this contract — they aren't a rechargeable
-background budget), with a `StoredCharge` resource present. Non-rechargeable ("primary")
-chemistries and `InfiniteCycles` (SMES-style) batteries *do* participate, with no special
-distinction exposed.
+All of the above only consider **eligible** RealBattery parts: not `BatteryDisabled`, not
+`FixedOutput` (one-shot thermal batteries don't participate in this contract — they aren't a
+rechargeable background budget), with a `StoredCharge` resource present. Non-rechargeable
+("primary") chemistries and `InfiniteCycles` (SMES-style) batteries *do* participate, with no
+special distinction exposed.
 
-All three require a **loaded** vessel (`vessel.parts` populated). `ReportConsumedEc` on a
-vessel that isn't loaded returns `0.0` and logs one warning per vessel (not spammed) — it does
-not throw. There is currently no support for reporting against an unloaded/`ProtoVessel`-backed
+All read/report methods require a **loaded** vessel (`vessel.parts` populated). `ReportConsumedEc`
+on a vessel that isn't loaded returns `0.0` and logs one warning per vessel (not spammed) — it
+does not throw. There is currently no support for reporting against an unloaded/`ProtoVessel`-backed
 vessel; report at the point your own mod reconciles state against a *loaded* vessel (see the
 BonVoyage example below for where that point naturally is).
+
+### The `v2` net-EC and depletion methods, in more detail
+
+`GetNetEcPerSecGross` / `GetNetEcPerSecTrue` don't recompute anything on call — they read RB's
+own most recently captured `BackgroundSimulator.VesselEnergySnapshot` for that vessel (captured
+on scene switch, vessel switch, game save, and once on flight-scene load), the same figures
+RB's own low-power alarm (`ExpUT`) is computed from. That means:
+- They can be a few seconds to minutes stale for a vessel that's stayed loaded and active
+  without switching away — not a new source of uncertainty, just the same one RB's own alarms
+  already accept.
+- They return `double.NaN` if no snapshot exists yet for the vessel (e.g. queried the same
+  frame it first loads) — check for `NaN` before using the value.
+
+`GetSecondsToEmpty` is a convenience built directly from `GetAvailableEc` /
+`GetNetEcPerSecGross` — the same quantity behind the low-power alarm's `ExpUT`, but as a plain
+duration with **no alarm lead-time subtracted** (`RealBatterySettings.LowPowerLeadSeconds` is a
+player-configurable alarm-timing concern, not part of this figure). Returns
+`double.PositiveInfinity` at a net surplus/balance (never runs out at the current rate), or
+`double.NaN` if no data is available.
+
+### `GetNetEcPerSecLive` (v3) vs. `GetNetEcPerSecGross`/`GetNetEcPerSecTrue`
+
+`GetNetEcPerSecLive` is the true, unsmoothed instantaneous net EC/s for a vessel that is
+**currently loaded** — the sum of each eligible battery's raw `lastECpower` for the physics
+tick that just ran, the same figure `BackgroundSimulator` itself treats as ground truth when
+calibrating its own solar/consumption estimate. It is not the value a part's PAW shows
+(`GUI_power`, deliberately smoothed so the on-screen readout doesn't flicker) — it's the
+unsmoothed number underneath that, safe to use in your own math.
+
+Use `GetNetEcPerSecLive` whenever you only ever care about the vessel the player is currently
+flying (an RPM/MAS IVA prop is the clearest example — IVA only ever shows the active vessel).
+Use `GetNetEcPerSecGross`/`GetNetEcPerSecTrue` for anything else (a vessel that may not be
+loaded, or where you specifically want RB's solar-inclusive/exclusive background estimate
+rather than the live figure). `GetNetEcPerSecLive` returns `0.0` for a vessel that isn't loaded
+— it has no unloaded-vessel fallback of its own.
+
+### Where the v2/v3 aggregates actually come from
+
+`GetMaxEc`, `GetEffectiveMaxEc`, `GetAvailableEc`, `GetDischargeableEcPerSec`, and
+`GetNetEcPerSecLive` are O(1) reads of a single aggregate that `RealBatteryLoadMaster` (the
+`VesselModule` that already drives RB's live EC/SC transfer every `FixedUpdate`) recomputes
+once per physics tick from its own battery list — not a fresh walk of the vessel's parts on
+every call. Every caller shares the same computation: RB's own UI, an RPM/MAS prop, and any
+third-party mod calling this contract all read the exact same number for the same tick, and
+none of them pay for more than one pass over the vessel's batteries per tick no matter how many
+callers ask. The one cost: a value can lag by up to one physics tick behind a structural change
+(a battery added/removed mid-flight) — the same latency RealBatteryLoadMaster's own EC/SC
+transfer logic already has, not a new one introduced by this contract.
 
 ## Units and semantics
 
@@ -83,7 +137,7 @@ BonVoyage example below for where that point naturally is).
 
 ## Versioning
 
-`RealBatteryPowerLedger.ContractVersion` (currently `1`) increments only for additive,
+`RealBatteryPowerLedger.ContractVersion` (currently `3`) increments only for additive,
 non-breaking changes — existing method signatures are frozen once shipped. Check
 `RealBatteryPowerLedgerWrapper.ContractVersion` after `Init()` if your mod depends on a
 feature added in a later version.

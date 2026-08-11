@@ -63,6 +63,49 @@ namespace RealBattery
             GameEvents.onVesselCrewWasModified.Remove(ReadAllRealBatteryModules);
         }
 
+        // --- Vessel-wide power cache (RealBatteryPowerLedger ContractVersion 3) ---
+        // Recomputed once per FixedUpdate (RecomputePowerCache, called at the end of the method
+        // below, after this tick's EC/SC transfer so it reflects this tick's lastECpower).
+        // RealBatteryPowerLedger's read methods are O(1) lookups into these fields — a single
+        // shared aggregate instead of every caller (RB's own UI, an RPM/MAS prop, a third-party
+        // mod) separately walking the vessel's parts.
+        public double CachedMaxEc { get; private set; }
+        public double CachedEffectiveMaxEc { get; private set; }
+        public double CachedAvailableEc { get; private set; }
+        public double CachedDischargeableEcPerSec { get; private set; }
+        public double CachedNetEcPerSecLive { get; private set; }
+
+        internal static RealBatteryLoadMaster GetInstance(Vessel v)
+        {
+            if (v?.vesselModules == null) return null;
+            foreach (var vm in v.vesselModules)
+                if (vm is RealBatteryLoadMaster lm) return lm;
+            return null;
+        }
+
+        private void RecomputePowerCache()
+        {
+            double maxEc = 0.0, effMaxEc = 0.0, availEc = 0.0, dischargeable = 0.0, netLive = 0.0;
+
+            foreach (RealBattery rb in RealBatteryPowerLedger.EnumerateEligibleBatteries(vessel))
+            {
+                PartResource sc = rb.part.Resources.Get("StoredCharge");
+                if (sc == null) continue;
+
+                maxEc += sc.maxAmount * RealBattery.EC2SCratio;
+                effMaxEc += sc.maxAmount * RealBatteryPowerLedger.EffectiveLife(rb) * RealBattery.EC2SCratio;
+                availEc += sc.amount * RealBattery.EC2SCratio;
+                dischargeable += rb.DischargeRate; // already EC/s (kW)-equivalent
+                netLive += rb.lastECpower;          // raw, unsmoothed; +charge / -discharge
+            }
+
+            CachedMaxEc = maxEc;
+            CachedEffectiveMaxEc = effMaxEc;
+            CachedAvailableEc = availEc;
+            CachedDischargeableEcPerSec = dischargeable;
+            CachedNetEcPerSecLive = netLive;
+        }
+
         private List<RealBattery> rbList = new List<RealBattery>();
         public void ReadAllRealBatteryModules(Vessel gameEventVessel = null)
         {
@@ -231,6 +274,11 @@ namespace RealBattery
                         kv.Key.Crate = kv.Value;
                 }
             }
+
+            // Outside the EC_maxAmount/rbList guard above so a vessel that just lost its last
+            // battery (or never had one) correctly settles the cache back to zero, instead of
+            // holding the last nonzero reading.
+            RecomputePowerCache();
         }
     }
 }

@@ -445,7 +445,7 @@ namespace RealBattery
 
         private void Update()
         {
-            //if (!RealBatterySettings.UseLowPowerMessage) return;
+            if (!RealBatterySettings.EnableCosmeticToasts) return;
 
             // Pace the check in real time
             double leadSec = Math.Max(30.0, RealBatterySettings.LowPowerLeadSeconds);

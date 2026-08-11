@@ -1727,13 +1727,16 @@ namespace RealBattery
                     {
                         ThermalCapNotified = true;
 
-                        var msg = new MessageSystem.Message(
-                            Localizer.Format("#LOC_RB_ThermalCap_title"),
-                            Localizer.Format("#LOC_RB_ThermalCap_body", part.partInfo.title),
-                            MessageSystemButton.MessageButtonColor.ORANGE,
-                            MessageSystemButton.ButtonIcons.ALERT
-                        );
-                        MessageSystem.Instance?.AddMessage(msg);
+                        if (RealBatterySettings.EnableCosmeticToasts)
+                        {
+                            var msg = new MessageSystem.Message(
+                                Localizer.Format("#LOC_RB_ThermalCap_title"),
+                                Localizer.Format("#LOC_RB_ThermalCap_body", part.partInfo.title),
+                                MessageSystemButton.MessageButtonColor.ORANGE,
+                                MessageSystemButton.ButtonIcons.ALERT
+                            );
+                            MessageSystem.Instance?.AddMessage(msg);
+                        }
 
                         RBLog.Warn($"[ApplyThermalEffects] InfiniteCycles thermal cap triggered on " +
                                    $"'{part.partInfo?.title}' ({tempK:F1} K > {TempOverheat:F0} K)");
@@ -2221,22 +2224,25 @@ namespace RealBattery
                     {
                         OverheatNotified = true;
 
-                        // Kerbal-flavored variants (localized)
-                        string[] bodies = new string[]
+                        if (RealBatterySettings.EnableCosmeticToasts)
                         {
-                            Localizer.Format("#LOC_RB_OverheatMsg1", part.partInfo.title),
-                            Localizer.Format("#LOC_RB_OverheatMsg2", part.partInfo.title),
-                            Localizer.Format("#LOC_RB_OverheatMsg3", part.partInfo.title)
-                        };
-                        string body = bodies[UnityEngine.Random.Range(0, bodies.Length)];
+                            // Kerbal-flavored variants (localized)
+                            string[] bodies = new string[]
+                            {
+                                Localizer.Format("#LOC_RB_OverheatMsg1", part.partInfo.title),
+                                Localizer.Format("#LOC_RB_OverheatMsg2", part.partInfo.title),
+                                Localizer.Format("#LOC_RB_OverheatMsg3", part.partInfo.title)
+                            };
+                            string body = bodies[UnityEngine.Random.Range(0, bodies.Length)];
 
-                        var msg = new MessageSystem.Message(
-                            Localizer.Format("#LOC_RB_Overheat_title"),
-                            body,
-                            MessageSystemButton.MessageButtonColor.ORANGE,
-                            MessageSystemButton.ButtonIcons.MESSAGE
-                        );
-                        MessageSystem.Instance?.AddMessage(msg);
+                            var msg = new MessageSystem.Message(
+                                Localizer.Format("#LOC_RB_Overheat_title"),
+                                body,
+                                MessageSystemButton.MessageButtonColor.ORANGE,
+                                MessageSystemButton.ButtonIcons.MESSAGE
+                            );
+                            MessageSystem.Instance?.AddMessage(msg);
+                        }
                     }
                 }
                 else

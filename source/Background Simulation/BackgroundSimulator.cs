@@ -74,6 +74,17 @@ namespace RealBattery
             return energySnapshots.ContainsKey(vesselId);
         }
 
+        // Read-only accessor for RealBatteryPowerLedger (netEC_Gross/netEC_True, ContractVersion 2).
+        // Returns the most recently captured snapshot as-is — captured on scene switch, vessel
+        // switch, game save, and once on flight-scene load (RealBatterySnapshotManager), not on
+        // every physics tick. May be a few seconds to minutes old for a vessel that has stayed
+        // loaded and active without switching away; still the same figure RB's own alarm system
+        // (ExpUT) already trusts, so it's not a new source of uncertainty.
+        internal static bool TryGetEnergySnapshot(Guid vesselId, out VesselEnergySnapshot snapshot)
+        {
+            return energySnapshots.TryGetValue(vesselId, out snapshot);
+        }
+
         public static void CaptureSnapshot(Vessel vessel)
         {
             if (vessel == null || !vessel.loaded) return;

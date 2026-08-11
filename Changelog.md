@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.3.2
+
+### Minor Improvements
+- Settings that depend on another setting (e.g. `Use SystemHeat` on `Use Thermal Simulation`, `EVA Refurbish` on `Battery Wear`) are now shown greyed-out and disabled when their dependency is off, instead of disappearing from the difficulty settings page entirely.
+- New **Cosmetic messages** setting (difficulty settings, on by default): toggles the flavor-text toast messages for low-power warnings, reduced thermal capacity, and battery overheat all at once. Battery end-of-life and self-runaway warnings are always shown regardless, since those are serious events rather than spam. (The low-power toast previously had no working toggle at all — the check existed in code but was never wired up.)
+- **`RealBatteryPowerLedger` (the read/report contract for third-party mods) reaches ContractVersion 3**, with five new read-only methods: `GetMaxEc`/`GetEffectiveMaxEc` (nominal vs. wear/thermal-derated capacity), `GetNetEcPerSecGross`/`GetNetEcPerSecTrue` (net vessel EC balance with/without solar, for a vessel that isn't currently loaded), and `GetNetEcPerSecLive`/`GetSecondsToEmpty` (true instantaneous rate and time-to-depletion for a loaded vessel). All vessel-wide aggregates are now backed by a single per-`FixedUpdate` cache on `RealBatteryLoadMaster` instead of a fresh walk of the vessel's parts on every call, so multiple consumers (RB's own tooling, RPM/MAS, other mods) share one computation. See `source/RealBatteryPowerLedger.md` for the full contract. *(For modders: no breaking changes — existing ContractVersion 1/2 method signatures are unchanged.)*
+
+### Credits
+- Thanks to forum user **Kvaksa** for the feedback behind two backlog items: the idea for a vessel-wide battery autonomy estimate (still planned, not yet in this release) and the request for a way to turn off the low-power/thermal/overheat toast spam, implemented above as the **Cosmetic messages** setting.
+
+## v3.3.1
+
+### Minor Improvements
+- **`RB_ignore` opt-out marker:** parts that should never receive a RealBattery conversion (e.g. dedicated generator/reactor parts with `ElectricCharge` but no storage role) can now be excluded cleanly via a single ex-ante patch adding a marker `MODULE { name = RB_ignore }`, instead of the previous manual per-part workaround (adding a dummy `RealBattery` module, then removing it after RealBattery's patches ran). Every RealBattery-adding patch (stock, mod-support, and the generic catch-alls) now checks for this marker. See `patches/00_Ignore/RB_Ignore_List.cfg` and `library.md` for details. *(For modders: this is now the documented way to opt a third-party part out of RealBattery's auto-conversion.)*
+- Universal Storage 2's `USEVAX` reactor part and Kerbal Foundries' `KF-APU` are now excluded via `RB_ignore` instead of the old dummy-module workaround.
+- Fixed Bluedog Design Bureau's `bluedog_Ranger_Bus` never receiving a `RealBattery` module: the part's dedicated patch only added a `StoredCharge` resource to its `RangerB`/`MarinerB` mesh-style subtypes (a separate B9PartSwitch from RealBattery's own), leaving that capacity completely unmanaged (no discharge simulation, no wear, no PAW battery info). It now also receives the standard module via the collective Bluedog probe patch (`AgZn` chemistry); the mesh-style-specific resource block is unchanged and still needed for that switcher.
+
 ## v3.3.0
 
 ### Major Changes

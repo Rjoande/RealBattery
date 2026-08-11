@@ -21,6 +21,7 @@ namespace RealBattery
         // ----- Core Settings -----
         public static bool UseLowPowerAlarm => S?.enableLowPowerAlarm ?? true;
         public static bool UseKAC => S?.useKACAlarms ?? true;
+        public static bool EnableCosmeticToasts => S?.enableCosmeticToasts ?? true;
         public static bool EnableSelfDischarge => S?.enableSelfDischarge ?? true;
         public static bool EnableBatteryWear => S?.enableBatteryWear ?? true;
         public static bool EnableHeatSimulation => S?.enableHeatSimulation ?? true;
@@ -217,7 +218,21 @@ namespace RealBattery
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_UseKAC", toolTip = "#LOC_RB_Settings_UseKAC_tip")]
         public bool useKACAlarms = false;
 
+        // Master switch for cosmetic flavor-text toasts (low-power warning, reduced thermal
+        // capacity, overheat auto-disable). Battery End-of-Life and background self-runaway
+        // stay always visible: those are serious events, not spam.
+        [GameParameters.CustomParameterUI("#LOC_RB_Settings_CosmeticToasts", toolTip = "#LOC_RB_Settings_CosmeticToasts_tip")]
+        public bool enableCosmeticToasts = true;
+
         public override bool Enabled(MemberInfo member, GameParameters parameters)
+        {
+            return true;
+        }
+
+        // Dependent fields stay visible (see Enabled above) but greyed out when their
+        // dependency is off, so the relationship is visible instead of the option
+        // silently disappearing (pattern: SituationalAwareness's SaParams.Interactible).
+        public override bool Interactible(MemberInfo member, GameParameters parameters)
         {
             if (member.Name == nameof(enableEVARefurbish))
                 return enableBatteryWear;
