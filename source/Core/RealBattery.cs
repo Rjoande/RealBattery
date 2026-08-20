@@ -468,7 +468,6 @@ namespace RealBattery
 
         public override void OnUpdate()
         {
-            RBLog.Verbose($"[RealBattery] OnUpdate check on {part.partInfo.title} in {HighLogic.LoadedScene} | LastChemistryID: {_lastAppliedChemistryID}, ChemistryID: {ChemistryID}");
             if (ChemistryID != _lastAppliedChemistryID)
             {
                 _lastAppliedChemistryID = ChemistryID;
@@ -484,8 +483,6 @@ namespace RealBattery
             }
             
             if (!HighLogic.LoadedSceneIsFlight || !moduleActive) return;
-
-            RBLog.Verbose("INF OnUpdate");
 
             // for slowing down the charge/discharge status. Time-based (not per-frame) so the
             // real-world settle time stays ~constant regardless of framerate or power
@@ -570,8 +567,6 @@ namespace RealBattery
                 BatteryTimeTo = "-";
             }
 
-            RBLog.Verbose($"[RealBattery] GUI_power update: lastECpower={lastECpower:F3}, GUI_power={GUI_power:F3}, Δt={TimeWarp.fixedDeltaTime:F3}");
-
             // Register with SystemHeat even when disabled, so the loop uses our TempOptimal target
             if (RealBatterySettings.EnableHeatSimulation && RealBatterySettings.UseSystemHeat && ((BatteryDisabled && !isRunaway) || (!BatteryDisabled && keepWarmActive)))
             {
@@ -586,7 +581,6 @@ namespace RealBattery
         {
             if (!moduleActive) return;
 
-            RBLog.Verbose($"[RealBattery] OnUpdate check on {part.partInfo.title} in {HighLogic.LoadedScene} | LastChemistryID: {_lastAppliedChemistryID}, ChemistryID: {ChemistryID}");
             if (ChemistryID != _lastAppliedChemistryID)
             {
                 _lastAppliedChemistryID = ChemistryID;
@@ -928,7 +922,6 @@ namespace RealBattery
                     // (LifeDecay cells do not bleed SoC — they decay life instead).
                     if (!LifeDecay && RealBatterySettings.EnableSelfDischarge)
                     {
-                        RBLog.Verbose($"[FixedUpdate] Called ApplySelfDischarge");
                         ApplySelfDischarge();
                     }
                     return;
@@ -1399,8 +1392,6 @@ namespace RealBattery
                 }
 
                 EC_power = EC_delta / TimeWarp.fixedDeltaTime;
-
-                RBLog.Verbose("INF charged");
             }
             else if (discharging)  // Discharge battery (or fixed output)
             {
@@ -1427,14 +1418,10 @@ namespace RealBattery
                 EC_power = FixedOutput
                     ? -(chemEC / TimeWarp.fixedDeltaTime)       // negative = discharging (chemically)
                     : (EC_accepted / TimeWarp.fixedDeltaTime);  // could be 0 if EC is full
-
-                RBLog.Verbose("INF discharged");
             }
             else
             {
                 EC_power = 0;
-
-                RBLog.Verbose("INF no charge or discharge");
             }
 
             // --- RESOURCE_EXTRA: chemistry-defined auxiliary resource flows ---
@@ -1466,12 +1453,10 @@ namespace RealBattery
                         // Negative request = inject into the vessel; excess (full/unreachable
                         // tanks) is not stored and is effectively dumped.
                         double produced = part.RequestResource(req.name, -requested);
-                        RBLog.Verbose($"[XferECtoRealBattery][ResourceExtra] output '{req.name}': requested={requested:F4}, received={(-produced):F4}");
                     }
                     else // "input"
                     {
                         double received = part.RequestResource(req.name, requested);
-                        RBLog.Verbose($"[XferECtoRealBattery][ResourceExtra] input '{req.name}': requested={requested:F4}, received={received:F4}");
                     }
                 }
             }
@@ -1526,7 +1511,6 @@ namespace RealBattery
                 part.GetConnectedResourceTotals(def.id, out double avail, out _);
                 if (avail < required * (1.0 - EPS))
                 {
-                    RBLog.Verbose($"[XferECtoRealBattery][ResourceExtra] input '{req.name}' short: need {required:F4}, have {avail:F4} — transfer cancelled.");
                     return false;
                 }
             }
@@ -1664,7 +1648,7 @@ namespace RealBattery
 
                     if (!isRunaway) flux /= EngBonus;
 
-                    SendThermalFlux("RealBattery", flux, smooth: true, tempK, isRunaway ? "ACTIVE (Runaway)" : "ACTIVE");
+                    SendThermalFlux("RealBattery", flux, smooth: true);
                 }
                 else if (useSH && systemHeat != null)
                 {
@@ -1672,7 +1656,7 @@ namespace RealBattery
                     // so the loop doesn't collapse toward 0 K between active cycles (SystemHeat
                     // only — stock has no equivalent "declare idle" concept).
                     smoothFlux = 0f;
-                    SendThermalFlux("RealBattery", 0f, smooth: false, tempK, "IDLE");
+                    SendThermalFlux("RealBattery", 0f, smooth: false);
                 }
             }
 
@@ -1717,7 +1701,7 @@ namespace RealBattery
                     // preserves the exact previous value at the reference 50 Hz / 0.02 s physics
                     // tick (warp 1x), but the term no longer depends on the actual timestep.
                     float heatBoost = severity * (float)sc.maxAmount * 0.02f;
-                    SendThermalFlux("RealBattery", heatBoost * (float)ThermalLoss, smooth: false, tempK, "InfCycleCap");
+                    SendThermalFlux("RealBattery", heatBoost * (float)ThermalLoss, smooth: false);
 
                     RBLog.Verbose($"[ApplyThermalEffects] InfiniteCycles thermal cap: " +
                                   $"severity={severity:F2}, cap={ThermalCapFactor:F3}, " +
@@ -1782,8 +1766,7 @@ namespace RealBattery
         //     hard reset (silencing, idle) should set smoothFlux = 0f themselves before calling
         //     with fluxKW = 0f, smooth = false.
         //   - Stock: fluxKW is sent as-is via part.AddThermalFlux — no scaling, never smoothed.
-        // tempK/logTag are only used for the verbose log line.
-        private void SendThermalFlux(string sourceId, float fluxKW, bool smooth, float tempK, string logTag)
+        private void SendThermalFlux(string sourceId, float fluxKW, bool smooth)
         {
             bool useSH = RealBatterySettings.UseSystemHeat && systemHeat != null;
             if (useSH)
@@ -1801,22 +1784,18 @@ namespace RealBattery
                     toSend = scaled;
                 }
                 SystemHeatBridge.AddFlux(systemHeat, sourceId, TempOptimal, toSend, true);
-                RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux {logTag} (SystemHeat): {toSend:F2} W @ target={TempOptimal:F0} K (loop={tempK:F1} K)");
             }
             else
             {
                 part.AddThermalFlux(fluxKW);
-                RBLog.Verbose($"[ApplyThermalEffects] ThermalFlux {logTag} (stock): {fluxKW:F2} W (part={tempK:F1} K)");
             }
         }
 
         public void UpdateBatteryLife()
         {
             if (!HighLogic.LoadedSceneIsFlight) return;
-            RBLog.Verbose($"[UpdateBatteryLife] Scene is FLIGHT");
 
             if (!RealBatterySettings.EnableBatteryWear) return;
-            RBLog.Verbose($"[UpdateBatteryLife] UseBatteryWear is ON");
 
             if (InfiniteCycles) return;
 
@@ -1884,9 +1863,7 @@ namespace RealBattery
             }
 
             // Standard self-discharge: only when battery is OFF.
-            RBLog.Verbose($"[ApplySelfDischarge] UseSelfDischarge is ON");
             if (!BatteryDisabled) return;
-            RBLog.Verbose($"[ApplySelfDischarge] Battery is OFF");
             if (SC_SOC <= 0) return;
 
             double ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;

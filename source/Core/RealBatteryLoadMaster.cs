@@ -137,9 +137,6 @@ namespace RealBattery
             // get vessel wide EC status (missing or available)
             vessel.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double EC_amount, out double EC_maxAmount);
 
-            if (RBLog.VerboseEnabled)
-                RBLog.Verbose($"[FixedUpdate] vessel='{vessel.GetDisplayName()}' EC={EC_amount:F1}/{EC_maxAmount:F1}, batteries={rbList.Count}");
-
             if (EC_maxAmount > 0 && rbList.Count != 0)
             {
                 // HighEClevel: use the lowest among active batteries so an unusual threshold
