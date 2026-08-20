@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.3.4
+
+### Minor Improvements
+- **Initial MFD Extended compatibility**: RealBattery now ships its own bay page ("BATT") for **MFD Extended**, the shared MAS multi-function-display add-on hosting a second, additive screen alongside a craft's existing IVA monitor. Currently a hello-world/verification page confirming the integration renders correctly end-to-end; the real vessel/fleet power readout (battery reserve, net EC rate, time to depletion, all already exposed via `RealBatteryPowerLedger`) follows in a later release. No effect on players without MFD Extended installed.
+
+## v3.3.3
+
+### Minor Improvements
+- Removed a batch of leftover per-frame/per-physics-tick verbose log lines (visible only with the debug "Enable Verbose Logs" setting on) that spammed the log continuously during normal play.
+
 ## v3.3.2
 
 ### Minor Improvements
