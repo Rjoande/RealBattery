@@ -251,6 +251,38 @@ namespace RealBattery
         // which is lost when the cryogenic state is interrupted.
         private bool IsSMES => KeepWarmMode == "cryo" && InfiniteCycles;
 
+        // True while this battery is actively overheating (tempK > TempOverheat, not yet
+        // cooled back below TempOverheat - 10). Two disjoint signals depending on chemistry,
+        // because ApplyThermalEffects branches on InfiniteCycles and only one of the two is
+        // ever touched for a given battery (see the InfiniteCycles branch's early `return`
+        // before HandleOverheatUX is reached): InfiniteCycles batteries derate ThermalCapFactor
+        // below 1.0 instead of calling HandleOverheatUX at all; classic (wear-based) batteries
+        // never touch ThermalCapFactor and instead latch OverheatNotified in HandleOverheatUX
+        // (true for the whole overheat window, not just the one-shot toast its name suggests).
+        //
+        // For InfiniteCycles, ThermalCapFactor < 1.0 alone is NOT sufficient: it's also
+        // legitimately below 1.0 for reasons that have nothing to do with overheating —
+        // mid-warmup/cooldown ramp (rises/falls as progress², see FixedUpdate's KeepWarm
+        // block) and while simply disabled (SMES has no supercurrent when off, TCF pinned
+        // near 0 by design — ApplyThermalEffects itself early-returns on BatteryDisabled
+        // before ever reaching the InfiniteCycles cap computation, so a disabled SMES's low
+        // TCF was never re-evaluated against real temperature in the first place). Mirror
+        // ApplyThermalEffects's own guard (`!keepWarmActive && !controlledShutdownActive`,
+        // plus the disabled early-return) so this reads true only when the InfiniteCycles cap
+        // block itself would actually be computing a live overheat derate right now.
+        // internal (not private): read by RealBatteryMFDProvider for the MFD STATUS column.
+        internal bool IsOverheating => InfiniteCycles
+            ? !BatteryDisabled && !keepWarmActive && !controlledShutdownActive && ThermalCapFactor < 1.0 - EPS
+            : OverheatNotified;
+
+        // Same "ActualLife" formula BatteryChargeStatus itself uses (line ~526) to rank
+        // DeadBattery above Overheat in its own status chain — exposed here so
+        // RealBatteryMFDProvider's STATUS column can apply the identical priority: a spent
+        // battery reporting OVERHEAT is misleading (nothing left to lose), so the MFD should
+        // fall silent (HEALTH already reads ~0%) rather than show a fault that no longer means
+        // anything for this part.
+        internal bool IsSpent => (RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0) < 0.01;
+
         // True when this cryo battery should use the CryoTanks-like waste heat model instead of EC upkeep.
         private bool UsesCryoWasteHeat() =>
             KeepWarmMode == "cryo" && RealBatterySettings.UseCryoWasteHeatMode;
@@ -272,10 +304,13 @@ namespace RealBattery
         // Tracks current thermal runaway state (true while active, cleared when extinguished)
         public bool    isRunaway = false;
         // Latency warmup/shutdown state
-        private bool   keepWarmActive = false;      // true during warmup latency
+        // internal (not private) on the two ramp flags: read by RealBatteryMFDProvider for the
+        // MFD STATUS column's advisory states (SHUTDOWN/WARMUP/COOLDOWN), same reuse pattern as
+        // IsEligible/IsOverheating above.
+        internal bool  keepWarmActive = false;      // true during warmup latency
         private double keepWarmTleft = 0.0;         // seconds left in warmup
         private double keepWarmGrace = 0.0;         // shutdown grace when upkeep EC missing
-        private bool   controlledShutdownActive = false;
+        internal bool  controlledShutdownActive = false;
         private double shutdownTleft = 0.0;
         private int    pct = 0;
         private bool   upkeepShort = false;
@@ -511,6 +546,8 @@ namespace RealBattery
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_Status_Runaway");
             else if (ActualLife < 0.01)
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_INF_DeadBattery");
+            else if (IsOverheating)
+                BatteryChargeStatus = Localizer.Format("#LOC_RB_Status_Overheat");
             else if (controlledShutdownActive)
                 BatteryChargeStatus = Localizer.Format("#LOC_RB_ShuttingDown", pct);
             else if (!BatteryDisabled && keepWarmActive)
@@ -1569,7 +1606,27 @@ namespace RealBattery
 
             // After runaway suppression, re-check if we should still proceed
             if (BatteryDisabled && !isRunaway)
+            {
+                // Even while disabled, keep a classic battery's OverheatNotified tracking the
+                // real temperature both ways — otherwise HandleOverheatUX (below, the only place
+                // that normally owns this flag) never runs again until the battery is manually
+                // re-enabled: not just "stuck true forever" (the original bug) but, with only a
+                // one-way reset, also "stuck false forever" once it cools once, even if it heats
+                // back up again while still off (found in-game 2026-08-30). Same bidirectional
+                // pattern the InfiniteCycles branch already uses for ThermalCapFactor below —
+                // state only, no toast: HandleOverheatUX itself, which owns the toast, still
+                // never runs while disabled, so re-entering overheat here doesn't re-alert.
+                // InfiniteCycles excluded: a disabled SMES's ThermalCapFactor == 0 is the correct
+                // "no supercurrent" state, not something to track here.
+                if (!InfiniteCycles)
+                {
+                    if (tempK > TempOverheat)
+                        OverheatNotified = true;
+                    else if (tempK < TempOverheat - 10f)
+                        OverheatNotified = false;
+                }
                 return;
+            }
 
             PartResource sc = part.Resources.Get("StoredCharge");
             double safeLife = ActualLife > 0.001 ? ActualLife : 0.001;
@@ -1747,6 +1804,7 @@ namespace RealBattery
                 if (!FixedOutput && !isRunaway) deltaWear /= EngBonus;
 
                 WearCounter += deltaWear;
+                UpdateBatteryLife(); // keep BatteryLife/SC in sync immediately, same as the runaway wear block above — otherwise LifeCycles (computed live from WearCounter) can reach 0 while BatteryHealth stays stuck at its last value until the next XferECtoRealBattery call
                 RBLog.Verbose($"[ApplyThermalEffects] Thermal wear: Δ={deltaWear:F5}, T={tempK:F1} K");
             }
 

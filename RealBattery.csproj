@@ -75,6 +75,7 @@
     <Compile Include="source\Core\RealBatteryChemistryDB.cs" />
     <Compile Include="source\Core\RealBatteryDefaults.cs" />
     <Compile Include="source\Core\RealBatteryLoadMaster.cs" />
+    <Compile Include="source\Core\RealBatteryMFDProvider.cs" />
     <Compile Include="source\Core\RealBatteryPowerLedger.cs" />
     <Compile Include="source\Core\RealBatterySettings.cs" />
     <Compile Include="source\Core\RealBatteryTuning.cs" />
