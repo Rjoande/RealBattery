@@ -14,8 +14,10 @@ namespace RealBattery
         public uint PersistentId;
         public string VesselName;
         public double StoredChargeAmount; // kWh
+        public double StoredChargeMaxAmount; // kWh, physical/nominal (undiminished) — added for the MFD fleet overview (RealBatteryMFDProvider.GetL2Text), unused by the alarm logic itself
         public double NetEC_Gross;         // EC/s (negative = draining)
         public double ExpUT;              // UT when warning should fire (0 = N/A)
+        public double Timestamp;          // UT this snapshot's StoredChargeAmount/NetEC_Gross were captured at — added for the MFD fleet overview's SOC projection (RealBatteryMFDProvider.BuildFleetRow), unused by the alarm logic itself
         public bool FromProto;            // true if loaded from ProtoVessel node
     }
 
@@ -184,8 +186,10 @@ namespace RealBattery
                     PersistentId = v.persistentId,
                     VesselName = v.vesselName,
                     StoredChargeAmount = mem.storedChargeAmount,
+                    StoredChargeMaxAmount = mem.storedChargeMaxAmount,
                     NetEC_Gross = mem.netEC_Gross,
                     ExpUT = mem.ExpUT,
+                    Timestamp = mem.timestamp,
                     FromProto = false
                 };
             }
@@ -228,8 +232,10 @@ namespace RealBattery
                 }
 
                 double sc = SafeParse(rb, "storedChargeAmount", 0);
+                double scMax = SafeParse(rb, "storedChargeMaxAmount", 0);
                 double net = SafeParse(rb, "netEC_Gross", 0);
                 double exp = SafeParse(rb, "ExpUT", 0);
+                double ts = SafeParse(rb, "timestamp", 0);
 
                 return new RBLiteSnapshot
                 {
@@ -237,8 +243,10 @@ namespace RealBattery
                     PersistentId = v.persistentId,
                     VesselName = v.vesselName,
                     StoredChargeAmount = sc,
+                    StoredChargeMaxAmount = scMax,
                     NetEC_Gross = net,
                     ExpUT = exp,
+                    Timestamp = ts,
                     FromProto = true
                 };
             }
