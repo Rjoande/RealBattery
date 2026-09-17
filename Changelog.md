@@ -8,7 +8,10 @@
 - `RealBatteryPowerLedger` reaches ContractVersion 4 — four new read-only methods backing the LOAD/EC LEVEL gauges above (see `source/RealBatteryPowerLedger.md`). *(For modders: additive only.)*
 
 ### Bugfixes
-- Fixed the Engineer specialist bonus reading as absent for a vessel's first tick(s) after loading, self-correcting after any scene switch — the engineer-level lookup used a part's serialized crew snapshot instead of its live crew roster.
+- Fixed the Engineer specialist bonus reading part's serialized crew snapshot instead of its live crew roster.
+
+### Localization
+- Added Russian localization - thanks to GitHub user **ostrkrs**!
 
 ## v3.4.1
 
