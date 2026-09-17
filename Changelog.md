@@ -3,13 +3,11 @@
 ## v3.4.2
 
 ### Minor Improvements
-- New **EPS Summary** screen on the BMS bay, now the entry page (cycle: EPS → BATT → FLEET → EPS): a vessel-wide power dashboard with a bidirectional LOAD gauge (draw/charge vs. rated capacity), RESERVE, an EC LEVEL indicator (the real ElectricCharge buffer vs. its own charge/discharge gates), EXP TIME, and BATTERIES/FAULTS counts.
-- LOAD and RESERVE's bars now color each segment by its own fixed position, like a real gauge's printed color bands, instead of recoloring the whole bar by the current reading.
+- New **EPS Summary** screen on the BMS bay, now the entry page (cycle: EPS -> BATT -> FLEET -> EPS): a vessel-wide power dashboard with a bidirectional LOAD gauge (draw/charge vs. rated capacity), RESERVE, an EC LEVEL indicator, EXP TIME, and BATTERIES/FAULTS counts.
 - The vessel name (EPS/BATT) and the "FLEET" label are now right-aligned on the title line; all three screens gained a small left margin.
 - `RealBatteryPowerLedger` reaches ContractVersion 4 — four new read-only methods backing the LOAD/EC LEVEL gauges above (see `source/RealBatteryPowerLedger.md`). *(For modders: additive only.)*
 
 ### Bugfixes
-- Fixed the RESERVE readout shifting by a character whenever its first number crossed a digit boundary (e.g. 9.9 → 10.0).
 - Fixed the Engineer specialist bonus reading as absent for a vessel's first tick(s) after loading, self-correcting after any scene switch — the engineer-level lookup used a part's serialized crew snapshot instead of its live crew roster.
 
 ## v3.4.1
