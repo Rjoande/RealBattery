@@ -435,11 +435,34 @@ namespace RealBattery
             return totalPVECps;
         }
 
+        // Bug found by Pietro 2026-09-17: a level-5 Engineer aboard read as if absent for the
+        // first tick(s) after a vessel loads (editor PAW's own naive DischargeRate estimate
+        // showed 9.0 EC/s, live flight only reached 8.5 — exactly the EngineerBonus() base
+        // malus at level 0, 0.95x, rather than level 5's 1.25x bonus), then self-corrected after
+        // any trip out of the scene and back. Root cause: for a LOADED vessel this used to read
+        // part.protoPartSnapshot?.protoModuleCrew — a serialized snapshot only refreshed on
+        // specific events (going off-rails, quicksave, scene switch), which can still hold a
+        // stale (often empty) roster right after a fresh launch/scene load until the next such
+        // event happens to fire. part.protoModuleCrew (no protoPartSnapshot) is the live,
+        // always-current crew roster for a part that's actually loaded — read that instead
+        // whenever the vessel is loaded, and only fall back to the snapshot for an unloaded
+        // vessel's ProtoVessel, where no live Part exists to ask.
         public static int GetMaxSpecialistLevel(Vessel vessel, string trait)
         {
             int max = 0;
+            bool loaded = vessel.loaded;
             foreach (var part in vessel.parts)
             {
+                if (loaded)
+                {
+                    foreach (var crew in part.protoModuleCrew)
+                    {
+                        if (crew.trait == trait)
+                            max = Math.Max(max, crew.experienceLevel);
+                    }
+                    continue;
+                }
+
                 var protoCrew = part.protoPartSnapshot?.protoModuleCrew;
                 if (protoCrew != null)
                 {

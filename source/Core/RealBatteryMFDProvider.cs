@@ -6,11 +6,18 @@ using UnityEngine;
 namespace RealBattery
 {
     // ============================================================================
-    //  RealBatteryMFDProvider — MFD Extended "BMS" bay content (L1, active vessel).
+    //  RealBatteryMFDProvider — MFD Extended "BMS" bay content, three pages cycled by the bay's
+    //  own button: EPS (vessel-wide power summary, new entry page) -> BATT (per-battery detail
+    //  for the active vessel, formerly "L1") -> FLEET (every RealBattery vessel in the save,
+    //  formerly "L2") -> back to EPS. Order extended 2026-09-15 (MFDExtension host side) to add
+    //  EPS as the new entry page; BATT and FLEET keep their existing page names/files, only
+    //  their position in the cycle shifted — every former L1/L2-suffixed identifier below was
+    //  renamed to Batt/Fleet at the same time, so the names track the real cycle order instead
+    //  of a now-stale "L1 was always first" numbering.
     //  Bay renamed from "BATT" to "BMS" on the MFDExtension host side (2026-08-27) — display
     //  label only, the internal page/file identifiers below (MFDExt_BATT) are unchanged.
     //
-    //  Wired via MAS's `textmethod = RealBatteryMFDProvider:GetL1Text` (see
+    //  Wired via MAS's `textmethod = RealBatteryMFDProvider:GetBattText` (see
     //  GameData/RealBattery/MFDExtension/MFDExt_BATT.cfg) — the same reflection-based
     //  bridge MAS itself uses to reuse RPM PAGEHANDLER classes (DPAI_RPM:getPageText,
     //  InternalVesselView:ShowMenu — verified against real examples under
@@ -42,11 +49,11 @@ namespace RealBattery
         [KSPField] public int buttonDown = 1;
         [KSPField] public int buttonHome = 4;
 
-        // Per-prop-instance scroll position, one per page — a second BMS-bearing monitor on the
-        // same vessel would scroll independently, same reasoning as CasModule's own scrollOffset
-        // field.
-        private int l1ScrollOffset;
-        private int l2ScrollOffset;
+        // Per-prop-instance scroll position, one per scrollable page — a second BMS-bearing
+        // monitor on the same vessel would scroll independently, same reasoning as CasModule's
+        // own scrollOffset field. EPS has no list of its own yet, so no offset for it.
+        private int battScrollOffset;
+        private int fleetScrollOffset;
 
         // This prop's REAL visible rows (40x20) — NOT the screenHeight a textmethod is actually
         // called with, which MAS passes as a fixed (40,32) regardless of the prop's true screen
@@ -60,14 +67,14 @@ namespace RealBattery
         // confirmed in game 2026-08-30 on that page (CasAggregator.BuildPage/AppendStatusLine).
         private const int StatusSeparatorRows = 1;
         // +1 each for the blank line between the column header and the first content row
-        // (replaces the old dash rule there — Pietro's call, 2026-08-30). L2's own-ship row no
+        // (replaces the old dash rule there — Pietro's call, 2026-08-30). FLEET's own-ship row no
         // longer has a rule after it either (removed, same request) — just the row itself.
-        private const int L1FixedHeaderRows = 8; // title, rule, AUTONOMY, NET RATE, RESERVE, rule, column header, blank line
-        private const int L2FixedHeaderRows = 4; // title, rule, column header, blank line
+        private const int BattFixedHeaderRows = 8; // title, rule, AUTONOMY, NET RATE, RESERVE, rule, column header, blank line
+        private const int FleetFixedHeaderRows = 4; // title, rule, column header, blank line
 
-        private static int L1BodyBudget => Math.Max(1, VisibleRows - L1FixedHeaderRows - StatusSeparatorRows - StatusLineRows);
-        private static int L2BodyBudget(bool hasActiveRow) =>
-            Math.Max(1, VisibleRows - L2FixedHeaderRows - (hasActiveRow ? 1 : 0) - StatusSeparatorRows - StatusLineRows);
+        private static int BattBodyBudget => Math.Max(1, VisibleRows - BattFixedHeaderRows - StatusSeparatorRows - StatusLineRows);
+        private static int FleetBodyBudget(bool hasActiveRow) =>
+            Math.Max(1, VisibleRows - FleetFixedHeaderRows - (hasActiveRow ? 1 : 0) - StatusSeparatorRows - StatusLineRows);
 
         private static int CountRealBatteryParts(Vessel vessel)
         {
@@ -85,24 +92,24 @@ namespace RealBattery
         // render's count: a button press is a rare, human-paced event, so this costs nothing (same
         // justification CasAggregator itself gives for re-collecting its own entries in
         // TryScrollDown instead of reusing BuildPage's last result).
-        public void ButtonProcessorL1(int buttonID)
+        public void ButtonProcessorBatt(int buttonID)
         {
             if (buttonID == buttonDown)
             {
-                int maxScroll = Math.Max(0, CountRealBatteryParts(FlightGlobals.ActiveVessel) - L1BodyBudget);
-                if (l1ScrollOffset < maxScroll) l1ScrollOffset++;
+                int maxScroll = Math.Max(0, CountRealBatteryParts(FlightGlobals.ActiveVessel) - BattBodyBudget);
+                if (battScrollOffset < maxScroll) battScrollOffset++;
             }
             else if (buttonID == buttonUp)
             {
-                if (l1ScrollOffset > 0) l1ScrollOffset--;
+                if (battScrollOffset > 0) battScrollOffset--;
             }
             else if (buttonID == buttonHome)
             {
-                l1ScrollOffset = 0;
+                battScrollOffset = 0;
             }
         }
 
-        public void ButtonProcessorL2(int buttonID)
+        public void ButtonProcessorFleet(int buttonID)
         {
             if (buttonID == buttonDown)
             {
@@ -110,16 +117,16 @@ namespace RealBattery
                 if (active == null) return;
                 bool hasActiveRow = BuildFleetRow(active, isActive: true).HasValue;
                 int otherCount = BuildOtherFleetRows(active).Count;
-                int maxScroll = Math.Max(0, otherCount - L2BodyBudget(hasActiveRow));
-                if (l2ScrollOffset < maxScroll) l2ScrollOffset++;
+                int maxScroll = Math.Max(0, otherCount - FleetBodyBudget(hasActiveRow));
+                if (fleetScrollOffset < maxScroll) fleetScrollOffset++;
             }
             else if (buttonID == buttonUp)
             {
-                if (l2ScrollOffset > 0) l2ScrollOffset--;
+                if (fleetScrollOffset > 0) fleetScrollOffset--;
             }
             else if (buttonID == buttonHome)
             {
-                l2ScrollOffset = 0;
+                fleetScrollOffset = 0;
             }
         }
 
@@ -130,6 +137,9 @@ namespace RealBattery
         private const string ColRed = "#FF0000";
         private const string ColMagenta = "#FF00FF";
         private const string ColWhite = "#FFFFFF";
+        // Empty/unfilled portion of an EPS gauge bar — a dim, desaturated cyan rather than plain
+        // white so a bar reads as "gauge track", not as unlit content text.
+        private const string ColTrack = "#3A4A4A";
 
         // Per-battery table column widths (character columns, plain-text length —
         // computed before any [#RRGGBB] tag is wrapped around a cell's content). The header
@@ -142,13 +152,27 @@ namespace RealBattery
         private const string ColSep = " ";     // single-space gap between # / CHEM / SOC / HEALTH
         private const string StatusGap = "   "; // wider breathing room before the STATUS word/value
 
-        // Fleet overview (L2) column widths. Sum with the 4 single-space separators below comes to
-        // 39 in the worst case (a full-width name + "STALE", the longest COMM value), fitting the
-        // same 40-column budget as L1.
+        // Fleet overview (FLEET page) column widths. Sum with the 4 single-space separators below
+        // comes to 39 in the worst case (a full-width name + "STALE", the longest COMM value),
+        // fitting the same 40-column budget as BATT.
         private const int FleetColWidthName = 11;
         private const int FleetColWidthSoc = 4;
         private const int FleetColWidthNet = 8;
         private const int FleetColWidthEnd = 7;  // worst case "00h:00m" / "00m:00s"
+
+        // EPS page layout. EpsGaugeLabelWidth fits both "LOAD" and "RESERVE" (4+5 / 7+2 spaces)
+        // so their bars start in the same column; EpsTextLabelWidth fits "EC LEVEL"/"EXP TIME"
+        // (8 letters + 3 spaces each). EpsRowTargetWidth is the plain-text length of a gauge row
+        // (label 9 + "[" + 20-char bar + "]" + 2 spaces + 4-wide percent field = 37) — every
+        // right-aligned value below (the LOAD detail row's CHARGE/DISCHARGE/IDLE tag, EC LEVEL,
+        // EXP TIME) pads out to this same column so the page reads as one consistent right edge.
+        private const int EpsGaugeLabelWidth = 9;
+        private const int EpsTextLabelWidth = 11;
+        private const int EpsGaugeBarWidth = 20;
+        private const int EpsRowTargetWidth = 37;
+        private const double EpsLoadCautionPct = 90.0;  // DISCHARGE amber / CHARGE->green from here
+        private const double EpsLoadCriticalPct = 95.0; // DISCHARGE red from here
+        private const double EpsEcLevelRedPct = 10.0;   // EC LEVEL: red at/below this, regardless of LowEClevel
 
         // Magnitude ladders for dynamic unit selection, base unit at index 1 (kW/kWh) since
         // RB's own EC/StoredCharge figures are already expressed in that unit by convention.
@@ -190,8 +214,8 @@ namespace RealBattery
         }
 
         // Same dynamic unit selection as FormatPower, but shorter (1 decimal, no space before the
-        // unit) — used in the fleet overview (L2) where every row has to fit a much narrower
-        // RATE column than L1's single-vessel header line.
+        // unit) — used in the fleet overview (FLEET page) where every row has to fit a much
+        // narrower RATE column than BATT's single-vessel header line.
         private static string FormatPowerCompact(double kW)
         {
             SelectUnit(kW, PowerUnits, out double scale, out string unit);
@@ -201,19 +225,82 @@ namespace RealBattery
         // Energy (RESERVE): unit chosen ONCE from the physical total and shared by both numbers
         // in the "available / total" pair — stays constant as SOC changes (100% and 1% of the
         // same pack both read in the same unit), instead of the available figure drifting to a
-        // smaller unit just because it's a small fraction of the total.
+        // smaller unit just because it's a small fraction of the total. The available figure is
+        // also right-aligned to a fixed width so the "/ total unit" suffix that follows it never
+        // shifts as its own digit count grows (e.g. 9.9 -> 10.0) — Pietro's explicit ask, shared
+        // by BATT's own RESERVE line and EPS's (same helper, same fix, one place).
+        private const int PairNumeratorWidth = 6;
         private static string FormatEnergyPair(double availableKWh, double maxKWh)
         {
             SelectUnit(maxKWh, EnergyUnits, out double scale, out string unit);
-            return $"{(availableKWh / scale):0.0} / {(maxKWh / scale):0.0} {unit}";
+            string avail = (availableKWh / scale).ToString("0.0").PadLeft(PairNumeratorWidth);
+            return $"{avail} / {(maxKWh / scale):0.0} {unit}";
+        }
+
+        // Power pair (EPS LOAD detail row): same fixed-width-numerator fix as FormatEnergyPair
+        // above, same reason — the live power figure changes every tick and must not shift the
+        // "/ capacity unit" suffix next to it. Unlike FormatEnergyPair, the unit is chosen from
+        // maxKW (the gauge's own denominator), not the numerator, for the same "stays constant
+        // as the numerator changes" reason.
+        private static string FormatPowerPair(double numeratorKW, double maxKW)
+        {
+            SelectUnit(maxKW, PowerUnits, out double scale, out string unit);
+            string num = (numeratorKW / scale).ToString("0.0").PadLeft(PairNumeratorWidth);
+            return $"{num} / {(maxKW / scale):0.0} {unit}";
+        }
+
+        // Renders a fixed-width gauge bar as a real analog gauge would: each of the 20 tile
+        // POSITIONS has a fixed color (tileColor, evaluated against that tile's own lower
+        // percentage bound) regardless of the current reading — only whether a tile is lit
+        // depends on pct. This is why a RESERVE bar sitting at, say, 40% shows a single red tile
+        // at the very start even though 40% itself reads white elsewhere: that first tile
+        // represents 0-5%, which IS the red zone, lit or not. Same tileColor function doubles as
+        // the single-value color for the row's percent/status text — call it with the current
+        // pct itself (not a tile's lower bound) to get "which zone is this reading in" for that
+        // purpose, one source of truth for both instead of two thresholds drifting apart.
+        // Consecutive same-color tiles are grouped into one [#RRGGBB]...[/] run rather than
+        // wrapping every single character, so the output stays reasonably short.
+        // Rounds pct to the nearest tile rather than flooring, so e.g. 94% of 20 reads as 19 lit
+        // (round(18.8)), matching what a player would call "basically full" more closely than
+        // floor's 18.
+        private static string BuildGaugeBar(double pct, Func<double, string> tileColor)
+        {
+            int filled = (int)Math.Round(Math.Max(0.0, Math.Min(100.0, pct)) / 100.0 * EpsGaugeBarWidth);
+            filled = Math.Max(0, Math.Min(EpsGaugeBarWidth, filled));
+
+            var sb = new StringBuilder();
+            int i = 0;
+            while (i < EpsGaugeBarWidth)
+            {
+                bool lit = i < filled;
+                string color = lit ? tileColor(i * (100.0 / EpsGaugeBarWidth)) : ColTrack;
+                int runStart = i;
+                while (i < EpsGaugeBarWidth && (i < filled) == lit &&
+                       (!lit || tileColor(i * (100.0 / EpsGaugeBarWidth)) == color))
+                    i++;
+                char glyph = lit ? '█' : '░';
+                sb.Append($"[{color}]{new string(glyph, i - runStart)}[{ColWhite}]");
+            }
+            return sb.ToString();
+        }
+
+        // Right-pads label.PadRight(EpsTextLabelWidth) with spaces so valueText ends at
+        // EpsRowTargetWidth, then wraps only valueText in valueColor — used by EC LEVEL and EXP
+        // TIME so both rows' values line up on the same right edge as the gauge rows above them,
+        // the same gap-fill technique BuildScrollStatusLine already uses for its own two-half line.
+        private static string BuildEpsTextRow(string label, string valueText, string valueColor)
+        {
+            string prefix = label.PadRight(EpsTextLabelWidth);
+            int gap = Math.Max(1, EpsRowTargetWidth - prefix.Length - valueText.Length);
+            return prefix + new string(' ', gap) + $"[{valueColor}]{valueText}[{ColWhite}]";
         }
 
         // Worst case among currently-discharging batteries on a LOADED vessel, not a vessel-wide
         // average — a small high-Crate battery and a large low-Crate one both maxed out would
         // average to a rate that matches neither's real depletion time. The first individual pack
         // to hit zero is the first moment the situation actually changes (load redistributes across
-        // the survivors), so it's the honest, actionable figure. Shared by L1's own AUTONOMY line
-        // and L2's per-vessel END column (for LIVE rows) — same definition, one place, instead of
+        // the survivors), so it's the honest, actionable figure. Shared by BATT's own AUTONOMY line
+        // and FLEET's per-vessel END column (for LIVE rows) — same definition, one place, instead of
         // two copies drifting apart. Returns PositiveInfinity if nothing is currently discharging
         // (including an unloaded vessel, where this can't be computed at all — see the ExpUT-based
         // path in BuildFleetRow instead).
@@ -264,6 +351,19 @@ namespace RealBattery
             return window.ToString();
         }
 
+        // Title line: fixed label on the left, variable text (vessel name on EPS/BATT, "FLEET"
+        // on FLEET's own title) flush to the right edge — same two-half gap-fill technique as
+        // BuildScrollStatusLine below, Pietro's ask after testing all three screens in game
+        // (2026-09-16): the variable part reads better right-aligned than immediately trailing
+        // the label. Falls back to a single-space gap (then hard truncation) if the two pieces
+        // together don't fit, same degrade-gracefully rule BuildScrollStatusLine already uses.
+        private static string BuildTitleLine(string label, string rightText, int screenWidth)
+        {
+            int gap = screenWidth - label.Length - rightText.Length;
+            string line = gap > 0 ? label + new string(' ', gap) + rightText : label + " " + rightText;
+            return line.Length > screenWidth ? Truncate(line, screenWidth) : line;
+        }
+
         // Mirrors CasAggregator.AppendBody's "+N MORE" behavior for a flat (non-tiered) list: if
         // everything from scrollOffset to the end already fits within bodyBudget, show it all and
         // no MORE line is needed; otherwise reserve the body's last row for a "+N MORE" line
@@ -305,21 +405,180 @@ namespace RealBattery
             return line;
         }
 
+        // ============================================================================
+        //  EPS — vessel-wide power summary, entry page (2026-09-15), ahead of BATT/FLEET in the
+        //  cycle. Design confirmed with Pietro over three mockup rounds (see
+        //  NOTES_Backlog_PostRelease.md) before this was written. No scroll softkeys
+        //  (epsScrollOffset/ButtonProcessorEps don't exist): fixed-size dashboard, nothing to
+        //  scroll — add them later only if real content needs a scrollable region.
+        //
+        //  LOAD: bidirectional gauge, deduced from GetNetEcPerSecLive's sign (regime) and
+        //  magnitude (fill). The denominator is the NOMINAL (nameplate) capacity for that
+        //  direction (GetNominalDischargeableEcPerSec / GetNominalChargeableEcPerSec) —
+        //  undiminished by wear and NOT excluding disabled/spent batteries — while the numerator
+        //  is the real, derated live rate. A worn or partially offline vessel therefore can't
+        //  fill the bar all the way even at maximum real effort, which is the point: the gap
+        //  between numerator and denominator IS the degradation, shown rather than hidden.
+        //  Colors: CHARGE cyan below 90%, green at/above (approaching-full charge is good news,
+        //  no further escalation); DISCHARGE green below 90%, amber 90-95%, red at/above 95%
+        //  (heavy discharge relative to nameplate capacity is the genuinely risky direction, so
+        //  it escalates — see RealBatteryMFDProvider design notes, 2026-09-16). No dead band:
+        //  idle reads as an empty bar on either curve, so there's no color snap to avoid.
+        //
+        //  EC LEVEL: the vessel's real stock ElectricCharge buffer level (not RealBattery's own
+        //  StoredCharge) against the same HighEClevel/LowEClevel gates RealBatteryLoadMaster
+        //  already uses to decide when batteries start charging/discharging that buffer — "are
+        //  the HighEClevel/LowEClevel conditions currently satisfied" at a glance. Green above
+        //  the high gate, cyan in the normal band between the gates, amber below the low gate,
+        //  red at or below 10% outright regardless of where the low gate sits (Pietro's call,
+        //  2026-09-16 — a flat floor rather than a fraction of the gate itself).
+        // ============================================================================
+        public string GetEpsText(int screenWidth, int screenHeight)
+        {
+            Vessel vessel = FlightGlobals.ActiveVessel;
+            if (vessel == null)
+                return "EPS SUMMARY" + Environment.NewLine + Environment.NewLine + "No active vessel.";
+
+            List<RealBattery> batteries = new List<RealBattery>();
+            if (vessel.parts != null)
+            {
+                foreach (Part part in vessel.parts)
+                {
+                    if (!part.Modules.Contains("RealBattery")) continue;
+                    RealBattery rbPart = part.Modules.GetModule<RealBattery>();
+                    if (rbPart != null) batteries.Add(rbPart);
+                }
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine(BuildTitleLine("EPS SUMMARY", vessel.vesselName, screenWidth));
+            sb.AppendLine(new string('-', Math.Min(screenWidth, 40)));
+
+            if (batteries.Count == 0)
+            {
+                sb.AppendLine(" No RealBattery parts on this vessel.");
+                return sb.ToString();
+            }
+
+            // --- LOAD ---
+            double netLive = RealBatteryPowerLedger.GetNetEcPerSecLive(vessel);
+            string loadRegime = netLive < -0.01 ? "DISCHARGE" : netLive > 0.01 ? "CHARGE" : "IDLE";
+            double loadDenom = loadRegime == "DISCHARGE"
+                ? RealBatteryPowerLedger.GetNominalDischargeableEcPerSec(vessel)
+                : RealBatteryPowerLedger.GetNominalChargeableEcPerSec(vessel);
+            double loadPct = loadDenom > 1e-6 ? Math.Min(100.0, Math.Abs(netLive) / loadDenom * 100.0) : 0.0;
+
+            // One classifier, two uses: per-tile (BuildGaugeBar, evaluated at each tile's own
+            // lower bound) and single-value (called with loadPct itself, for the percent/regime
+            // text) — same thresholds, never two copies to keep in sync.
+            Func<double, string> loadTileColor;
+            if (loadRegime == "CHARGE")
+                loadTileColor = p => p >= EpsLoadCautionPct ? ColGreen : ColCyan;
+            else if (loadRegime == "DISCHARGE")
+                loadTileColor = p => p >= EpsLoadCriticalPct ? ColRed : p >= EpsLoadCautionPct ? ColAmber : ColGreen;
+            else
+                loadTileColor = _ => ColWhite;
+            string loadColor = loadTileColor(loadPct);
+
+            sb.AppendLine(
+                " LOAD".PadRight(EpsGaugeLabelWidth + 1) + "[" + BuildGaugeBar(loadPct, loadTileColor) + "]  " +
+                $"[{loadColor}]{$"{loadPct:0}%".PadLeft(4)}[{ColWhite}]");
+
+            string loadPair = FormatPowerPair(Math.Abs(netLive), loadDenom);
+            string loadPrefix = new string(' ', EpsGaugeLabelWidth + 2) + loadPair;
+            int loadGap = Math.Max(1, EpsRowTargetWidth + 1 - loadPrefix.Length - loadRegime.Length);
+            sb.AppendLine(loadPrefix + new string(' ', loadGap) + $"[{loadColor}]{loadRegime}[{ColWhite}]");
+            sb.AppendLine();
+
+            // --- RESERVE --- (same source/thresholds as BATT's own RESERVE line)
+            double availableEc = RealBatteryPowerLedger.GetAvailableEc(vessel);
+            double maxEc = RealBatteryPowerLedger.GetMaxEc(vessel);
+            double socPct = maxEc > 1e-6 ? (availableEc / maxEc) * 100.0 : 0.0;
+            Func<double, string> reserveTileColor = p => p < 1.0 ? ColRed : p < 10.0 ? ColAmber : ColWhite;
+            string reserveColor = reserveTileColor(socPct);
+
+            sb.AppendLine(
+                " RESERVE".PadRight(EpsGaugeLabelWidth + 1) + "[" + BuildGaugeBar(socPct, reserveTileColor) + "]  " +
+                $"[{reserveColor}]{$"{socPct:0}%".PadLeft(4)}[{ColWhite}]");
+            sb.AppendLine(
+                new string(' ', EpsGaugeLabelWidth + 2) +
+                FormatEnergyPair(availableEc / RealBattery.EC2SCratio, maxEc / RealBattery.EC2SCratio));
+            sb.AppendLine();
+
+            // --- EC LEVEL ---
+            vessel.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double ecAmount, out double ecMax);
+            double ecPct = ecMax > 1e-6 ? (ecAmount / ecMax) * 100.0 : 0.0;
+            double highGatePct = RealBatteryPowerLedger.GetEcLevelHighThreshold(vessel) * 100.0;
+            double lowGatePct = RealBatteryPowerLedger.GetEcLevelLowThreshold(vessel) * 100.0;
+
+            string ecColor;
+            if (ecPct <= EpsEcLevelRedPct) ecColor = ColRed;
+            else if (ecPct < lowGatePct) ecColor = ColAmber;
+            else if (ecPct <= highGatePct) ecColor = ColCyan;
+            else ecColor = ColGreen;
+
+            sb.AppendLine(" " + BuildEpsTextRow("EC LEVEL", $"{ecPct:0}%", ecColor));
+
+            // --- EXP TIME --- (same calc/format as BATT's own AUTONOMY, renamed here since it
+            // no longer sits next to a NET RATE line giving it context)
+            double minSecondsToEmpty = ComputeMinSecondsToEmpty(vessel);
+            bool expStable = double.IsPositiveInfinity(minSecondsToEmpty);
+            sb.AppendLine(" " + BuildEpsTextRow("EXP TIME", expStable ? "stable" : FormatEndTimer(minSecondsToEmpty), expStable ? ColGreen : ColCyan));
+
+            sb.AppendLine(new string('-', Math.Min(screenWidth, 40)));
+
+            // --- BATTERIES ---
+            int offlineCount = 0;
+            foreach (RealBattery rb in batteries)
+                if (rb.BatteryDisabled) offlineCount++;
+            int onlineCount = batteries.Count - offlineCount;
+
+            sb.AppendLine(
+                $" BATTERIES  {batteries.Count}     ONLINE [{ColGreen}]{onlineCount}[{ColWhite}]   OFFLINE [{ColMagenta}]{offlineCount}[{ColWhite}]");
+            sb.AppendLine();
+
+            // --- FAULTS --- (only non-zero categories, most severe first — same priority BATT's
+            // own per-battery STATUS column uses. OFFLINE deliberately excluded: it already has
+            // its own count in BATTERIES above. LOW HEALTH excludes disabled batteries too — a
+            // fully offline battery's health is no longer actionable information, it's already
+            // covered by OFFLINE.)
+            int runawayCount = 0, overheatCount = 0, lowHealthCount = 0;
+            foreach (RealBattery rb in batteries)
+            {
+                if (rb.isRunaway) runawayCount++;
+                if (rb.IsOverheating) overheatCount++;
+                if (!rb.BatteryDisabled)
+                {
+                    double healthPct = (rb.InfiniteCycles ? rb.ThermalCapFactor : rb.BatteryLife) * 100.0;
+                    if (healthPct < 80.0) lowHealthCount++;
+                }
+            }
+
+            sb.AppendLine(" FAULTS");
+            bool anyFault = false;
+            if (runawayCount > 0) { sb.AppendLine($"   [{ColRed}]RUNAWAY      x{runawayCount}[{ColWhite}]"); anyFault = true; }
+            if (overheatCount > 0) { sb.AppendLine($"   [{ColAmber}]OVERHEAT     x{overheatCount}[{ColWhite}]"); anyFault = true; }
+            if (lowHealthCount > 0) { sb.AppendLine($"   [{ColYellow}]LOW HEALTH   x{lowHealthCount}[{ColWhite}]"); anyFault = true; }
+            if (!anyFault) sb.AppendLine($"   [{ColGreen}]NO FAULTS[{ColWhite}]");
+
+            return sb.ToString();
+        }
+
         // IMPORTANT: MAS splits text into rows on Environment.NewLine ONLY
         // (MdVTextMesh.SetText -> Utility.LineSeparator = { Environment.NewLine },
         // i.e. "\r\n" on Windows). A plain '\n' is NOT a line break for MAS — the
         // whole string renders as one clipped row (confirmed in game 2026-08-23:
         // only the header line was visible). Hence AppendLine/Environment.NewLine
         // throughout, never '\n'.
-        public string GetL1Text(int screenWidth, int screenHeight)
+        public string GetBattText(int screenWidth, int screenHeight)
         {
             Vessel vessel = FlightGlobals.ActiveVessel;
             if (vessel == null)
                 return "BATTERY MANAGER" + Environment.NewLine + Environment.NewLine + "No active vessel.";
 
             var sb = new StringBuilder();
-            sb.AppendLine(Truncate($"BATTERY MANAGER   {vessel.vesselName}", screenWidth));
-            sb.AppendLine(new string('-', Math.Min(screenWidth, 39)));
+            sb.AppendLine(BuildTitleLine("BATTERY MANAGER", vessel.vesselName, screenWidth));
+            sb.AppendLine(new string('-', Math.Min(screenWidth, 40)));
 
             // Physical presence, not eligibility/capacity: a vessel where every battery is
             // disabled or in runaway still HAS RealBattery parts — GetEffectiveMaxEc alone
@@ -340,7 +599,7 @@ namespace RealBattery
 
             if (batteries.Count == 0)
             {
-                sb.AppendLine("No RealBattery parts on this vessel.");
+                sb.AppendLine(" No RealBattery parts on this vessel.");
                 return sb.ToString();
             }
 
@@ -349,21 +608,21 @@ namespace RealBattery
             double netLive = RealBatteryPowerLedger.GetNetEcPerSecLive(vessel);
 
             // --- Autonomy: worst case among currently-discharging batteries (ComputeMinSecondsToEmpty,
-            // shared with L2's own END column for LIVE vessels) — see that method's own remarks for
-            // why this beats a vessel-wide average. FormatEndTimer (also shared with L2) keeps this
-            // consistent with L2 and correct under a non-stock home body: Kerbin-day/year lengths
+            // shared with FLEET's own END column for LIVE vessels) — see that method's own remarks
+            // for why this beats a vessel-wide average. FormatEndTimer (also shared with FLEET)
+            // keeps this consistent and correct under a non-stock home body: Kerbin-day/year lengths
             // from RealBatterySettings, not a hardcoded 24h/365d calendar.
             double minSecondsToEmpty = ComputeMinSecondsToEmpty(vessel);
 
             if (!double.IsPositiveInfinity(minSecondsToEmpty))
-                sb.AppendLine($"AUTONOMY   [{ColCyan}]{FormatEndTimer(minSecondsToEmpty)}[{ColWhite}]");
+                sb.AppendLine($" AUTONOMY   [{ColCyan}]{FormatEndTimer(minSecondsToEmpty)}[{ColWhite}]");
             else
-                sb.AppendLine($"AUTONOMY   [{ColGreen}]stable[{ColWhite}]");
+                sb.AppendLine($" AUTONOMY   [{ColGreen}]stable[{ColWhite}]");
 
             // --- Net rate + status ---
             string status = netLive < -0.01 ? "DISCHARGE" : netLive > 0.01 ? "CHARGE" : "IDLE";
             string statusColor = netLive < -0.01 ? ColRed : ColGreen;
-            sb.AppendLine($"NET RATE   [{ColCyan}]{FormatPower(netLive)}[{ColWhite}]  [{statusColor}]{status}[{ColWhite}]");
+            sb.AppendLine($" NET RATE   [{ColCyan}]{FormatPower(netLive)}[{ColWhite}]  [{statusColor}]{status}[{ColWhite}]");
 
             // --- Reserve ---
             // Physical total (sc.maxAmount, undiminished by wear/thermal derating), not the
@@ -373,11 +632,11 @@ namespace RealBattery
             double socPct = maxEc > 1e-6 ? (availableEc / maxEc) * 100.0 : 0.0;
             double availableKWh = availableEc / RealBattery.EC2SCratio;
             double maxKWh = maxEc / RealBattery.EC2SCratio;
-            sb.AppendLine($"RESERVE    [{ColCyan}]{socPct:0}%[{ColWhite}]  ({FormatEnergyPair(availableKWh, maxKWh)})");
+            sb.AppendLine($" RESERVE    [{ColCyan}]{socPct:0}%[{ColWhite}]  ({FormatEnergyPair(availableKWh, maxKWh)})");
 
-            sb.AppendLine(new string('-', Math.Min(screenWidth, 39)));
+            sb.AppendLine(new string('-', Math.Min(screenWidth, 40)));
             sb.AppendLine(
-                "#".PadRight(ColWidthIdx) + ColSep +
+                " " + "#".PadRight(ColWidthIdx) + ColSep +
                 "CHEM".PadRight(ColWidthChem) + ColSep +
                 "SOC".PadLeft(ColWidthSoc) + ColSep +
                 "HEALTH".PadLeft(ColWidthHealth) + StatusGap +
@@ -390,21 +649,21 @@ namespace RealBattery
             // pilot needs to see here, flagged via the STATUS column instead of hidden.
             //
             // Scrollable window + status line (buttonUp/buttonDown/buttonHome via
-            // ButtonProcessorL1) — same flat-list scroll mechanic as L2's own fleet body below,
-            // itself modeled on MFDExtension's own CAS bay. Re-clamped here too, not only in
-            // ButtonProcessorL1's own guard — a battery added/removed elsewhere (staging, EVA
+            // ButtonProcessorBatt) — same flat-list scroll mechanic as FLEET's own fleet body
+            // below, itself modeled on MFDExtension's own CAS bay. Re-clamped here too, not only
+            // in ButtonProcessorBatt's own guard — a battery added/removed elsewhere (staging, EVA
             // construction) between button presses could otherwise leave a stale offset pointing
             // past the end.
-            int bodyBudget = L1BodyBudget;
+            int bodyBudget = BattBodyBudget;
             int maxScroll = Math.Max(0, batteries.Count - bodyBudget);
-            l1ScrollOffset = Math.Max(0, Math.Min(l1ScrollOffset, maxScroll));
+            battScrollOffset = Math.Max(0, Math.Min(battScrollOffset, maxScroll));
 
-            int totalFromOffsetL1 = batteries.Count - l1ScrollOffset;
-            int shownCount = ResolveShownCount(totalFromOffsetL1, bodyBudget, out bool hasMoreL1);
-            int batteryIndex = l1ScrollOffset;
+            int totalFromOffsetBatt = batteries.Count - battScrollOffset;
+            int shownCount = ResolveShownCount(totalFromOffsetBatt, bodyBudget, out bool hasMoreBatt);
+            int batteryIndex = battScrollOffset;
             for (int rowIdx = 0; rowIdx < shownCount; rowIdx++)
             {
-                RealBattery rb = batteries[l1ScrollOffset + rowIdx];
+                RealBattery rb = batteries[battScrollOffset + rowIdx];
                 batteryIndex++;
                 // InfiniteCycles (SMES/cryo) batteries don't wear by cycles — BatteryLife stays
                 // pinned at 1.0 forever for them. ThermalCapFactor (their thermal derating, not
@@ -494,55 +753,54 @@ namespace RealBattery
                 string statusCol = string.IsNullOrEmpty(batteryStatusText) ? "" : $"[{batteryStatusColor}]{batteryStatusText}[{ColWhite}]";
 
                 sb.AppendLine(
-                    idxCol + ColSep + chemCol + ColSep + socCol + ColSep +
+                    " " + idxCol + ColSep + chemCol + ColSep + socCol + ColSep +
                     $"[{healthColor}]{healthCol}[{ColWhite}]" + StatusGap + statusCol);
             }
 
-            int rowsUsedL1 = shownCount + (hasMoreL1 ? 1 : 0);
-            if (hasMoreL1)
+            int rowsUsedBatt = shownCount + (hasMoreBatt ? 1 : 0);
+            if (hasMoreBatt)
             {
                 // Aligned under CHEM, not column 0 — reads as a continuation of the battery list
                 // it's summarizing rather than an unrelated line floating at the row's left edge.
-                string indent = new string(' ', ColWidthIdx + ColSep.Length);
-                sb.AppendLine($"{indent}+{totalFromOffsetL1 - shownCount} MORE");
+                string indent = new string(' ', 1 + ColWidthIdx + ColSep.Length);
+                sb.AppendLine($"{indent}+{totalFromOffsetBatt - shownCount} MORE");
             }
 
             // Pad with blank lines up to the body budget so the footer (separator + status line)
             // anchors to the bottom of the screen instead of riding up against the last content
             // row whenever the body doesn't fill it — same fix as CasAggregator's own
             // status-line anchoring.
-            for (int i = rowsUsedL1; i < bodyBudget; i++)
+            for (int i = rowsUsedBatt; i < bodyBudget; i++)
                 sb.AppendLine();
 
             // Footer: a rule (own width, matching the header rule above — not CAS's own 40, which
             // is just that page's own line width) then the status line, always together.
-            sb.AppendLine(new string('-', Math.Min(screenWidth, 39)));
-            sb.AppendLine(BuildScrollStatusLine(batteries.Count, l1ScrollOffset, shownCount, screenWidth));
+            sb.AppendLine(new string('-', Math.Min(screenWidth, 40)));
+            sb.AppendLine(BuildScrollStatusLine(batteries.Count, battScrollOffset, shownCount, screenWidth));
 
             return sb.ToString();
         }
 
         // ============================================================================
-        //  L2 — Fleet overview. One row per vessel in the save that has RealBattery parts, loaded
-        //  or not, sorted alphabetically — the active vessel is pinned as its own row right under
-        //  the header instead (no marker glyph needed to mark it: position + color already do).
-        //  Reachable from L1 by pressing the bay's own button again
+        //  FLEET — Fleet overview. One row per vessel in the save that has RealBattery parts,
+        //  loaded or not, sorted alphabetically — the active vessel is pinned as its own row
+        //  right under the header instead (no marker glyph needed to mark it: position + color
+        //  already do). Reachable from BATT by pressing the bay's own button again
         //  (MFDExt_OwnButtonOverrides["MFDExt_BATT"], see
         //  GameData/RealBattery/MFDExtension/MFDExt_BATT_Nav.lua) — pressing it again from here
-        //  returns to L1 via MFDExt_Redirect's default behavior (jumps to a bay's own page from
-        //  anywhere else), no extra Lua needed for the return trip.
+        //  moves on to EPS via that same override chain (EPS -> BATT -> FLEET -> EPS).
         //
         //  Deliberately read-only for this first version (no vessel selection/switching). A loaded
         //  vessel gets exact figures from RealBatteryPowerLedger plus a real per-battery discharge
-        //  timer (ComputeMinSecondsToEmpty, same definition as L1's own AUTONOMY); an unloaded one
-        //  gets the same best-effort snapshot (RAM if visited this session, else parsed from the
-        //  save's ProtoVessel) already trusted by the low-power alarm system
+        //  timer (ComputeMinSecondsToEmpty, same definition as BATT's own AUTONOMY); an unloaded
+        //  one gets the same best-effort snapshot (RAM if visited this session, else parsed from
+        //  the save's ProtoVessel) already trusted by the low-power alarm system
         //  (AlarmManager.RBAlarmSync), reused as-is rather than re-deriving a second, competing
         //  notion of "vessel battery state". No per-battery detail (RUNAWAY/OVERHEAT/etc.) for
         //  unloaded vessels — that would require parsing ProtoPartModuleSnapshot fields, out of
         //  scope for this pass.
         // ============================================================================
-        public string GetL2Text(int screenWidth, int screenHeight)
+        public string GetFleetText(int screenWidth, int screenHeight)
         {
             Vessel active = FlightGlobals.ActiveVessel;
             if (active == null)
@@ -552,17 +810,17 @@ namespace RealBattery
             List<FleetRow> otherRows = BuildOtherFleetRows(active);
 
             var sb = new StringBuilder();
-            sb.AppendLine(Truncate("BATTERY MANAGER   FLEET", screenWidth));
-            sb.AppendLine(new string('-', Math.Min(screenWidth, 39)));
+            sb.AppendLine(BuildTitleLine("BATTERY MANAGER", "FLEET", screenWidth));
+            sb.AppendLine(new string('-', Math.Min(screenWidth, 40)));
 
             if (!activeRow.HasValue && otherRows.Count == 0)
             {
-                sb.AppendLine("No RealBattery vessels in this save.");
+                sb.AppendLine(" No RealBattery vessels in this save.");
                 return sb.ToString();
             }
 
             sb.AppendLine(
-                "VESSEL".PadRight(FleetColWidthName) + ColSep +
+                " " + "VESSEL".PadRight(FleetColWidthName) + ColSep +
                 "SOC".PadLeft(FleetColWidthSoc) + ColSep +
                 "NET".PadLeft(FleetColWidthNet) + ColSep +
                 "END".PadLeft(FleetColWidthEnd) + ColSep +
@@ -573,7 +831,7 @@ namespace RealBattery
             {
                 // No rule after the own-ship row anymore (removed, same request) — it flows
                 // straight into the rest of the fleet below.
-                sb.AppendLine(BuildFleetDataRow(activeRow.Value));
+                sb.AppendLine(" " + BuildFleetDataRow(activeRow.Value));
             }
 
             // Purely alphabetical — no criticality ordering. The pilot already sees which vessels
@@ -581,25 +839,25 @@ namespace RealBattery
             otherRows.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
 
             // Scrollable window + status line (buttonUp/buttonDown/buttonHome via
-            // ButtonProcessorL2) — same flat-list scroll mechanic as L1's own battery table above,
-            // itself modeled on MFDExtension's own CAS bay. The own-ship row/rule above (when
-            // present) are fixed, never part of the scrollable region — only the alphabetical
-            // "rest of the fleet" body scrolls. Re-clamped here too, not only in ButtonProcessorL2's
-            // own guard — a vessel appearing/disappearing between button presses (recovered,
-            // terminated, newly gaining a RealBattery snapshot) could otherwise leave a stale
-            // offset pointing past the end.
-            int bodyBudget = L2BodyBudget(activeRow.HasValue);
+            // ButtonProcessorFleet) — same flat-list scroll mechanic as BATT's own battery table
+            // above, itself modeled on MFDExtension's own CAS bay. The own-ship row/rule above
+            // (when present) are fixed, never part of the scrollable region — only the alphabetical
+            // "rest of the fleet" body scrolls. Re-clamped here too, not only in
+            // ButtonProcessorFleet's own guard — a vessel appearing/disappearing between button
+            // presses (recovered, terminated, newly gaining a RealBattery snapshot) could otherwise
+            // leave a stale offset pointing past the end.
+            int bodyBudget = FleetBodyBudget(activeRow.HasValue);
             int maxScroll = Math.Max(0, otherRows.Count - bodyBudget);
-            l2ScrollOffset = Math.Max(0, Math.Min(l2ScrollOffset, maxScroll));
+            fleetScrollOffset = Math.Max(0, Math.Min(fleetScrollOffset, maxScroll));
 
-            int totalFromOffsetL2 = otherRows.Count - l2ScrollOffset;
-            int shownCount = ResolveShownCount(totalFromOffsetL2, bodyBudget, out bool hasMoreL2);
+            int totalFromOffsetFleet = otherRows.Count - fleetScrollOffset;
+            int shownCount = ResolveShownCount(totalFromOffsetFleet, bodyBudget, out bool hasMoreFleet);
             for (int i = 0; i < shownCount; i++)
-                sb.AppendLine(BuildFleetDataRow(otherRows[l2ScrollOffset + i]));
+                sb.AppendLine(" " + BuildFleetDataRow(otherRows[fleetScrollOffset + i]));
 
-            int rowsUsedL2 = shownCount + (hasMoreL2 ? 1 : 0);
-            if (hasMoreL2)
-                sb.AppendLine($"+{totalFromOffsetL2 - shownCount} MORE");
+            int rowsUsedFleet = shownCount + (hasMoreFleet ? 1 : 0);
+            if (hasMoreFleet)
+                sb.AppendLine($" +{totalFromOffsetFleet - shownCount} MORE");
 
             if (otherRows.Count > 0)
             {
@@ -607,20 +865,20 @@ namespace RealBattery
                 // line) anchors to the bottom of the screen instead of riding up against the last
                 // content row whenever the body doesn't fill it — same fix as CasAggregator's own
                 // status-line anchoring.
-                for (int i = rowsUsedL2; i < bodyBudget; i++)
+                for (int i = rowsUsedFleet; i < bodyBudget; i++)
                     sb.AppendLine();
 
                 // Footer: a rule (own width, matching the header rule above — not CAS's own 40,
                 // which is just that page's own line width) then the status line, always together
                 // — never an orphaned rule with no status line when otherRows is empty.
-                sb.AppendLine(new string('-', Math.Min(screenWidth, 39)));
-                sb.AppendLine(BuildScrollStatusLine(otherRows.Count, l2ScrollOffset, shownCount, screenWidth));
+                sb.AppendLine(new string('-', Math.Min(screenWidth, 40)));
+                sb.AppendLine(BuildScrollStatusLine(otherRows.Count, fleetScrollOffset, shownCount, screenWidth));
             }
 
             return sb.ToString();
         }
 
-        // Extracted so ButtonProcessorL2's own DOWN guard can recompute the exact same list (just
+        // Extracted so ButtonProcessorFleet's own DOWN guard can recompute the exact same list (just
         // for its Count) without duplicating the enumeration/filtering logic.
         private static List<FleetRow> BuildOtherFleetRows(Vessel active)
         {
@@ -695,8 +953,8 @@ namespace RealBattery
                 $"[{commColor}]{commText}[{ColWhite}]";
         }
 
-        // Loaded vessel: exact figures from RealBatteryPowerLedger (same source L1 uses) plus a
-        // real per-battery discharge timer (ComputeMinSecondsToEmpty — same definition L1's own
+        // Loaded vessel: exact figures from RealBatteryPowerLedger (same source BATT uses) plus a
+        // real per-battery discharge timer (ComputeMinSecondsToEmpty — same definition BATT's own
         // AUTONOMY uses, not a vessel-wide average). Not loaded: AlarmManager's own best-effort
         // snapshot (RAM if visited this session, else parsed from the save's ProtoVessel) — the
         // same data the low-power alarm already trusts, timer from ExpUT minus current UT. Returns
@@ -765,8 +1023,8 @@ namespace RealBattery
         {
             // seconds <= 0 (not just < 0): once a countdown actually reaches zero it stops being
             // useful information — hide it the same way "not applicable" already is, rather than
-            // sitting on a permanent "00m:00s" (Pietro's call, 2026-08-30 — applies to both L1's
-            // AUTONOMY and L2's END, sharing this one formatter).
+            // sitting on a permanent "00m:00s" (Pietro's call, 2026-08-30 — applies to both BATT's
+            // AUTONOMY and FLEET's END, sharing this one formatter).
             if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds <= 0)
                 return "--";
 

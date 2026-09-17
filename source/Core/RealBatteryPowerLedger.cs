@@ -46,10 +46,20 @@ namespace RealBattery
     //  (sum of each battery's raw, unsmoothed lastECpower — not the display-smoothed GUI_power
     //  a PAW reads) — the live counterpart to GetNetEcPerSecGross/True, which stay
     //  snapshot-based and are still the only source for an unloaded/background vessel.
+    //
+    //  ContractVersion 4 (2026-09, MFD EPS summary page): three loaded-vessel-only additions,
+    //  same cache-backed pattern as v3. GetNominalDischargeableEcPerSec / GetNominalChargeableEcPerSec
+    //  are the NAMEPLATE (undiminished, unfiltered) counterparts to GetDischargeableEcPerSec —
+    //  every RealBattery part counts at its raw sc.maxAmount * Crate, wear/thermal-derating and
+    //  BatteryDisabled/eligibility ignored, charge-side excluding IsPrimary batteries (which can
+    //  never accept a charge). GetEcLevelHighThreshold / GetEcLevelLowThreshold expose the same
+    //  vessel-wide HighEClevel/LowEClevel gate fractions (0..1) RealBatteryLoadMaster's own
+    //  charge/discharge branch selection already computes, instead of a caller re-deriving a
+    //  second, possibly-drifting copy of that aggregation.
     // ============================================================================
     public static class RealBatteryPowerLedger
     {
-        public const int ContractVersion = 3;
+        public const int ContractVersion = 4;
 
         // Warn once per vessel (session-lifetime), not on every call — same pattern as
         // AlarmManager's _knownNoRbVessels negative cache.
@@ -135,6 +145,64 @@ namespace RealBattery
             if (vessel == null || !vessel.loaded) return 0.0;
             var lm = RealBatteryLoadMaster.GetInstance(vessel);
             return lm?.CachedNetEcPerSecLive ?? 0.0;
+        }
+
+        /// <summary>
+        /// Nameplate (rated) discharge capacity, EC/s, across ALL RealBattery parts on the
+        /// vessel — sc.maxAmount * Crate, undiminished by wear/thermal derating or engineer
+        /// bonus, and NOT restricted to eligible (enabled, non-FixedOutput) batteries like
+        /// <see cref="GetDischargeableEcPerSec"/>. A disabled, spent or damaged battery still
+        /// counts here at its full rated rate. Zero if the vessel isn't loaded or has none. See
+        /// remarks on GetMaxEc for the underlying cache/latency model.
+        /// </summary>
+        public static double GetNominalDischargeableEcPerSec(Vessel vessel)
+        {
+            if (vessel == null || !vessel.loaded) return 0.0;
+            var lm = RealBatteryLoadMaster.GetInstance(vessel);
+            return lm?.CachedNominalDischargeableEcPerSec ?? 0.0;
+        }
+
+        /// <summary>
+        /// Nameplate (rated) charge-acceptance capacity, EC/s, across ALL non-primary
+        /// RealBattery parts on the vessel — same basis as
+        /// <see cref="GetNominalDischargeableEcPerSec"/> (undiminished, unfiltered by
+        /// eligibility) but excluding IsPrimary batteries, which can never accept a charge
+        /// regardless of health. Zero if the vessel isn't loaded or has none rechargeable. See
+        /// remarks on GetMaxEc for the underlying cache/latency model.
+        /// </summary>
+        public static double GetNominalChargeableEcPerSec(Vessel vessel)
+        {
+            if (vessel == null || !vessel.loaded) return 0.0;
+            var lm = RealBatteryLoadMaster.GetInstance(vessel);
+            return lm?.CachedNominalChargeableEcPerSec ?? 0.0;
+        }
+
+        /// <summary>
+        /// Vessel-wide charge gate, as a fraction (0..1) of the stock ElectricCharge buffer's
+        /// own maxAmount — the same conservative aggregate (lowest HighEClevel among active
+        /// batteries, falling back to all batteries if none are enabled) RealBatteryLoadMaster's
+        /// FixedUpdate already computes to decide when batteries start charging that buffer.
+        /// Defaults to 1.0 (no gate) if the vessel isn't loaded or has no batteries.
+        /// </summary>
+        public static double GetEcLevelHighThreshold(Vessel vessel)
+        {
+            if (vessel == null || !vessel.loaded) return 1.0;
+            var lm = RealBatteryLoadMaster.GetInstance(vessel);
+            return lm?.CachedHighEClevel ?? 1.0;
+        }
+
+        /// <summary>
+        /// Vessel-wide discharge gate, as a fraction (0..1) of the stock ElectricCharge buffer's
+        /// own maxAmount — the same conservative aggregate (highest LowEClevel among active
+        /// batteries, falling back to all batteries if none are enabled) RealBatteryLoadMaster's
+        /// FixedUpdate already computes to decide when batteries start discharging into that
+        /// buffer. Defaults to 0.0 (no gate) if the vessel isn't loaded or has no batteries.
+        /// </summary>
+        public static double GetEcLevelLowThreshold(Vessel vessel)
+        {
+            if (vessel == null || !vessel.loaded) return 0.0;
+            var lm = RealBatteryLoadMaster.GetInstance(vessel);
+            return lm?.CachedLowEClevel ?? 0.0;
         }
 
         /// <summary>

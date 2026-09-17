@@ -14,7 +14,7 @@ namespace RealBattery
         public uint PersistentId;
         public string VesselName;
         public double StoredChargeAmount; // kWh
-        public double StoredChargeMaxAmount; // kWh, physical/nominal (undiminished) — added for the MFD fleet overview (RealBatteryMFDProvider.GetL2Text), unused by the alarm logic itself
+        public double StoredChargeMaxAmount; // kWh, physical/nominal (undiminished) — added for the MFD fleet overview (RealBatteryMFDProvider.GetFleetText), unused by the alarm logic itself
         public double NetEC_Gross;         // EC/s (negative = draining)
         public double ExpUT;              // UT when warning should fire (0 = N/A)
         public double Timestamp;          // UT this snapshot's StoredChargeAmount/NetEC_Gross were captured at — added for the MFD fleet overview's SOC projection (RealBatteryMFDProvider.BuildFleetRow), unused by the alarm logic itself

@@ -35,18 +35,41 @@ This is the same structure used by the patches included with RealBattery. It is 
 
 ### Filters for standalone battery parts
 ```
-:HAS[@RESOURCE[ElectricCharge],!RESOURCE[StoredCharge],!MODULE[RealBattery],!MODULE[ModuleEnginesFX],!MODULE[ModuleGenerator],!MODULE[ModuleResourceConverter],!MODULE[ModuleSystemHeatFissionFuelContainer],!MODULE[ModuleCommand]]
+:HAS[@RESOURCE[ElectricCharge],!RESOURCE[StoredCharge],!MODULE[RealBattery],!MODULE[RB_ignore],!MODULE[ModuleEnginesFX],!MODULE[ModuleGenerator],!MODULE[ModuleResourceConverter],!MODULE[ModuleSystemHeatFissionFuelContainer],!MODULE[ModuleCommand]]
 ```
 
 ### Filters for crewed parts
 ```
-:HAS[@RESOURCE[ElectricCharge],!RESOURCE[StoredCharge],!MODULE[RealBattery],!MODULE[ModuleEnginesFX],!MODULE[ModuleGenerator],!MODULE[ModuleResourceConverter],!MODULE[ModuleSystemHeatFissionFuelContainer],#CrewCapacity[>0]]
+:HAS[@RESOURCE[ElectricCharge],!RESOURCE[StoredCharge],!MODULE[RealBattery],!MODULE[RB_ignore],!MODULE[ModuleEnginesFX],!MODULE[ModuleGenerator],!MODULE[ModuleResourceConverter],!MODULE[ModuleSystemHeatFissionFuelContainer],#CrewCapacity[>0]]
 ```
 
 ### Filters for probe and avionics parts
 ```
-:HAS[@RESOURCE[ElectricCharge],!RESOURCE[StoredCharge],!MODULE[RealBattery],!MODULE[ModuleEnginesFX],!MODULE[ModuleGenerator],!MODULE[ModuleResourceConverter],!MODULE[ModuleSystemHeatFissionFuelContainer],@MODULE[ModuleCommand]:HAS[#minimumCrew[0]]]
+:HAS[@RESOURCE[ElectricCharge],!RESOURCE[StoredCharge],!MODULE[RealBattery],!MODULE[RB_ignore],!MODULE[ModuleEnginesFX],!MODULE[ModuleGenerator],!MODULE[ModuleResourceConverter],!MODULE[ModuleSystemHeatFissionFuelContainer],@MODULE[ModuleCommand]:HAS[#minimumCrew[0]]]
 ```
+
+## Opting a part out of RealBattery (RB_ignore)
+
+If a part has `ElectricCharge` but must never be converted to a RealBattery (e.g. it is
+conceptually a generator/reactor rather than a storage device, and doesn't carry any of the
+stock modules the filters above already exclude), add the `RB_ignore` marker module to it in a
+patch that runs **before** RealBattery's own patches (`:FIRST[RealBattery]`, or any pass earlier
+than `:FOR[zzz_RealBattery]`):
+
+```
+@PART[myPartName]:FIRST[RealBattery]
+{
+    MODULE
+    {
+        name = RB_ignore
+    }
+}
+```
+
+Every patch shipped with RealBattery (stock, mod-support, and the generic catch-alls) already
+checks `!MODULE[RB_ignore]` before adding a battery, so a part carrying this marker is always
+skipped — no need to add resources/modules manually and then remove them after the fact. See
+`patches/00_Ignore/RB_Ignore_List.cfg` in the core mod for the canonical example.
 
 ## Main RealBattery module
 This is the baseline module. In v3, all chemistry parameters (capacity, wear rates, thermal thresholds, etc.) are defined centrally in `Chemistries.cfg` and resolved at runtime via `ChemistryID`. You do **not** need to specify them inline here.

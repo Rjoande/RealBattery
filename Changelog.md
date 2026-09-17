@@ -1,11 +1,21 @@
 # Changelog
 
-# Changelog
+## v3.4.2
+
+### Minor Improvements
+- New **EPS Summary** screen on the BMS bay, now the entry page (cycle: EPS → BATT → FLEET → EPS): a vessel-wide power dashboard with a bidirectional LOAD gauge (draw/charge vs. rated capacity), RESERVE, an EC LEVEL indicator (the real ElectricCharge buffer vs. its own charge/discharge gates), EXP TIME, and BATTERIES/FAULTS counts.
+- LOAD and RESERVE's bars now color each segment by its own fixed position, like a real gauge's printed color bands, instead of recoloring the whole bar by the current reading.
+- The vessel name (EPS/BATT) and the "FLEET" label are now right-aligned on the title line; all three screens gained a small left margin.
+- `RealBatteryPowerLedger` reaches ContractVersion 4 — four new read-only methods backing the LOAD/EC LEVEL gauges above (see `source/RealBatteryPowerLedger.md`). *(For modders: additive only.)*
+
+### Bugfixes
+- Fixed the RESERVE readout shifting by a character whenever its first number crossed a digit boundary (e.g. 9.9 → 10.0).
+- Fixed the Engineer specialist bonus reading as absent for a vessel's first tick(s) after loading, self-correcting after any scene switch — the engineer-level lookup used a part's serialized crew snapshot instead of its live crew roster.
 
 ## v3.4.1
 
 ### Minor Improvements
-- **New Fleet Overview screen** on the MFD Extended BMS bay: press the BMS button again while on the main battery screen to see every RealBattery-equipped vessel in the save at a glance — charge, net rate, time-to-empty, and whether the reading is live or an estimate for a vessel that's out of physics range — sorted alphabetically, with your own ship pinned at the top. Press BMS again to return to the main screen.
+- **New Fleet Overview screen** on the MFD Extended BMS bay: press the BMS button again while on the main battery screen to see every RealBattery-equipped vessel in the save at a glance: charge, net rate, time-to-empty, and whether the reading is live or an estimate for a vessel that's out of physics range. Sorted alphabetically, with your own ship pinned at the top. Press BMS again to return to the main screen.
 - **List scrolling** on both BMS screens: the monitor's UP/DOWN/HOME keys now scroll long battery or fleet lists, with a status line at the bottom showing your position and a key reminder.
 - Long vessel names that don't fit their column now scroll across instead of being cut off.
 - Charge-level colors on the Fleet Overview now match the same low/critical bands used by VesselViewer EFIS's fuel gauges, for a consistent reading across screens.

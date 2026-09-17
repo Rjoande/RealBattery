@@ -75,6 +75,29 @@ namespace RealBattery
         public double CachedDischargeableEcPerSec { get; private set; }
         public double CachedNetEcPerSecLive { get; private set; }
 
+        // Nominal (nameplate) discharge/charge capacity — sum of sc.maxAmount * Crate across
+        // EVERY physically present RealBattery part (rbList, unfiltered), undiminished by
+        // ActualLife/ThermalCapFactor/engineer bonus and NOT restricted to eligible
+        // (enabled, non-FixedOutput) batteries like CachedDischargeableEcPerSec above. Added
+        // for the MFD's EPS LOAD gauge (2026-09-16): a worn, disabled or spent battery still
+        // counts against the vessel's rated capacity here, so the gauge visibly can't fill all
+        // the way even at maximum real effort on a degraded system — the point is to show
+        // degradation, not hide it behind a denominator that shrank along with the numerator.
+        // Charge-side excludes primary (non-rechargeable, IsPrimary) batteries, which can never
+        // accept a charge no matter how healthy they are.
+        public double CachedNominalDischargeableEcPerSec { get; private set; }
+        public double CachedNominalChargeableEcPerSec { get; private set; }
+
+        // Vessel-wide HighEClevel/LowEClevel gate fractions (0..1), same conservative
+        // aggregation FixedUpdate below already computes for its own charge/discharge branch
+        // selection (lowest High / highest Low among active batteries, falling back to all
+        // batteries if none are enabled) — cached here so the MFD's EC LEVEL indicator can read
+        // the exact same gates the real charge/discharge logic uses, instead of re-deriving a
+        // second, possibly-drifting copy. Defaults (1.0 / 0.0) mean "no gate constrains
+        // anything" for a vessel with no batteries; overwritten every tick the block below runs.
+        public double CachedHighEClevel { get; private set; } = 1.0;
+        public double CachedLowEClevel { get; private set; } = 0.0;
+
         internal static RealBatteryLoadMaster GetInstance(Vessel v)
         {
             if (v?.vesselModules == null) return null;
@@ -99,11 +122,27 @@ namespace RealBattery
                 netLive += rb.lastECpower;          // raw, unsmoothed; +charge / -discharge
             }
 
+            // Nominal capacity walk — deliberately over rbList (every RealBattery part found on
+            // the vessel), not EnumerateEligibleBatteries, and using raw sc.maxAmount * Crate
+            // with no ActualLife/EngBonus applied. See remarks on CachedNominalDischargeableEcPerSec.
+            double nominalDischargeable = 0.0, nominalChargeable = 0.0;
+            foreach (RealBattery rb in rbList)
+            {
+                PartResource sc = rb.part.Resources.Get("StoredCharge");
+                if (sc == null) continue;
+
+                double nominalRate = sc.maxAmount * rb.Crate;
+                nominalDischargeable += nominalRate;
+                if (!rb.IsPrimary) nominalChargeable += nominalRate;
+            }
+
             CachedMaxEc = maxEc;
             CachedEffectiveMaxEc = effMaxEc;
             CachedAvailableEc = availEc;
             CachedDischargeableEcPerSec = dischargeable;
             CachedNetEcPerSecLive = netLive;
+            CachedNominalDischargeableEcPerSec = nominalDischargeable;
+            CachedNominalChargeableEcPerSec = nominalChargeable;
         }
 
         private List<RealBattery> rbList = new List<RealBattery>();
@@ -163,6 +202,8 @@ namespace RealBattery
                 }
                 double HighEClevel = anyEnabled ? highEnabled : highAll;
                 double LowEClevel  = anyEnabled ? lowEnabled : lowAll;
+                CachedHighEClevel = HighEClevel;
+                CachedLowEClevel = LowEClevel;
 
                 double EC_delta_highLevel = EC_amount - EC_maxAmount * HighEClevel;  //amount of available EC for charging: 980 - 1000 * 0.95 =   30EC
                 double EC_delta_lowLevel =  EC_amount - EC_maxAmount * LowEClevel; //amount of missing EC for discharging:  500 - 1000 * 0.9  = -400EC

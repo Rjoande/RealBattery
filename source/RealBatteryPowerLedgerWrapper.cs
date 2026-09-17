@@ -18,7 +18,7 @@
 
     Contract reference: RealBatteryPowerLedger.cs (source/Core/RealBatteryPowerLedger.cs) and
     RealBatteryPowerLedger.md (this folder) in the RealBattery repo. ContractVersion this
-    wrapper targets: 3. All methods speak plain ElectricCharge (EC) units — RealBattery's
+    wrapper targets: 4. All methods speak plain ElectricCharge (EC) units — RealBattery's
     internal StoredCharge resource and its EC<->SC ratio are not your concern.
 
     The five ContractVersion-2 read methods (GetMaxEc, GetEffectiveMaxEc, GetNetEcPerSecGross,
@@ -67,6 +67,12 @@ namespace RealBattery
         // ContractVersion 3 (optional — null on an older RealBattery install)
         private static Func<Vessel, double> _getNetEcPerSecLive;
 
+        // ContractVersion 4 (optional — null on an older RealBattery install)
+        private static Func<Vessel, double> _getNominalDischargeableEcPerSec;
+        private static Func<Vessel, double> _getNominalChargeableEcPerSec;
+        private static Func<Vessel, double> _getEcLevelHighThreshold;
+        private static Func<Vessel, double> _getEcLevelLowThreshold;
+
         /// <summary>
         /// Resolves RealBatteryPowerLedger via reflection. Call once (e.g. from a
         /// MainMenu-startup KSPAddon); safe to call more than once. Never throws.
@@ -105,6 +111,12 @@ namespace RealBattery
                 // Optional: only present on ContractVersion >= 3.
                 _getNetEcPerSecLive = Bind<Func<Vessel, double>>(ledgerType, "GetNetEcPerSecLive");
 
+                // Optional: only present on ContractVersion >= 4.
+                _getNominalDischargeableEcPerSec = Bind<Func<Vessel, double>>(ledgerType, "GetNominalDischargeableEcPerSec");
+                _getNominalChargeableEcPerSec = Bind<Func<Vessel, double>>(ledgerType, "GetNominalChargeableEcPerSec");
+                _getEcLevelHighThreshold = Bind<Func<Vessel, double>>(ledgerType, "GetEcLevelHighThreshold");
+                _getEcLevelLowThreshold = Bind<Func<Vessel, double>>(ledgerType, "GetEcLevelLowThreshold");
+
                 Installed = _getDischargeableEcPerSec != null && _getAvailableEc != null && _reportConsumedEc != null;
             }
             catch
@@ -130,6 +142,17 @@ namespace RealBattery
 
         // ContractVersion 3.
         public static double GetNetEcPerSecLive(Vessel vessel) => _getNetEcPerSecLive != null ? _getNetEcPerSecLive(vessel) : 0.0;
+
+        // ContractVersion 4. Note: the real contract defaults GetEcLevelHighThreshold/
+        // GetEcLevelLowThreshold to 1.0/0.0 respectively (not 0.0/0.0) for "no gate constrains
+        // anything" — this wrapper collapses the unbound case to a flat 0.0 like everything else
+        // here, which is NOT a safe stand-in for the high threshold specifically. A mod that
+        // actually depends on these two should reference RealBattery.dll directly instead of
+        // going through this wrapper.
+        public static double GetNominalDischargeableEcPerSec(Vessel vessel) => _getNominalDischargeableEcPerSec != null ? _getNominalDischargeableEcPerSec(vessel) : 0.0;
+        public static double GetNominalChargeableEcPerSec(Vessel vessel) => _getNominalChargeableEcPerSec != null ? _getNominalChargeableEcPerSec(vessel) : 0.0;
+        public static double GetEcLevelHighThreshold(Vessel vessel) => _getEcLevelHighThreshold != null ? _getEcLevelHighThreshold(vessel) : 0.0;
+        public static double GetEcLevelLowThreshold(Vessel vessel) => _getEcLevelLowThreshold != null ? _getEcLevelLowThreshold(vessel) : 0.0;
 
         private static TDelegate Bind<TDelegate>(Type type, string methodName) where TDelegate : class
         {

@@ -1,4 +1,4 @@
-# RealBattery Power Ledger (ContractVersion 3)
+# RealBattery Power Ledger (ContractVersion 4)
 
 For third-party mods that manage their **own** background/offline energy accounting (e.g. a
 rover autopilot that keeps driving while the vessel is unloaded, or any mod that simulates
@@ -47,8 +47,12 @@ vessel was *not* loaded, or independently of KSP's live resource flow.
 | `GetNetEcPerSecTrue(Vessel vessel)` | Net vessel EC balance excluding solar — conservative/worst-case | v2 |
 | `GetSecondsToEmpty(Vessel vessel)` | Seconds to depletion at the current gross rate | v2 |
 | `GetNetEcPerSecLive(Vessel vessel)` | True instantaneous net EC/s for a *loaded* vessel, no snapshot involved | v3 |
+| `GetNominalDischargeableEcPerSec(Vessel vessel)` | Nameplate discharge capacity (EC/s) across **all** parts, undiminished, unfiltered | v4 |
+| `GetNominalChargeableEcPerSec(Vessel vessel)` | Nameplate charge-acceptance capacity (EC/s) across all non-primary parts | v4 |
+| `GetEcLevelHighThreshold(Vessel vessel)` | Vessel-wide charge gate, fraction 0..1 of stock EC_maxAmount (default 1.0) | v4 |
+| `GetEcLevelLowThreshold(Vessel vessel)` | Vessel-wide discharge gate, fraction 0..1 of stock EC_maxAmount (default 0.0) | v4 |
 
-All of the above only consider **eligible** RealBattery parts: not `BatteryDisabled`, not
+All of the above **except the four v4 additions** only consider **eligible** RealBattery parts: not `BatteryDisabled`, not
 `FixedOutput` (one-shot thermal batteries don't participate in this contract — they aren't a
 rechargeable background budget), with a `StoredCharge` resource present. Non-rechargeable
 ("primary") chemistries and `InfiniteCycles` (SMES-style) batteries *do* participate, with no
@@ -95,6 +99,25 @@ loaded, or where you specifically want RB's solar-inclusive/exclusive background
 rather than the live figure). `GetNetEcPerSecLive` returns `0.0` for a vessel that isn't loaded
 — it has no unloaded-vessel fallback of its own.
 
+### `v4` additions — nameplate capacity and EC-buffer gates
+
+`GetNominalDischargeableEcPerSec`/`GetNominalChargeableEcPerSec` deliberately do **not** filter
+by eligibility and do **not** derate by wear/thermal/engineer bonus, unlike every other
+aggregate in this contract — a disabled, spent or damaged battery still counts at its full rated
+`sc.maxAmount * Crate`. These exist for a UI gauge that wants to show "how much of the vessel's
+rated capacity is this real, derated figure actually reaching" (RealBattery's own MFD Extended
+EPS summary page is the first consumer) rather than for energy accounting — for accounting, use
+`GetDischargeableEcPerSec` instead. The charge-side variant excludes `IsPrimary` (non-rechargeable)
+batteries, which can never accept a charge regardless of health.
+
+`GetEcLevelHighThreshold`/`GetEcLevelLowThreshold` expose the vessel-wide `HighEClevel`/
+`LowEClevel` gates (fractions of the stock `ElectricCharge` resource's own `maxAmount`, not
+`StoredCharge`) that `RealBatteryLoadMaster` already uses every tick to decide when batteries
+start charging or discharging that buffer — the same conservative aggregation (lowest High /
+highest Low among active batteries) it uses internally, exposed read-only rather than
+re-derived. Defaults (1.0 / 0.0 respectively) mean "no gate constrains anything" for a vessel
+with no batteries.
+
 ### Where the v2/v3 aggregates actually come from
 
 `GetMaxEc`, `GetEffectiveMaxEc`, `GetAvailableEc`, `GetDischargeableEcPerSec`, and
@@ -137,7 +160,7 @@ transfer logic already has, not a new one introduced by this contract.
 
 ## Versioning
 
-`RealBatteryPowerLedger.ContractVersion` (currently `3`) increments only for additive,
+`RealBatteryPowerLedger.ContractVersion` (currently `4`) increments only for additive,
 non-breaking changes — existing method signatures are frozen once shipped. Check
 `RealBatteryPowerLedgerWrapper.ContractVersion` after `Init()` if your mod depends on a
 feature added in a later version.
