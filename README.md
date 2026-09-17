@@ -120,6 +120,7 @@ Current languages:
 - Spanish (`en-es`)
 - French (`fr-fr`)
 - Simplified Chinese (`zh-cn`) by **Aebestach**
+- Russian (`ru`) by **ostrkrs**
 
 ## Licensing
 
