@@ -85,7 +85,6 @@
     <Compile Include="source\Core\SystemHeatBridge.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="GameData\RealBattery\RealBattery_mm.cfg" />
     <None Include="GameData\RealBattery\RealBattery.version" />
     <None Include="source\RealBattery.netkan" />
     <None Include="source\run_netkan.bat" />

@@ -252,9 +252,9 @@ namespace RealBattery
         // Renders a fixed-width gauge bar as a real analog gauge would: each of the 20 tile
         // POSITIONS has a fixed color (tileColor, evaluated against that tile's own lower
         // percentage bound) regardless of the current reading — only whether a tile is lit
-        // depends on pct. This is why a RESERVE bar sitting at, say, 40% shows a single red tile
-        // at the very start even though 40% itself reads white elsewhere: that first tile
-        // represents 0-5%, which IS the red zone, lit or not. Same tileColor function doubles as
+        // depends on pct. This is why a LOAD bar sitting at, say, 40% (DISCHARGE) shows green
+        // tiles only, while the amber/red zone tiles stay dark until the reading reaches them.
+        // Same tileColor function doubles as
         // the single-value color for the row's percent/status text — call it with the current
         // pct itself (not a tile's lower bound) to get "which zone is this reading in" for that
         // purpose, one source of truth for both instead of two thresholds drifting apart.
@@ -494,11 +494,13 @@ namespace RealBattery
             double availableEc = RealBatteryPowerLedger.GetAvailableEc(vessel);
             double maxEc = RealBatteryPowerLedger.GetMaxEc(vessel);
             double socPct = maxEc > 1e-6 ? (availableEc / maxEc) * 100.0 : 0.0;
-            Func<double, string> reserveTileColor = p => p < 1.0 ? ColRed : p < 10.0 ? ColAmber : ColWhite;
-            string reserveColor = reserveTileColor(socPct);
+            // The bar itself is always white (no colored end zones); only the percent text keeps
+            // the low-reserve red/amber thresholds.
+            Func<double, string> reserveTextColor = p => p < 1.0 ? ColRed : p < 10.0 ? ColAmber : ColWhite;
+            string reserveColor = reserveTextColor(socPct);
 
             sb.AppendLine(
-                " RESERVE".PadRight(EpsGaugeLabelWidth + 1) + "[" + BuildGaugeBar(socPct, reserveTileColor) + "]  " +
+                " RESERVE".PadRight(EpsGaugeLabelWidth + 1) + "[" + BuildGaugeBar(socPct, _ => ColWhite) + "]  " +
                 $"[{reserveColor}]{$"{socPct:0}%".PadLeft(4)}[{ColWhite}]");
             sb.AppendLine(
                 new string(' ', EpsGaugeLabelWidth + 2) +
