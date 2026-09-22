@@ -249,11 +249,6 @@ netkan.exe
 # (loading-screen tips) — not RealBattery's own code/assets, not part of what it ships.
 /GameData/REPOSoftTech/
 
-# README.md itself IS tracked here, matching the real repo — Pietro edits it directly on
-# GitHub, not locally. README_release.md is the separate release-package version (bundled into
-# the zip for players) — different content, deliberately never synced with the one above.
-/README_release.md
-
 # Personal double-click-to-commit helper — a local convenience tool, not something contributors
 # need from the repo itself.
 /commit.bat
