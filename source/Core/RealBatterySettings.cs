@@ -68,6 +68,20 @@ namespace RealBattery
             }
         }
 
+        // Matches the CLR assembly name (GetName().Name), never LoadedAssembly.name, which is the
+        // DLL's file name and can differ.
+        private static bool? _dynamicBatteryStorageAvailable;
+        public static bool DynamicBatteryStorageAvailable
+        {
+            get
+            {
+                if (_dynamicBatteryStorageAvailable.HasValue) return _dynamicBatteryStorageAvailable.Value;
+                try { _dynamicBatteryStorageAvailable = AssemblyLoader.loadedAssemblies.Any(a => a.assembly != null && a.assembly.GetName().Name == "DynamicBatteryStorage"); }
+                catch { _dynamicBatteryStorageAvailable = false; }
+                return _dynamicBatteryStorageAvailable.Value;
+            }
+        }
+
         private static bool? _kacInstalled;
         public static bool KACIsInstalled()
         {

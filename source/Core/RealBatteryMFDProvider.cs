@@ -380,11 +380,11 @@ namespace RealBattery
             return Math.Max(0, bodyBudget - 1);
         }
 
-        // Λ (U+039B, greek capital lambda) / ○ (U+25CB, white circle) — not "^"/"O": the caret
-        // renders much smaller than "v" in the monitor's font, and a monospaced capital "O" reads
-        // as an oval or a zero. Both glyphs verified on screen in game (2026-08-30, on CAS, the
-        // page this text is kept in sync with — CasAggregator.AppendStatusLine).
-        private const string KeyLegend = "ΛV: scroll  ○: home";
+        // ▲▼ (U+25B2/U+25BC, black up/down triangles) / ○ (U+25CB, white circle) — not "^"/"V"/"O":
+        // the caret renders much smaller than "v" in the monitor's font, and a monospaced capital
+        // "O" reads as an oval or a zero. All glyphs verified on screen in game (○ 2026-08-30, ▲▼
+        // 2026-09-17, on CAS; same legend as CAS/ELEC/TCS in MFDExtension's ScrollingListPage).
+        private const string KeyLegend = "▲▼: scroll  ○: home";
 
         // Two halves, not one phrase: "X-Y of N" stays left, the key legend goes right, the gap
         // between them filled with spaces — so position and legend read as two distinct pieces of
@@ -507,19 +507,23 @@ namespace RealBattery
                 FormatEnergyPair(availableEc / RealBattery.EC2SCratio, maxEc / RealBattery.EC2SCratio));
             sb.AppendLine();
 
-            // --- EC LEVEL ---
-            vessel.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double ecAmount, out double ecMax);
-            double ecPct = ecMax > 1e-6 ? (ecAmount / ecMax) * 100.0 : 0.0;
-            double highGatePct = RealBatteryPowerLedger.GetEcLevelHighThreshold(vessel) * 100.0;
-            double lowGatePct = RealBatteryPowerLedger.GetEcLevelLowThreshold(vessel) * 100.0;
+            // --- EC LEVEL --- (hidden when DynamicBatteryStorage is installed: its ELEC page owns
+            // EC LEVEL, this page owns EXP TIME — BMS/ELEC partition, 2026-09-16)
+            if (!RealBatterySettings.DynamicBatteryStorageAvailable)
+            {
+                vessel.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double ecAmount, out double ecMax);
+                double ecPct = ecMax > 1e-6 ? (ecAmount / ecMax) * 100.0 : 0.0;
+                double highGatePct = RealBatteryPowerLedger.GetEcLevelHighThreshold(vessel) * 100.0;
+                double lowGatePct = RealBatteryPowerLedger.GetEcLevelLowThreshold(vessel) * 100.0;
 
-            string ecColor;
-            if (ecPct <= EpsEcLevelRedPct) ecColor = ColRed;
-            else if (ecPct < lowGatePct) ecColor = ColAmber;
-            else if (ecPct <= highGatePct) ecColor = ColCyan;
-            else ecColor = ColGreen;
+                string ecColor;
+                if (ecPct <= EpsEcLevelRedPct) ecColor = ColRed;
+                else if (ecPct < lowGatePct) ecColor = ColAmber;
+                else if (ecPct <= highGatePct) ecColor = ColCyan;
+                else ecColor = ColGreen;
 
-            sb.AppendLine(" " + BuildEpsTextRow("EC LEVEL", $"{ecPct:0}%", ecColor));
+                sb.AppendLine(" " + BuildEpsTextRow("EC LEVEL", $"{ecPct:0}%", ecColor));
+            }
 
             // --- EXP TIME --- (same calc/format as BATT's own AUTONOMY, renamed here since it
             // no longer sits next to a NET RATE line giving it context)

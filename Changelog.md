@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.4.3
+
+### Minor Improvements
+- The EPS Summary's RESERVE gauge bar is now entirely white (no colored end zones); the percentage next to it still turns amber/red when the reserve runs low.
+- The BMS key legend on the status line now reads `▲▼: scroll  ○: home`, matching the other MFD Extended bays.
+- New **NEXT/PREV** softkeys (R9/R10) cycle the three BMS pages (EPS / BATT / FLEET), in addition to the bay button.
+- With **DynamicBatteryStorage** installed, the EPS Summary no longer shows EC LEVEL (its ELEC page owns it); EXP TIME stays here.
+
 ## v3.4.2
 
 ### Minor Improvements
