@@ -20,7 +20,7 @@ The new system rewards thoughtful planning, buffering for peak loads, and progre
 - Seamless integration with B9PartSwitch and localization support
 - Optional language files to rename ElectricCharge and StoredCharge
 
-> See also the [Changelog](https://github.com/Rjoande/RealBattery/blob/master/RealBattery/Changelog.md) for a list of newly-released features.
+> See also the [Changelog](https://github.com/Rjoande/RealBattery/blob/master/Changelog.md) for a list of newly-released features.
 
 ### Extras
 Optional patches are included in the release to enhance immersion and realism. Extra patches are modular and can be removed or disabled if undesired:
@@ -46,10 +46,14 @@ To install an extra, simply place the corresponding patch into your `GameData` f
 - [DangIt! Continued](https://github.com/linuxgurugamer/DangIt/releases)
 - [Bon Voyage](https://github.com/jarosm/KSP-BonVoyage) (requires [Harmony](https://github.com/KSPModdingLibs/HarmonyKSP))
 - [Conformal Decals](https://git.offworldcolonies.nexus/drewcassidy/KSP-Conformal-Decals/releases)
-- [LoadingTipsPlus](https://forum.kerbalspaceprogram.com/topic/142840-110x-loadingtipsplus-v198-17th-oct-2020/) (bundled with RealBattery since v3)
+- [LoadingTipsPlus](https://forum.kerbalspaceprogram.com/topic/142840-110x-loadingtipsplus-v198-17th-oct-2020/) (shows RealBattery's loading-screen tips; no longer bundled — installed automatically by CKAN, otherwise install it manually)
 - [MFD Extended](https://github.com/Rjoande/MFD-Extension) *(adds an in-IVA battery management screen — see below; RealBattery works identically without it)*
 
 ## Installation
+
+**Via [CKAN](https://github.com/KSP-CKAN/CKAN)** (recommended): search for `RealBattery` — dependencies are installed automatically. The `Extras/` patches are not installed by CKAN; copy them manually from the release zip if you want them.
+
+**Manually:**
 
 1. Remove any previous `RealBattery` install.
 3. Download the latest release from the [Releases](https://github.com/Rjoande/RealBattery/releases) page.

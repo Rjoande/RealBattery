@@ -24,6 +24,8 @@ SUGGESTED / RECOMMENDED
 - DangIt! Continued
 - Bon Voyage
 - Conformal Decals
+- LoadingTipsPlus (shows RealBattery's loading-screen tips; not bundled,
+  installed automatically by CKAN)
 - HarmonyKSP (only needed for the optional Bon Voyage fallback bridge)
 - MFD Extended (https://github.com/Rjoande/MFD-Extension) - adds an in-IVA
   battery management display (BMS bay: EPS Summary, Battery Management, and
