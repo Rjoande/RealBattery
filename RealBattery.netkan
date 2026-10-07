@@ -30,8 +30,8 @@ depends:
   - name: CommunityResourcePack
 recommends:
   - name: LoadingTipsPlus
-suggests:
   - name: SystemHeat
+suggests:
   - name: CommunityTechTree
   - name: DynamicBatteryStorage
   - name: DangItContinued
