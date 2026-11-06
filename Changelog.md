@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.4.4
+
+### Localization
+- Restored the Russian translation for the optional Extras (EC-to-current / EC-to-kW resource renames) and for the RealBatteryExpansion chemistries (HoCell, MgSb, QET, SMES, VRFB), accidentally dropped in v3.4.2 - thanks again to GitHub user **ostrkrs** for spotting it!
+
 ## v3.4.3
 
 ### Minor Improvements
