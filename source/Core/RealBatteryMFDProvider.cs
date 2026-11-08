@@ -406,9 +406,8 @@ namespace RealBattery
         }
 
         // ============================================================================
-        //  EPS — vessel-wide power summary, entry page (2026-09-15), ahead of BATT/FLEET in the
-        //  cycle. Design confirmed with Pietro over three mockup rounds (see
-        //  NOTES_Backlog_PostRelease.md) before this was written. No scroll softkeys
+        //  EPS — vessel-wide power summary, entry page, ahead of BATT/FLEET in the
+        //  cycle. No scroll softkeys
         //  (epsScrollOffset/ButtonProcessorEps don't exist): fixed-size dashboard, nothing to
         //  scroll — add them later only if real content needs a scrollable region.
         //

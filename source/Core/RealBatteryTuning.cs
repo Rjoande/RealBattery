@@ -3,11 +3,11 @@ using UnityEngine;
 namespace RealBattery
 {
     // ============================================================================
-    //  RealBatteryTuning  [plan M3 / T3.5]
+    //  RealBatteryTuning
     //  Optional global calibration overrides, read once from an optional
     //  REALBATTERY_TUNING cfg node. Lets a small set of empirically-tuned constants be
     //  adjusted without recompiling — currently only the cryo waste-heat flux per liter,
-    //  added to support the T3b structured calibration protocol (PLAN_Fix_Refactoring.md).
+    //  tuned against CryoTanks (a 1200 L SMES vs. a matched LH2 tank).
     //
     //  Absent node or key -> falls back to the compiled-in default below, which is the
     //  value RealBattery shipped with before this knob existed (2026-07 decision, see

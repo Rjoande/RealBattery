@@ -1,0 +1,107 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{757EC23D-96E1-4DAA-A4D5-57F129E9B309}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>RealBattery</RootNamespace>
+    <AssemblyName>RealBattery</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\GameData\RealBattery\plugin\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\GameData\RealBattery\plugin\</OutputPath>
+    <DefineConstants>
+    </DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>..\lib\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="B9PartSwitch">
+      <HintPath>..\lib\B9PartSwitch.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="UnityEngine">
+      <HintPath>..\lib\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\lib\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Alarms\AlarmBackends.cs" />
+    <Compile Include="Alarms\AlarmManager.cs" />
+    <Compile Include="Background Simulation\BackgroundSimulator.cs" />
+    <Compile Include="Alarms\KACWrapper.cs" />
+    <Compile Include="Background Simulation\KopernicusStarResolver.cs" />
+    <Compile Include="Background Simulation\ModuleEnergyEstimator.cs" />
+    <Compile Include="Core\EVAService.cs" />
+    <Compile Include="Core\Logging.cs" />
+    <Compile Include="Core\RealBattery.cs" />
+    <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="Core\RealBatteryChemistry.cs" />
+    <Compile Include="Core\RealBatteryChemistryDB.cs" />
+    <Compile Include="Core\RealBatteryDefaults.cs" />
+    <Compile Include="Core\RealBatteryLoadMaster.cs" />
+    <Compile Include="Core\RealBatteryMFDProvider.cs" />
+    <Compile Include="Core\RealBatteryPowerLedger.cs" />
+    <Compile Include="Core\RealBatterySettings.cs" />
+    <Compile Include="Core\RealBatteryTuning.cs" />
+    <Compile Include="Core\RB_ignore.cs" />
+    <Compile Include="Background Simulation\RealBatterySnapshotManager.cs" />
+    <Compile Include="Background Simulation\RealBatteryVesselModule.cs" />
+    <Compile Include="Core\SystemHeatBridge.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\GameData\RealBattery\RealBattery.version" />
+    <None Include="RealBatteryPowerLedgerWrapper.cs" />
+    <None Include="RealBatteryPowerLedger.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

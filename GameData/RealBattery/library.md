@@ -1,6 +1,9 @@
 ﻿# RealBattery module templates
 Below are sample configurations for RealBattery modules and B9PartSwitch subtypes. Feel free to copy and paste the modules you like to create your own custom patches.
 
+C# mods that need to read RealBattery's capacity or report their own EC consumption: see the
+`RealBatteryPowerLedger` contract at https://github.com/Rjoande/RealBattery/blob/master/source/RealBatteryPowerLedger.md
+
 ## Patch outline
 These are basic patch structures with logical operators to determine battery capacity in multiple parts at once. The parts must contain `ElectricCharge` and `StoredCharge` resources. Amount is optional since they will be overwritten by b9PartSwitch, but it is advised to use the stats of the first subtype for visual consistency. In the example are Lead-acid battery stats.
 This is the same structure used by the patches included with RealBattery. It is recommended to always use B9PartSwitch to simplify the automatic calculation of mass and cost using `tankTypes` -- it works also with single-chemistry parts. **Important:** reset `cost` and `mass` for standalone batteries only!

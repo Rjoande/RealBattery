@@ -16,9 +16,8 @@ namespace RealBattery
     //  Semantics: REPORTING, not commanding. The caller declares "I consumed X EC over this
     //  period" and RealBattery — the sole authority on its own model — decides how to apply it
     //  (pro-quota StoredCharge drain, wear, BatteryLife, SC_SOC). This deliberately replaces
-    //  the M6b "DrainEc/ChargeEc" command-style surface (archived, unshipped, in
-    //  RealBatteryAPI_draft/) after Pietro found that shape unconvincing — see
-    //  PLAN_BV_API_Integration.md §B1 for the full design rationale.
+    //  an earlier, never-shipped "DrainEc/ChargeEc" command-style surface: the caller
+    //  reports, RealBattery stays the sole authority on how its batteries are drained.
     //
     //  Idempotency/anti-double-reporting is the CALLER's responsibility: this contract holds
     //  no state between calls (beyond the one-time-per-vessel unloaded-vessel warning below).
@@ -300,7 +299,7 @@ namespace RealBattery
 
         // ------------------------------------------------------------------------------
 
-        // Eligibility (D6, PLAN_BV_API_Integration.md §B1.1bis): enabled, not a one-shot
+        // Eligibility: enabled, not a one-shot
         // FixedOutput (thermal) battery (D1), has StoredCharge. IsPrimary and InfiniteCycles
         // batteries participate with no special-casing here (D2/D3) — InfiniteCycles skips
         // wear in DrainSc below, same as the live simulation.

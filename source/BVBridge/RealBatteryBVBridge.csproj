@@ -17,7 +17,7 @@
     <DebugSymbols>false</DebugSymbols>
     <DebugType>none</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>GameData\RealBattery\plugin\</OutputPath>
+    <OutputPath>..\..\GameData\RealBattery\plugin\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -26,7 +26,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>GameData\RealBattery\plugin\</OutputPath>
+    <OutputPath>..\..\GameData\RealBattery\plugin\</OutputPath>
     <DefineConstants>
     </DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -38,30 +38,30 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>lib\Assembly-CSharp.dll</HintPath>
+      <HintPath>..\..\lib\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="0Harmony">
-      <HintPath>lib\0Harmony.dll</HintPath>
+      <HintPath>..\..\lib\0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="UnityEngine">
-      <HintPath>lib\UnityEngine.dll</HintPath>
+      <HintPath>..\..\lib\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>lib\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>..\..\lib\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BVBridge\AssemblyInfo.cs" />
-    <Compile Include="BVBridge\BridgeBootstrap.cs" />
-    <Compile Include="BVBridge\CapacityPatch.cs" />
-    <Compile Include="BVBridge\DrainPatch.cs" />
-    <Compile Include="BVBridge\RealBatteryFieldAccess.cs" />
+    <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="BridgeBootstrap.cs" />
+    <Compile Include="CapacityPatch.cs" />
+    <Compile Include="DrainPatch.cs" />
+    <Compile Include="RealBatteryFieldAccess.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />

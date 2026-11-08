@@ -5,8 +5,8 @@ using System.Reflection;
 namespace RealBatteryBVBridge
 {
     // Reads/writes RealBattery's PartModule fields via reflection, without a compile-time
-    // reference to RealBattery.dll (RealBattery's own public API was explored in M6b but
-    // parked — see RealBatteryAPI_draft/ at the repo root — so this bridge stays self-
+    // reference to RealBattery.dll (an earlier public API was explored but never shipped,
+    // so this bridge stays self-
     // contained via reflection, same approach as the RealBattery-side of the BonVoyage PR).
     //
     // Most fields used here are genuine KSPFields (readable via the stock BaseField API);

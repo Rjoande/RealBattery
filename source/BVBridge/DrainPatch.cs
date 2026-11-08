@@ -13,8 +13,8 @@ namespace RealBatteryBVBridge
     //
     // Note (2026-08, campaign B): an earlier in-game test found this drain producing no effect
     // on a live BV 1.5.1.3 install; the root cause was never conclusively isolated before
-    // RealBattery pivoted to proposing native BonVoyage support instead (see
-    // PLAN_BV_API_Integration.md §B2). This bridge remains the fallback for players on a BV
+    // RealBattery pivoted to proposing native BonVoyage support instead (BonVoyage PR #46).
+    // This bridge remains the fallback for players on a BV
     // build without native support. If it resurfaces, the per-branch diagnostic Debug.Log
     // calls this method used during that investigation can be restored from git history.
     internal static class DrainPatch
