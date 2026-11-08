@@ -10,7 +10,7 @@ namespace RealBatteryBVBridge
     // Only does anything if BOTH BonVoyage and RealBattery are installed, and only applies
     // patches if BonVoyage does not already expose native RealBattery support (the
     // BonVoyage.RealBatterySupport marker shipped by RealBattery's own upstream PR — see
-    // M6_BonVoyage_PR/ in the RealBattery repo). A missing 0Harmony.dll or an incompatible
+    // https://github.com/net-lisias-ksp/BonVoyage/pull/46). A missing 0Harmony.dll or an incompatible
     // BonVoyage version only disables this bridge; RealBattery.dll itself never references
     // this assembly and is entirely unaffected either way.
     [KSPAddon(KSPAddon.Startup.MainMenu, true)]
