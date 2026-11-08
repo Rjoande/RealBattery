@@ -257,3 +257,8 @@ netkan.exe
 # used only to compile against — third-party/Squad copyrighted binaries, never RealBattery's own
 # code, and not redistributable in a public repo.
 /lib/
+
+# Local Claude Code workspace: project hub, internal notes and session settings — never published.
+/CLAUDE.md
+/notes/
+/.claude/
