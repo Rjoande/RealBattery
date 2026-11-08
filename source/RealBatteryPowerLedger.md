@@ -183,7 +183,8 @@ if (RealBatteryPowerLedgerWrapper.Init())
 ## For BonVoyage specifically
 
 This contract is the RealBattery-side half of the integration proposed to LisiasT (see
-`M6_BonVoyage_PR/MESSAGE_TO_LISIAST.md` and `PLAN_BV_API_Integration.md` §B2). The intended
+the [design proposal on BonVoyage PR #46](https://github.com/net-lisias-ksp/BonVoyage/pull/46#issuecomment-5148039347)
+and `PLAN_BV_API_Integration.md` §B2). The intended
 shape on BV's side is a `RealBatteryPowerSupply : Batteries` that:
 
 - reports `GetAvailableEc(vessel)` as `Batteries.MaxAvailableEC` during `SystemCheck`, and
