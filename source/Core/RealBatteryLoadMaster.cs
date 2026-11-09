@@ -146,6 +146,15 @@ namespace RealBattery
         }
 
         private List<RealBattery> rbList = new List<RealBattery>();
+
+        // False when the vessel only carries "No battery" subtypes (or no RealBattery at all).
+        private bool AnyActiveBattery()
+        {
+            foreach (RealBattery rb in rbList)
+                if (rb.moduleActive) return true;
+            return false;
+        }
+
         public void ReadAllRealBatteryModules(Vessel gameEventVessel = null)
         {
             if (vessel == null || vessel.Parts == null)
@@ -176,7 +185,7 @@ namespace RealBattery
             // get vessel wide EC status (missing or available)
             vessel.GetConnectedResourceTotals(PartResourceLibrary.ElectricityHashcode, out double EC_amount, out double EC_maxAmount);
 
-            if (EC_maxAmount > 0 && rbList.Count != 0)
+            if (EC_maxAmount > 0 && AnyActiveBattery())
             {
                 // HighEClevel: use the lowest among active batteries so an unusual threshold
                 // on one battery doesn't block charging for the whole vessel.
@@ -190,6 +199,7 @@ namespace RealBattery
                 int nScale = 0;
                 foreach (RealBattery rbScan in rbList)
                 {
+                    if (!rbScan.moduleActive) continue; // "No battery" subtype: no thresholds, no C-rate scaling
                     if (rbScan.HighEClevel < highAll) highAll = rbScan.HighEClevel;
                     if (rbScan.LowEClevel > lowAll) lowAll = rbScan.LowEClevel;
                     if (!rbScan.BatteryDisabled)
@@ -223,7 +233,7 @@ namespace RealBattery
                 {
                     foreach (RealBattery rb in rbList)
                     {
-                        if (rb.BatteryDisabled || rb.CrateScale == "false") continue;
+                        if (!rb.moduleActive || rb.BatteryDisabled || rb.CrateScale == "false") continue;
                         crateBackup[rb] = rb.Crate;
                         float f = Math.Max(0.01f, rb.CrateScaleFactor);
                         if (rb.CrateScale == "add")

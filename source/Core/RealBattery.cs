@@ -192,8 +192,8 @@ namespace RealBattery
         public bool BatteryStaged = RBDefaults.BatteryStaged;
         [KSPField(isPersistant = true)] private bool StageFired = false;
         [KSPField(isPersistant = true)] public bool BatteryStagedUserSet = false;
-        public override bool IsStageable() => BatteryStaged && !StageFired;
-        public override bool StagingToggleEnabledEditor() => BatteryStaged;
+        public override bool IsStageable() => moduleActive && BatteryStaged && !StageFired;
+        public override bool StagingToggleEnabledEditor() => moduleActive && BatteryStaged;
 
 
         // --- ACTIONS ----------------------------------------------------------------
@@ -329,6 +329,8 @@ namespace RealBattery
         private bool   runawayExtinguished = false;   // chemical source depleted; apply short tail
 
         private string _lastAppliedChemistryID = null; // cache the last applied chemistry ID to avoid redundant DB lookups
+        // B9PS sets moduleActive after our OnStart (e.g. the "No battery" subtype), so changes are detected per tick.
+        private bool _lastModuleActive = true;
 
         // Auxiliary resource flows from the active chemistry (RESOURCE_EXTRA); empty when none.
         private List<ResourceRequirement> _resourceExtras = new List<ResourceRequirement>();
@@ -503,14 +505,7 @@ namespace RealBattery
 
         public override void OnUpdate()
         {
-            if (ChemistryID != _lastAppliedChemistryID)
-            {
-                _lastAppliedChemistryID = ChemistryID;
-                ApplyChemistryFromDB();
-                // moduleActive only changes via a chemistry/subtype switch, not every tick —
-                // no need to re-apply PAW visibility outside this branch (P5).
-                ModuleActiveHideUI();
-            }
+            RefreshAfterSubtypeSwitch();
 
             if (HighLogic.LoadedSceneIsEditor)
             {
@@ -616,14 +611,11 @@ namespace RealBattery
         }
         public void FixedUpdate()
         {
-            if (!moduleActive) return;
+            // Before the moduleActive gate: switching to the "No battery" subtype must still
+            // hide the PAW fields and disarm staging.
+            RefreshAfterSubtypeSwitch();
 
-            if (ChemistryID != _lastAppliedChemistryID)
-            {
-                _lastAppliedChemistryID = ChemistryID;
-                ApplyChemistryFromDB();
-                ModuleActiveHideUI();
-            }
+            if (!moduleActive) return;
 
             double ActualLife = RealBatterySettings.EnableBatteryWear ? BatteryLife : 1.0;
             double dt = TimeWarp.fixedDeltaTime;
@@ -1011,7 +1003,7 @@ namespace RealBattery
         public override void OnActive()
         {
             // Only react if the player armed staging and we haven't fired yet.
-            if (!BatteryStaged || StageFired) return;
+            if (!moduleActive || !BatteryStaged || StageFired) return;
 
             // For thermal batteries we'll later enforce "non-disableable".
             // For now, staging simply enables the battery.
@@ -1345,6 +1337,13 @@ namespace RealBattery
         // ============================================================================
         public double XferECtoRealBattery(double amount)
         {
+            // "No battery" subtype: the module stays on the part but owns no StoredCharge.
+            if (!moduleActive || !part.Resources.Contains("StoredCharge"))
+            {
+                lastECpower = 0.0;
+                return 0.0;
+            }
+
             if (ScResourceMissing)
             {
                 lastECpower = 0.0;
@@ -1995,6 +1994,21 @@ namespace RealBattery
             // Automatic overheat protection: unlocked together with PCM
             PreventOverheat = PCMUnlocked;
         }
+        // Re-applies chemistry, PAW visibility and staging after a B9PS subtype switch. Both
+        // ChemistryID and moduleActive only change that way, so this is a no-op on most ticks.
+        private void RefreshAfterSubtypeSwitch()
+        {
+            bool chemistryChanged = ChemistryID != _lastAppliedChemistryID;
+            bool activeChanged = moduleActive != _lastModuleActive;
+            if (!chemistryChanged && !activeChanged) return;
+
+            _lastAppliedChemistryID = ChemistryID;
+            _lastModuleActive = moduleActive;
+            if (chemistryChanged) ApplyChemistryFromDB();
+            ModuleActiveHideUI();
+            if (activeChanged) ApplyStagingState();
+        }
+
         private void ModuleActiveHideUI()
         {
             _fBatteryDisabled.guiActive = moduleActive;
@@ -2018,6 +2032,11 @@ namespace RealBattery
             _fChargeInfoEditor.guiActiveEditor = moduleActive;
             _fBatteryStaged.guiActiveEditor = moduleActive;
             _fSimulationMode.guiActiveEditor = moduleActive;
+
+            // Action groups: nothing to toggle on a part without a battery.
+            Actions[nameof(ToggleBatteryAction)].active = moduleActive;
+            Actions[nameof(EnableBattery)].active = moduleActive;
+            Actions[nameof(DisableBattery)].active = moduleActive;
         }
         private void EnforceNonDisableableLatch()
         {
@@ -2099,7 +2118,7 @@ namespace RealBattery
         }
         private void ApplyStagingState()
         {
-            if (BatteryStaged)
+            if (BatteryStaged && moduleActive)
             {
                 // KSP 1.12 stagingIcon only accepts the stock DefaultIcons enum (no custom
                 // texture via cfg). FUEL_TANK is a generic-storage silhouette, kept for standard

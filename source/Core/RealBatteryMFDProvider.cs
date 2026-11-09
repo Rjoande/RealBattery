@@ -81,7 +81,7 @@ namespace RealBattery
             if (vessel?.parts == null) return 0;
             int count = 0;
             foreach (Part part in vessel.parts)
-                if (part.Modules.Contains("RealBattery")) count++;
+                if (part.Modules.GetModule<RealBattery>()?.moduleActive == true) count++; // same filter as the BATT list
             return count;
         }
 
@@ -445,7 +445,7 @@ namespace RealBattery
                 {
                     if (!part.Modules.Contains("RealBattery")) continue;
                     RealBattery rbPart = part.Modules.GetModule<RealBattery>();
-                    if (rbPart != null) batteries.Add(rbPart);
+                    if (rbPart != null && rbPart.moduleActive) batteries.Add(rbPart); // skip "No battery" subtypes
                 }
             }
 
@@ -598,7 +598,7 @@ namespace RealBattery
                 {
                     if (!part.Modules.Contains("RealBattery")) continue;
                     RealBattery rbPart = part.Modules.GetModule<RealBattery>();
-                    if (rbPart != null) batteries.Add(rbPart);
+                    if (rbPart != null && rbPart.moduleActive) batteries.Add(rbPart); // skip "No battery" subtypes
                 }
             }
 

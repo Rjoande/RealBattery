@@ -139,6 +139,7 @@ namespace RealBattery
                 {
                     var pm = part.Modules["RealBattery"];
                     if (pm == null) continue;
+                    if (pm is RealBattery rbActive && !rbActive.moduleActive) continue; // "No battery" subtype
 
                     bool isEnabled = true;
                     var disabledField = pm.Fields["BatteryDisabled"];

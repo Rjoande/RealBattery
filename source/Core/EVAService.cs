@@ -290,8 +290,9 @@ namespace RealBattery
         {
             RBLog.Info($"[RB_AfterOnStart] EvaRefurbishEnabled={EvaRefurbishEnabled}, EnableEVARefurbush={RealBatterySettings.EnableEVARefurbush}");
 
-            // Global gate: hide all EVA events if servicing is disabled (part or settings level).
-            bool serviceEnabled = EvaRefurbishEnabled && RealBatterySettings.EnableEVARefurbush;
+            // Global gate: hide all EVA events if servicing is disabled (part or settings level)
+            // or the part has no battery ("No battery" subtype).
+            bool serviceEnabled = moduleActive && EvaRefurbishEnabled && RealBatterySettings.EnableEVARefurbush;
             if (!serviceEnabled)
             {
                 RBLog.Info("[RB_AfterOnStart] EVA servicing disabled, hiding all events.");
