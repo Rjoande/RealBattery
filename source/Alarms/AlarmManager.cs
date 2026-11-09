@@ -85,6 +85,15 @@ namespace RealBattery
                 return;
             }
 
+            // With Kerbalism the depletion estimate behind these alarms does not exist (background is
+            // Kerbalism's, with its own low/empty battery warnings): never create RB alarms, and remove
+            // the ones left by a save made without Kerbalism.
+            if (KerbalismBridge.Active)
+            {
+                PurgeAlarmsForKerbalism(contextTag);
+                return;
+            }
+
             double now = Planetarium.GetUniversalTime();
             int created = 0, updated = 0, deleted = 0, kept = 0, skipped = 0;
 
@@ -146,6 +155,21 @@ namespace RealBattery
             }
 
             RBAlarmUtil.Log($"[{contextTag}] Sync summary: created={created} updated={updated} deleted={deleted} kept={kept} skipped={skipped}");
+        }
+
+        private static bool _kerbalismPurgeDone;
+        private static void PurgeAlarmsForKerbalism(string contextTag)
+        {
+            if (_kerbalismPurgeDone) return;
+            _kerbalismPurgeDone = true;
+            int deleted = 0;
+            foreach (var v in FlightGlobals.Vessels)
+            {
+                if (v == null || !HasAlarm(v.persistentId)) continue;
+                DeleteAlarm(v.persistentId);
+                deleted++;
+            }
+            RBAlarmUtil.Log($"[{contextTag}] Kerbalism present: RealBattery depletion alarms disabled ({deleted} stale alarm(s) removed).");
         }
 
         // ---------------- helpers (static) ----------------
@@ -462,6 +486,8 @@ namespace RealBattery
 
             RBAlarmUtil.Dbg($"Toast tick. Next in ~{Math.Min(leadSec, 180.0):F0}s real-time.");
 
+            // The low-power toast reads the same RB depletion estimate, which Kerbalism replaces.
+            if (KerbalismBridge.Active) return;
             double now = Planetarium.GetUniversalTime();
             int total = 0, activeSkipped = 0, noSnap = 0, protoUsed = 0, candidates = 0, shown = 0, notYet = 0, alreadyShown = 0;
             string scene = HighLogic.LoadedScene.ToString();

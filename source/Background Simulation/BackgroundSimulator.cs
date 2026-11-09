@@ -63,6 +63,11 @@ namespace RealBattery
         }
 
 
+        // Single gate for the whole RB background estimate: off by setting, or whenever Kerbalism is
+        // present, since Kerbalism then simulates unloaded vessels itself and drives RealBattery through
+        // RealBattery.BackgroundUpdate (see KerbalismSupport.cs).
+        public static bool Enabled => RealBatterySettings.EnableBackgroundSimulation && !KerbalismBridge.Active;
+
         private static HashSet<Guid> vesselsNeedingRecalculation = new HashSet<Guid>();
         private static Dictionary<Guid, VesselSnapshot> vesselSnapshots = new Dictionary<Guid, VesselSnapshot>();
         private static Dictionary<Guid, VesselEnergySnapshot> energySnapshots = new Dictionary<Guid, VesselEnergySnapshot>();
@@ -86,6 +91,12 @@ namespace RealBattery
         }
 
         public static void CaptureSnapshot(Vessel vessel)
+        {
+            if (!Enabled) return;
+            CaptureSnapshotCore(vessel);
+        }
+
+        private static void CaptureSnapshotCore(Vessel vessel)
         {
             if (vessel == null || !vessel.loaded) return;
 
@@ -330,7 +341,7 @@ namespace RealBattery
 
         public static void ApplySnapshot(Vessel vessel)
         {
-            if (!RealBatterySettings.EnableBackgroundSimulation) return;
+            if (!Enabled) return;
 
             int maxSpecialistLevel = ModuleEnergyEstimator.GetMaxSpecialistLevel(vessel, "Engineer");
             double EngBonus = 0.95 + 0.06 * maxSpecialistLevel;
@@ -624,6 +635,12 @@ namespace RealBattery
         }
 
         public static void UpdateEnergySnapshot(Vessel vessel)
+        {
+            if (!Enabled) return;
+            UpdateEnergySnapshotCore(vessel);
+        }
+
+        private static void UpdateEnergySnapshotCore(Vessel vessel)
         {
             if (vessel == null || !energySnapshots.ContainsKey(vessel.id)) return;
 

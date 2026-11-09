@@ -83,6 +83,8 @@
     <Compile Include="Background Simulation\RealBatterySnapshotManager.cs" />
     <Compile Include="Background Simulation\RealBatteryVesselModule.cs" />
     <Compile Include="Core\SystemHeatBridge.cs" />
+    <Compile Include="Core\KerbalismBridge.cs" />
+    <Compile Include="Core\KerbalismSupport.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\GameData\RealBattery\RealBattery.version" />

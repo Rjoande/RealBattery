@@ -75,6 +75,10 @@ RB's own low-power alarm (`ExpUT`) is computed from. That means:
   already accept.
 - They return `double.NaN` if no snapshot exists yet for the vessel (e.g. queried the same
   frame it first loads) — check for `NaN` before using the value.
+- With **Kerbalism** installed RB's background snapshot is never captured (Kerbalism simulates
+  unloaded vessels itself through RB's `BackgroundUpdate` hook), so these two methods and
+  `GetSecondsToEmpty` return `double.NaN` permanently in that configuration. `GetNetEcPerSecLive`
+  and the request/report methods are unaffected.
 
 `GetSecondsToEmpty` is a convenience built directly from `GetAvailableEc` /
 `GetNetEcPerSecGross` — the same quantity behind the low-power alarm's `ExpUT`, but as a plain

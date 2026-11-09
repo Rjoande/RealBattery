@@ -208,6 +208,19 @@ namespace RealBattery
                 double EC_delta_highLevel = EC_amount - EC_maxAmount * HighEClevel;  //amount of available EC for charging: 980 - 1000 * 0.95 =   30EC
                 double EC_delta_lowLevel =  EC_amount - EC_maxAmount * LowEClevel; //amount of missing EC for discharging:  500 - 1000 * 0.9  = -400EC
 
+                // Kerbalism applies its consumers/producers as one deferred total at its next Sync, so at
+                // high warp (hundreds of seconds per tick) a tick's consumption can exceed the whole EC
+                // buffer: refilling only the buffer deficit would leave EC at zero every tick. Anticipate
+                // the other brokers' net EC for this tick (from Kerbalism's last Sync) in both gates, and
+                // let RBResources clamp against it. Without Kerbalism this is a no-op.
+                if (KerbalismBridge.Active)
+                {
+                    double netOthersEc = KerbalismBridge.NetRateOfOthers(vessel, "ElectricCharge", out bool _) * TimeWarp.fixedDeltaTime;
+                    if (netOthersEc < 0.0) EC_delta_lowLevel += netOthersEc;
+                    else EC_delta_highLevel += netOthersEc;
+                    RBResources.SetAnticipatedNetEc(vessel, netOthersEc);
+                }
+
                 // -----------------------------------------------------------------
                 // CrateScale: chemistries that opt in scale their effective C-rate by the
                 // number of participating batteries, for this tick only (never persisted).
