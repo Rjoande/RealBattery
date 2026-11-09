@@ -1,11 +1,9 @@
 # Changelog
 
-## [Unreleased]
-
 ## v3.5.0
 
 ### Minor Improvements
-- **No battery option for pods and probe cores:** crewed parts and command parts that offer a choice of battery chemistry now also have a **No battery** variant in the editor ([#22](https://github.com/Rjoande/RealBattery/issues/22)) - thanks to GitHub user **ostrkrs** for the suggestion! It removes the part's built-in cells and their ElectricCharge, along with their mass and cost, for craft that already carry dedicated batteries. A part without a battery has no power of its own: once separated or isolated, it stays unpowered. Parts with a single, historically chosen chemistry keep their battery. The default variant is unchanged, so existing craft and saves are not affected.
+- **No battery option for pods and probe cores:** crewed parts and command parts that offer a choice of battery chemistry now also have a **No battery** variant in the editor ([#22](https://github.com/Rjoande/RealBattery/issues/22)) - thanks to GitHub user **ostrkrs** for the suggestion! Parts with a single, historically chosen chemistry keep their battery.
 
 ### Bugfixes
 - Selecting a non-battery variant in the editor (the new No battery option, or the non-battery variants some HabTech2, OPT and Bluedog parts already had) now always hides the battery controls, disarms the battery's staging and removes its action group entries; previously this only happened if the chemistry changed at the same time.
