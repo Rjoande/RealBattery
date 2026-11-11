@@ -25,6 +25,9 @@ namespace RealBattery
         private static Func<Vessel, string, double> _amount;
         private static Func<Vessel, string, double> _capacity;
         private static Func<Vessel, string, List<KeyValuePair<string[], double>>> _brokers;
+        // Optional (not part of KERBALISM.API): DB.KerbalismData(vessel).EnvSunlightFactor.
+        private static MethodInfo _vesselData;
+        private static PropertyInfo _sunlightFactor;
 
         public static bool Active
         {
@@ -69,6 +72,14 @@ namespace RealBattery
                 _brokers  = Bind<Func<Vessel, string, List<KeyValuePair<string[], double>>>>(api, "ResourceBrokers",
                     typeof(Vessel), typeof(string));
 
+                try
+                {
+                    Type db = api.Assembly.GetType("KERBALISM.DB", false);
+                    _vesselData = db?.GetMethod("KerbalismData", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Vessel) }, null);
+                    _sunlightFactor = _vesselData?.ReturnType.GetProperty("EnvSunlightFactor", BindingFlags.Public | BindingFlags.Instance);
+                }
+                catch { _vesselData = null; _sunlightFactor = null; }
+
                 _active = _produce != null && _consume != null && _amount != null && _capacity != null && _brokers != null;
                 if (_active)
                     RBLog.Boot("[KerbalismBridge] Kerbalism detected: EC flows routed through KERBALISM.API, RealBattery background simulation delegated to Kerbalism.");
@@ -100,6 +111,19 @@ namespace RealBattery
         }
 
         public static double Amount(Vessel v, string resource) => _amount(v, resource);
+
+        // Fraction (0..1) of the current Kerbalism step this vessel spends in sunlight, as Kerbalism
+        // computed it for its own solar panels; NaN when the internal member is not reachable.
+        public static double SunlightFactor(Vessel v)
+        {
+            if (_vesselData == null || _sunlightFactor == null) return double.NaN;
+            try
+            {
+                object vd = _vesselData.Invoke(null, new object[] { v });
+                return vd == null ? double.NaN : (double)_sunlightFactor.GetValue(vd, null);
+            }
+            catch { return double.NaN; }
+        }
 
         public static double Capacity(Vessel v, string resource) => _capacity(v, resource);
 

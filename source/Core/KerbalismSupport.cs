@@ -66,6 +66,14 @@ namespace RealBattery
             // proto resources). Valid only when the two steps are contiguous and EC isn't full.
             public double measuredOthers;
             public bool measuredValid;
+            // EC (units) that RB offered on the previous step but Kerbalism clamped away at full
+            // capacity, and the total RB production rate of that step, to hand the SC back.
+            public double surplusPrevEc;
+            public double producedPrevRate;
+            // Sunlight fraction of this step relative to the previous one (<= 1): the expected
+            // surplus from the last step is scaled by it, so charging backs off entering an eclipse.
+            public double sunNow;
+            public double sunScale;
             public double engBonus;
             public double hoursPerDay;
         }
@@ -76,6 +84,14 @@ namespace RealBattery
         private const string KbgEcKey   = "kbgEcPrev";
         private const string KbgUtKey   = "kbgUtPrev";
         private const string KbgRateKey = "kbgRatePrev";
+        private const string KbgDtKey   = "kbgDtPrev";
+        private const string KbgSunKey  = "kbgSunPrev";
+
+        // Background steps can last thousands of seconds while the consumers' rates keep moving
+        // (climatization follows day/night), so producing exactly the last known deficit lets the
+        // small EC buffer run dry within one step. RB therefore offers this much more than the
+        // expected deficit; Kerbalism discards what does not fit and the next step refunds the SC.
+        private const double KbgDischargeHeadroom = 2.0;
 
         // Chemistry parameters needed in background, resolved from the DB (by persisted or
         // prefab ChemistryID, or the B9PS subtype name) with the prefab's inline values as fallback.
@@ -120,6 +136,18 @@ namespace RealBattery
                 double chargeCap  = sc.maxAmount * (chem.infiniteCycles ? thermalCap : actualLife);
                 bool enabled = !disabled && virtualCap > 1e-9;
 
+                // Refund the part of the previous step's production that Kerbalism clamped away.
+                double ownPrev = PGet(module_snapshot, KbgRateKey, 0.0);
+                double refundSC = 0.0;
+                if (ownPrev > 0.0 && ctx.producedPrevRate > 1e-12 && ctx.surplusPrevEc > 0.0)
+                {
+                    refundSC = ctx.surplusPrevEc * (ownPrev / ctx.producedPrevRate) / EC2SCratio;
+                    refundSC = Math.Min(refundSC, Math.Max(0.0, sc.maxAmount - sc.amount));
+                    sc.amount += refundSC;
+                    if (!chem.infiniteCycles)
+                        wear = Math.Max(0.0, wear - (chem.fixedOutput ? refundSC : refundSC / ctx.engBonus));
+                }
+
                 // Kerbalism rebuilds its broker list at every Sync and never saves it, so the
                 // first step after a game load knows nothing about the consumers: a long step
                 // would then drain the EC buffer before RB reacts. Keep the last known balance in
@@ -129,6 +157,8 @@ namespace RealBattery
                 // (never less: an EC-full clamp would otherwise read as phantom consumption).
                 if (ctx.measuredValid && ctx.measuredOthers < netOthers) netOthers = ctx.measuredOthers;
                 if (ctx.netOthersKnown || ctx.measuredValid) PSet(module_snapshot, KbgNetKey, netOthers);
+                // A surplus seen on the last step (solar) only holds for the lit part of this one.
+                if (netOthers > 0.0) netOthers *= ctx.sunScale;
 
                 double dischargeRate = sc.maxAmount * chem.crate * actualLife;   // EC/s (kW)
                 if (!chem.fixedOutput) dischargeRate *= ctx.engBonus;
@@ -140,9 +170,9 @@ namespace RealBattery
                 if (enabled && sc.amount > EPS && (chem.fixedOutput ||
                     netOthers < -EPS || ctx.ecAmount < ctx.ecCapacity * chem.lowLevel))
                 {
-                    // Cover the others' deficit plus the gap below the discharge threshold.
-                    double want = Math.Max(0.0, -netOthers)
-                                + Math.Max(0.0, ctx.ecCapacity * chem.lowLevel - ctx.ecAmount) / elapsed_s;
+                    // Offer the others' expected deficit with headroom, plus whatever refills the buffer.
+                    double want = Math.Max(0.0, -netOthers) * KbgDischargeHeadroom
+                                + Math.Max(0.0, ctx.ecCapacity - ctx.ecAmount) / elapsed_s;
                     double rate = chem.fixedOutput ? dischargeRate : Math.Min(dischargeRate, share * want);
                     rate = Math.Min(rate, sc.amount * EC2SCratio / elapsed_s);
                     if (rate > 1e-9)
@@ -219,13 +249,15 @@ namespace RealBattery
                 PSet(module_snapshot, KbgEcKey, ctx.ecAmount);
                 PSet(module_snapshot, KbgUtKey, ctx.ut);
                 PSet(module_snapshot, KbgRateKey, ecRate);
+                PSet(module_snapshot, KbgDtKey, elapsed_s);
+                if (!double.IsNaN(ctx.sunNow)) PSet(module_snapshot, KbgSunKey, ctx.sunNow);
 
                 if (RBLog.VerboseEnabled && (Math.Abs(ecRate) > 1e-12 || ctx.ecAmount < ctx.ecCapacity * chem.lowLevel))
                     RBLog.Verbose($"[KerbalismBG] '{v.vesselName}' / '{part_snapshot.partInfo?.title}': " +
                                   $"EC {ecRate:+0.000;-0.000} EC/s over {elapsed_s:F2}s, vesselEC={ctx.ecAmount:F2}/{ctx.ecCapacity:F2}, " +
                                   $"SC={sc.amount:F3}/{sc.maxAmount:F3} kWh, netOthers={netOthers:F3}" +
                                   $"{(ctx.netOthersKnown ? "" : " (stored)")}{(ctx.measuredValid ? $" measured={ctx.measuredOthers:F3}" : "")}, " +
-                                  $"share={share:P0}, brokers=[{KerbalismBridge.DescribeBrokers(v, "ElectricCharge")}]");
+                                  $"share={share:P0}, refund={refundSC:F4} kWh, sun={ctx.sunNow:F2}x{ctx.sunScale:F2}, brokers=[{KerbalismBridge.DescribeBrokers(v, "ElectricCharge")}]");
             }
             catch (Exception ex)
             {
@@ -242,7 +274,7 @@ namespace RealBattery
             var ctx = new KbgVesselContext { vesselId = v.id, ut = ut };
             bool wearOn = RealBatterySettings.EnableBatteryWear;
 
-            double ecPrev = double.NaN, utPrev = double.NaN, ownRatePrev = 0.0;
+            double ecPrev = double.NaN, utPrev = double.NaN, dtStored = double.NaN, sunPrev = double.NaN, ownRatePrev = 0.0, producedPrev = 0.0;
             if (v.protoVessel != null)
             {
                 foreach (ProtoPartSnapshot p in v.protoVessel.protoPartSnapshots)
@@ -253,10 +285,13 @@ namespace RealBattery
                     {
                         if (m.moduleName != nameof(RealBattery)) continue;
                         ownRatePrev += PGet(m, KbgRateKey, 0.0);
+                        producedPrev += Math.Max(0.0, PGet(m, KbgRateKey, 0.0));
                         if (double.IsNaN(ecPrev))
                         {
                             ecPrev = PGet(m, KbgEcKey, double.NaN);
                             utPrev = PGet(m, KbgUtKey, double.NaN);
+                            dtStored = PGet(m, KbgDtKey, double.NaN);
+                            sunPrev = PGet(m, KbgSunKey, double.NaN);
                         }
                         if (PGetBool(m, "BatteryDisabled", false) || PGetBool(m, "forcedRunawayActive", false)) break;
                         ctx.totalVirtualCap += sc.maxAmount * (wearOn ? PGet(m, "BatteryLife", 1.0) : 1.0);
@@ -283,6 +318,20 @@ namespace RealBattery
                     ctx.measuredValid = true;
                 }
             }
+            // Surplus of the previous step: what RB offered minus what the EC level shows was taken.
+            // The bookkeeping keys are dropped whenever the vessel gets loaded (unknown module
+            // values are not re-saved), so finding them means the previous step was a background one.
+            if (ctx.netOthersKnown && producedPrev > 1e-12 && !double.IsNaN(ecPrev) && !double.IsNaN(dtStored) && dtStored > 0.0)
+            {
+                double offered = producedPrev * dtStored;
+                double accepted = (ctx.ecAmount - ecPrev) - (ctx.netOthers + (ownRatePrev - producedPrev)) * dtStored;
+                ctx.surplusPrevEc = Math.Max(0.0, Math.Min(offered, offered - accepted));
+                ctx.producedPrevRate = producedPrev;
+            }
+            ctx.sunNow = KerbalismBridge.SunlightFactor(v);
+            ctx.sunScale = 1.0;
+            if (!double.IsNaN(ctx.sunNow))
+                ctx.sunScale = (!double.IsNaN(sunPrev) && sunPrev > 0.01) ? Math.Min(1.0, ctx.sunNow / sunPrev) : Math.Min(1.0, ctx.sunNow);
             ctx.engBonus = 0.95 + 0.06 * ModuleEnergyEstimator.GetMaxSpecialistLevel(v, "Engineer");
             ctx.hoursPerDay = RealBatterySettings.GetHoursPerDay();
 
