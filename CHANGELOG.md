@@ -1,6 +1,6 @@
 # Changelog
 
-## v3.5.0
+[Unreleased]
 
 ### Minor Improvements
 - **No battery option for pods and probe cores:** crewed parts and command parts that offer a choice of battery chemistry now also have a **No battery** variant in the editor ([#22](https://github.com/Rjoande/RealBattery/issues/22)) - thanks to GitHub user **ostrkrs** for the suggestion! Parts with a single, historically chosen chemistry keep their battery.
@@ -8,6 +8,12 @@
 ### Bugfixes
 - Selecting a non-battery variant in the editor (the new No battery option, or the non-battery variants some HabTech2, OPT and Bluedog parts already had) now always hides the battery controls, disarms the battery's staging and removes its action group entries; previously this only happened if the chemistry changed at the same time.
 - A part without a battery no longer offers EVA refurbishing and no longer appears in the MFD battery lists.
+
+## v3.4.5
+
+### Compatibility
+- **Kerbalism is now supported.** RealBattery used to clash with Kerbalism's own resource simulation; the two now work together out of the box, at any time warp and on unloaded vessels too. With Kerbalism installed, its low/empty battery warnings replace RealBattery's background estimate and depletion alarms (the related options are greyed out). Nothing changes without Kerbalism. Thanks to GitHub user **Xandaros** for his feedback ([#20](https://github.com/Rjoande/RealBattery/issues/20)).
+- `ChemistryID` is now persisted in the save (needed by the Kerbalism background hook); existing saves are migrated transparently.
 
 ## v3.4.4
 

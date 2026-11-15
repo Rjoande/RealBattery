@@ -13,6 +13,10 @@ namespace RealBattery
         {
             base.OnLoad(node);
 
+            // With Kerbalism the background estimate is not used (RealBattery.BackgroundUpdate runs
+            // instead): a stale REALBATTERY_ENERGY node from an older save must not be carried on.
+            if (KerbalismBridge.Active) return;
+
             if (snapshotLoaded)
                 return;
 
@@ -70,7 +74,7 @@ namespace RealBattery
         {
             base.OnStart();
 
-            if (snapshotNode != null)
+            if (snapshotNode != null && !KerbalismBridge.Active)
             {
                 // Restore only — do NOT also call UpdateEnergySnapshot here. ApplySnapshot (run
                 // shortly after via RealBatterySnapshotManager.DelayedApplyAllSnapshots, which
@@ -104,6 +108,8 @@ namespace RealBattery
         protected override void OnSave(ConfigNode node)
         {
             base.OnSave(node);
+
+            if (KerbalismBridge.Active) return;
 
             // Called when saving vessel snapshot
             var snap = BackgroundSimulator.GetEnergySnapshot(vessel.id);

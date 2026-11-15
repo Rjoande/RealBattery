@@ -45,6 +45,7 @@ To install an extra, simply place the corresponding patch into your `GameData` f
 - [System Monitor (Dynamic Battery Storage)](https://github.com/post-kerbin-mining-corporation/DynamicBatteryStorage/releases)
 - [DangIt! Continued](https://github.com/linuxgurugamer/DangIt/releases)
 - [Bon Voyage](https://github.com/jarosm/KSP-BonVoyage) (requires [Harmony](https://github.com/KSPModdingLibs/HarmonyKSP))
+- [Kerbalism](https://github.com/Kerbalism/Kerbalism) *(fully supported, see below)*
 - [Conformal Decals](https://git.offworldcolonies.nexus/drewcassidy/KSP-Conformal-Decals/releases)
 - [LoadingTipsPlus](https://forum.kerbalspaceprogram.com/topic/142840-110x-loadingtipsplus-v198-17th-oct-2020/) (shows RealBattery's loading-screen tips; no longer bundled — installed automatically by CKAN, otherwise install it manually)
 - [MFD Extended](https://github.com/Rjoande/MFD-Extension) *(adds an in-IVA battery management screen — see below; RealBattery works identically without it)*
@@ -69,6 +70,7 @@ RealBattery Recharged dynamically applies to any part with ElectricCharge, inclu
 Known compatibility or special support includes:
 
 - Bon Voyage
+- Kerbalism
 - Airplane Plus
 - Planetside Exploration Technologies
 - Artemis Construction Kit
@@ -98,6 +100,16 @@ Bon Voyage's rover autopilot needs to know how much battery capacity a vessel ha
 
 - **Native support** (preferred): a pull request to [Bon Voyage /L](https://github.com/net-lisias-ksp/BonVoyage) teaches it to read RealBattery's `StoredCharge` directly. If you're running a Bon Voyage build that already includes it, that's what you're using — nothing else is involved.
 - **Fallback bridge**: for players on a Bon Voyage build that predates native support, RealBattery ships an optional companion plugin, `RealBatteryBVBridge.dll`, that applies the same integration at runtime via [HarmonyKSP](https://github.com/KSPModdingLibs/HarmonyKSP). It only activates if both Bon Voyage and HarmonyKSP are installed, and automatically detects and steps aside if it finds native support already present — so upgrading Bon Voyage never causes the two to conflict. If HarmonyKSP isn't installed, RealBattery itself is entirely unaffected; only this optional bridge is inactive.
+
+### Kerbalism compatibility
+
+Kerbalism runs its own resource simulation (deferred, vessel-wide, and continuing on unloaded vessels) and warns about any producer that bypasses it on a loaded vessel above 1000x warp. When Kerbalism is installed RealBattery adapts automatically:
+
+- all ElectricCharge the batteries deliver or absorb goes through Kerbalism's resource system, so no *"incoherent behavior"* warning and no forced warp drop; a **RealBattery** entry shows up among the ElectricCharge producers/consumers in Kerbalism's UI;
+- batteries on **unloaded vessels** are simulated by Kerbalism through RealBattery's background hook: they keep powering life support, comms and processes while the vessel is away, with wear and self-discharge applied, and no spurious "life support off" while StoredCharge is still available;
+- RealBattery's own background estimate, depletion alarms and low-power toast are switched off (Kerbalism's low/empty battery messages take over), and the related difficulty options are greyed out with a note. `RESOURCE_EXTRA` flows are not simulated on unloaded vessels in this configuration.
+
+Everything else (chemistries, charge/discharge thresholds, wear, thermal effects, EVA service, staging, MFD pages) behaves exactly as without Kerbalism. You don't need to change Kerbalism's `EnforceCoherency` setting.
 
 ### MFD Extended integration
 
