@@ -112,7 +112,7 @@ namespace RealBattery
         // --- v3 Chemistry DB fields -------------------------------------------------
         // ChemistryID: if non-empty, all parameters below are populated from the DB.
         // Falls back to inline cfg values when empty or ID not found (full v2 compat).
-        [KSPField(isPersistant = false)] public string ChemistryID = "";
+        [KSPField(isPersistant = true)] public string ChemistryID = "";  // persisted so Kerbalism BackgroundUpdate can read it from the proto module
         // KeepWarmMode replaces the v2 bool KeepWarm; "false" | "warm" | "cryo"
         [KSPField(isPersistant = false)] public string KeepWarmMode   = RBDefaults.KeepWarmMode;
         [KSPField(isPersistant = false)] public float  TempKeepWarmLo = RBDefaults.TempKeepWarmLo;     // K: lower upkeep threshold
@@ -447,6 +447,7 @@ namespace RealBattery
             TechUnlockUI();
 
             _rbVolume = ReadPartVolumeL();
+            EnforceScFlowState();
 
             // 7) Edge detectors & final UI state
             lastDisabled = BatteryDisabled; // initialize edge detector
@@ -766,7 +767,7 @@ namespace RealBattery
                     {
                         //double dischargeKW = (sc?.maxAmount ?? 0.0) * Crate * ActualLife;
                         double wantEC = KeepWarmECperSec(isWarmupPhase: false, (sc?.maxAmount ?? 0.0)) * dt;
-                        double gotEC = (wantEC > 0.0) ? part.RequestResource(PartResourceLibrary.ElectricityHashcode, wantEC) : 0.0;
+                        double gotEC = (wantEC > 0.0) ? RBResources.Request(part, PartResourceLibrary.ElectricityHashcode, wantEC) : 0.0;
                         
                         bool upkeepNeeded = wantEC > EPS;                   // temp < 600 K
                         upkeepShort = upkeepNeeded && (gotEC < wantEC * 0.999);
@@ -1414,17 +1415,17 @@ namespace RealBattery
                 double SOC_ChargeEfficiency = ChargeEfficiencyCurve.Evaluate((float)SC_SOC);
                 EC_delta = TimeWarp.fixedDeltaTime * DischargeRate * SOC_ChargeEfficiency;  // maximum amount of EC the battery can convert to SC, limited by current charge capacity
 
-                EC_delta = part.RequestResource(PartResourceLibrary.ElectricityHashcode, Math.Min(EC_delta, amount));
+                EC_delta = RBResources.Request(part, PartResourceLibrary.ElectricityHashcode, Math.Min(EC_delta, amount));
 
                 SC_delta = -EC_delta / EC2SCratio;                  // SC_delta = -1EC / 10EC/SC * 0.9 = -0.09SC
-                SC_delta = part.RequestResource(SC_ID, SC_delta);   // actual SC accepted (negative); may fall short of the request if the battery is near full
+                SC_delta = RequestSC(SC_delta);   // actual SC accepted (negative); may fall short of the request if the battery is near full
 
                 // Overfill guard: if the battery couldn't accept the full planned SC (near-full
                 // capacity), give back the unconverted EC to the network instead of destroying it.
                 double excessEC = EC_delta + SC_delta * EC2SCratio;
                 if (excessEC > EPS)
                 {
-                    part.RequestResource(PartResourceLibrary.ElectricityHashcode, -excessEC);
+                    RBResources.Request(part, PartResourceLibrary.ElectricityHashcode, -excessEC);
                     EC_delta -= excessEC;
                 }
 
@@ -1437,17 +1438,17 @@ namespace RealBattery
                 if (!FixedOutput)
                 {
                     // Normal discharge: cap by demand (-amount)
-                    SC_delta = part.RequestResource(SC_ID, Math.Min(SC_delta, -amount / EC2SCratio)); // requesting SC; positive return value
+                    SC_delta = RequestSC(Math.Min(SC_delta, -amount / EC2SCratio)); // requesting SC; positive return value
                 }
                 else
                 {
                     // Fixed output: always consume up to the max allowed this tick
-                    SC_delta = part.RequestResource(SC_ID, SC_delta); // requesting SC; positive return value
+                    SC_delta = RequestSC(SC_delta); // requesting SC; positive return value
                 }
 
                 // Try to inject EC; if vessel EC is full, this may return 0
                 EC_delta = -SC_delta * EC2SCratio;          // target EC to inject (negative = add to network)
-                double EC_accepted = part.RequestResource(PartResourceLibrary.ElectricityHashcode, EC_delta);
+                double EC_accepted = RBResources.Request(part, PartResourceLibrary.ElectricityHashcode, EC_delta);
 
                 // Report thermal/power using *chemical* output when FixedOutput is true,
                 // otherwise use the *accepted* electrical power.
@@ -1489,11 +1490,11 @@ namespace RealBattery
                     {
                         // Negative request = inject into the vessel; excess (full/unreachable
                         // tanks) is not stored and is effectively dumped.
-                        double produced = part.RequestResource(req.name, -requested);
+                        double produced = RBResources.Request(part, req.name, -requested);
                     }
                     else // "input"
                     {
-                        double received = part.RequestResource(req.name, requested);
+                        double received = RBResources.Request(part, req.name, requested);
                     }
                 }
             }
@@ -1929,7 +1930,7 @@ namespace RealBattery
             double socLossPerSecond = socLossPerDay / (hoursPerDay * 3600.0);
 
             double SC_loss   = socLossPerSecond * part.Resources["StoredCharge"].maxAmount;
-            double actualLoss = part.RequestResource("StoredCharge", SC_loss);
+            double actualLoss = RequestSC(SC_loss);
 
             if (part.Resources["StoredCharge"].maxAmount > 0.0)
                 SC_SOC = part.Resources["StoredCharge"].amount / part.Resources["StoredCharge"].maxAmount;
@@ -2159,7 +2160,7 @@ namespace RealBattery
             double ecPerSec = KeepWarmECperSec(isWarmupPhase, sc?.maxAmount ?? 0.0);
                         if (ecPerSec <= EPS) return 0.0; // hot enough or negligible cost
             double wantEC = ecPerSec * dt;
-            double gotEC = (wantEC > 0.0) ? part.RequestResource(PartResourceLibrary.ElectricityHashcode, wantEC) : 0.0;
+            double gotEC = (wantEC > 0.0) ? RBResources.Request(part, PartResourceLibrary.ElectricityHashcode, wantEC) : 0.0;
                 return Math.Max(0.0, gotEC);
         }
         private double KeepWarmECperSec(bool isWarmupPhase, double capacity)

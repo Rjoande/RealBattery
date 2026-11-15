@@ -82,6 +82,20 @@ namespace RealBattery
             }
         }
 
+        // Kerbalism (CLR assembly name "Kerbalism"). The bridge itself may still be inactive if the
+        // API shape differs: use KerbalismBridge.Active for behaviour, this only for presence.
+        private static bool? _kerbalismAvailable;
+        public static bool KerbalismAvailable
+        {
+            get
+            {
+                if (_kerbalismAvailable.HasValue) return _kerbalismAvailable.Value;
+                try { _kerbalismAvailable = AssemblyLoader.loadedAssemblies.Any(a => a.assembly != null && a.assembly.GetName().Name == "Kerbalism"); }
+                catch { _kerbalismAvailable = false; }
+                return _kerbalismAvailable.Value;
+            }
+        }
+
         private static bool? _kacInstalled;
         public static bool KACIsInstalled()
         {
@@ -238,8 +252,15 @@ namespace RealBattery
         [GameParameters.CustomParameterUI("#LOC_RB_Settings_CosmeticToasts", toolTip = "#LOC_RB_Settings_CosmeticToasts_tip")]
         public bool enableCosmeticToasts = true;
 
+        // Read-only notice, shown only when Kerbalism is installed: its background simulation replaces
+        // RealBattery's, so the background and depletion-alarm options above are frozen (see Interactible).
+        [GameParameters.CustomParameterUI("#LOC_RB_Settings_KerbalismMode", toolTip = "#LOC_RB_Settings_KerbalismMode_tip")]
+        public bool kerbalismModeActive = true;
+
         public override bool Enabled(MemberInfo member, GameParameters parameters)
         {
+            if (member.Name == nameof(kerbalismModeActive))
+                return RealBatterySettings.KerbalismAvailable;
             return true;
         }
 
@@ -260,8 +281,18 @@ namespace RealBattery
             if (member.Name == nameof(enableThermalRunaway))
                 return enableHeatSimulation;
 
+            if (member.Name == nameof(kerbalismModeActive))
+                return false;
+
+
+            // Depletion alarms come from the RB background estimate, which Kerbalism replaces.
+
+            if (member.Name == nameof(enableLowPowerAlarm))
+                return !KerbalismBridge.Active;
+
+
             if (member.Name == nameof(useKACAlarms))
-                return enableLowPowerAlarm && RealBatterySettings.KACIsInstalled();
+                return enableLowPowerAlarm && RealBatterySettings.KACIsInstalled() && !KerbalismBridge.Active;
 
             return true;
         }
@@ -359,5 +390,13 @@ namespace RealBattery
 
         [GameParameters.CustomParameterUI("#LOC_RB_VerboseLog", toolTip = "#LOC_RB_VerboseLog_desc")]
         public bool enableVerboseLoadLogs = false;
+
+        // The RB background estimate is bypassed entirely with Kerbalism: freeze its switch.
+        public override bool Interactible(MemberInfo member, GameParameters parameters)
+        {
+            if (member.Name == nameof(disableBackgroundSimulation))
+                return !KerbalismBridge.Active;
+            return true;
+        }
     }
 }

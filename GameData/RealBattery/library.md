@@ -444,3 +444,24 @@ You can copy the values from the `DATA` node to the main RealBattery module (sho
             }
         }
 ```
+
+## Kerbalism
+
+When Kerbalism is installed RealBattery detects it at runtime (no patch needed) and:
+
+- routes every `ElectricCharge` (and `RESOURCE_EXTRA`) request of loaded vessels through
+  `KERBALISM.API` instead of `Part.RequestResource`, so Kerbalism never sees RealBattery as an
+  "incoherent" producer at high warp;
+- keeps `StoredCharge` outside Kerbalism's resource cache (its `flowState` is turned off and
+  the module moves it directly), since Kerbalism's vessel-wide balancing would not respect
+  per-part state of charge, primary cells or wear;
+- exposes the static `BackgroundUpdate(...)` hook Kerbalism calls on unloaded vessels, which
+  discharges/charges each battery against Kerbalism's own EC balance, applies wear and
+  self-discharge, and writes the persistent fields back to the proto module. `RESOURCE_EXTRA`
+  inputs/outputs are **not** simulated there. RealBattery's own `BackgroundSimulator`,
+  depletion alarms and low-power toast are disabled in this configuration.
+
+`ChemistryID` is persisted so the background hook can resolve the chemistry from the proto
+module; for parts switched through B9PartSwitch the `SUBTYPE` name must keep matching the
+`ChemistryID` (already a RealBattery convention), which is also the fallback for saves made
+before this field was persisted.

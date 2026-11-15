@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## v3.4.5
+
+### Compatibility
+- **Kerbalism is now supported.** RealBattery used to clash with Kerbalism's own resource simulation; the two now work together out of the box, at any time warp and on unloaded vessels too. With Kerbalism installed, its low/empty battery warnings replace RealBattery's background estimate and depletion alarms (the related options are greyed out). Nothing changes without Kerbalism. Thanks to GitHub user **Xandaros** for his feedback ([#20](https://github.com/Rjoande/RealBattery/issues/20)).
+- `ChemistryID` is now persisted in the save (needed by the Kerbalism background hook); existing saves are migrated transparently.
 
 ## v3.4.4
 
