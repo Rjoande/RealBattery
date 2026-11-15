@@ -1,9 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## v3.4.5
 
 ### Compatibility
-- **Kerbalism:** fixed the *"A producer of ElectricCharge has incoherent behavior at high warp speed"* warning (and the forced drop to 1000x warp) that Kerbalism raised whenever a RealBattery discharged on a loaded vessel ([#20](https://github.com/Rjoande/RealBattery/issues/20)). With Kerbalism installed RealBattery now routes all its ElectricCharge flows through Kerbalism's resource system, and batteries on unloaded vessels are simulated by Kerbalism itself through RealBattery's `BackgroundUpdate` hook: they keep feeding Kerbalism's life support, comms and processes while the vessel is away, with wear and self-discharge applied per step, and no more "life support off" on vessels whose StoredCharge is actually full. RealBattery's own background estimate, depletion alarms and low-power toast are disabled in that configuration (Kerbalism posts its own battery warnings); the corresponding difficulty options are greyed out with a note. Nothing changes without Kerbalism. `RESOURCE_EXTRA` flows are not simulated on unloaded vessels under Kerbalism.
+- **Kerbalism is now supported.** RealBattery used to clash with Kerbalism's own resource simulation; the two now work together out of the box, at any time warp and on unloaded vessels too. With Kerbalism installed, its low/empty battery warnings replace RealBattery's background estimate and depletion alarms (the related options are greyed out). Nothing changes without Kerbalism. Thanks to GitHub user **Xandaros** for his feedback ([#20](https://github.com/Rjoande/RealBattery/issues/20)).
 - `ChemistryID` is now persisted in the save (needed by the Kerbalism background hook); existing saves are migrated transparently.
 
 ## v3.4.4
