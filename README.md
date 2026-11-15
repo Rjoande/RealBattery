@@ -29,6 +29,7 @@ Optional patches are included in the release to enhance immersion and realism. E
 - **EC-to-current** and **EC-to-kW** localization packs: rename *Electric Charge* to *Electric Current*, or alternatively to *kW/kWh* (replacing EC/SC with power units). **Only install one at a time!** See the [wiki](https://github.com/Rjoande/RealBattery/wiki/Understanding-EC-and-SC-Units) for details.
 - **Electric-pump-fed Engines**: the *Goldfish* and *Angora* engines from [Near Future Launch Vehicles](https://github.com/post-kerbin-mining-corporation/NearFutureLaunchVehicles/releases) now require electric charge to operate.
 - **Fuel Cell Output**: fuel cells internal buffer aligns with actual electrical output.
+- **Remove toasted decals**: removes the burnt-looking "toasted" variants from the battery label decals, leaving only the clean ones.
 
 To install an extra, simply place the corresponding patch into your `GameData` folder. See the `Extras/` folder in the release package for details.
 
@@ -52,13 +53,13 @@ To install an extra, simply place the corresponding patch into your `GameData` f
 
 ## Installation
 
-**Via [CKAN](https://github.com/KSP-CKAN/CKAN)** (recommended): search for `RealBattery` — dependencies are installed automatically. The `Extras/` patches are not installed by CKAN; copy them manually from the release zip if you want them.
+**Via [CKAN](https://github.com/KSP-CKAN/CKAN)**: coming soon — RealBattery Recharged is awaiting indexing. Once listed, search for `RealBattery` and dependencies will be installed automatically. The `Extras/` patches are not installed by CKAN; copy them manually from the release zip if you want them.
 
 **Manually:**
 
 1. Remove any previous `RealBattery` install.
-3. Download the latest release from the [Releases](https://github.com/Rjoande/RealBattery/releases) page.
-2. Extract into your `GameData` folder.
+2. Download the latest release from the [Releases](https://github.com/Rjoande/RealBattery/releases/latest) page.
+3. Extract into your `GameData` folder.
 4. Ensure [dependencies](#dependencies) are installed.
 5. (Optional) Install the [extras](#extras) as you like.
 
@@ -113,18 +114,19 @@ Everything else (chemistries, charge/discharge thresholds, wear, thermal effects
 
 ### MFD Extended integration
 
-If [MFD Extended](https://github.com/Rjoande/MFD-Extension) is installed, RealBattery ships its own **BMS** bay on the shared IVA multi-function display — no configuration needed, it's detected automatically. It has two screens, reached by pressing the BMS button on the monitor:
+If [MFD Extended](https://github.com/Rjoande/MFD-Extension) is installed, RealBattery ships its own **BMS** bay on the shared IVA multi-function display — no configuration needed, it's detected automatically. It has three screens, cycled with the BMS button or the NEXT/PREV softkeys (EPS → BATT → FLEET → EPS):
 
-- **Battery Management** (the default view): the active vessel's overall charge, net power, and time to depletion, plus a per-battery table with chemistry, charge, health, and any fault state (overheating, thermal runaway, disabled, etc.).
-- **Fleet Overview**: press the BMS button again to switch here. Shows every RealBattery-equipped vessel in the save at a glance — charge, net rate, and time-to-empty, marked as live data or an estimate depending on whether that vessel is currently loaded — sorted alphabetically with your own ship pinned at the top. Press BMS again to go back.
+- **EPS Summary** (the entry page): a vessel-wide power dashboard — a bidirectional LOAD gauge (draw or charge vs. the batteries' rated capacity), RESERVE, an EC LEVEL indicator, expected time to depletion (EXP TIME), and battery/fault counts.
+- **Battery Management**: the active vessel's overall charge, net power, and time to depletion, plus a per-battery table with chemistry, charge, health, and any fault state (overheating, thermal runaway, disabled, etc.).
+- **Fleet Overview**: every RealBattery-equipped vessel in the save at a glance — charge, net rate, and time-to-empty, marked as live data or an estimate depending on whether that vessel is currently loaded — sorted alphabetically with your own ship pinned at the top.
 
-Both screens support scrolling through longer lists with the monitor's own onscreen keys. Without MFD Extended installed, RealBattery behaves identically in every other respect.
+Longer lists scroll with the monitor's UP/DOWN/HOME keys. With [System Monitor (Dynamic Battery Storage)](https://github.com/post-kerbin-mining-corporation/DynamicBatteryStorage/releases) installed, the EPS Summary leaves EC LEVEL to that mod's own ELEC page. Without MFD Extended installed, RealBattery behaves identically in every other respect.
 
 ## Contributing
 
 Pull requests, translations, and feedback are welcome!  
 Please fork the repository and submit a PR against the `master` branch.  
-To report bugs or suggest features, open an issue or post in the [KSP Forum Thread](https://forum.kerbalspaceprogram.com/topic/227955-112x-realbattery-recharged-v2-realistic-battery-simulation/).
+To report bugs or suggest features, open an issue or post in the [KSP Forum Thread](https://forum.kerbalspaceprogram.com/topic/227955-112x-realbattery-recharged-v3-realistic-battery-simulation/).
 
 ## Translations
 
