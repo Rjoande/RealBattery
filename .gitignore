@@ -265,3 +265,6 @@ netkan.exe
 
 # KSP-generated part icon thumbnails
 /@thumbs/
+
+# Local maintainer scripts (e.g. radar chart generator) — not shipped with the mod.
+/tools/
