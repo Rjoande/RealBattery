@@ -10,12 +10,23 @@ namespace RealBattery
         private static bool _cached;
         private static Type _moduleType;
         private static MethodInfo _addFluxMethod;
-        private static FieldInfo _moduleUsedField;
+        private static MethodInfo _setEnabledMethod;
+        private static FieldInfo _moduleIdField;
+        private static PropertyInfo _loopProp;
+        private static PropertyInfo _loopConvFluxProp;
+        private static PropertyInfo _loopConvTempProp;
+
+        // moduleID of the ModuleSystemHeat that RealBattery's own patch adds to battery parts.
+        internal const string ModuleId = "ModuleSystemHeatRealBattery";
 
         // Per-module BaseField cache for currentLoopTemperature, keyed by PartModule instance.
         // ConditionalWeakTable ties entry lifetime to the key (the SystemHeat module) so entries
         // for destroyed parts are collected automatically — no manual cache invalidation needed.
         private static readonly ConditionalWeakTable<PartModule, BaseField> _loopTempFieldCache =
+            new ConditionalWeakTable<PartModule, BaseField>();
+
+        // Same cache for nominalLoopTemperature.
+        private static readonly ConditionalWeakTable<PartModule, BaseField> _loopNominalFieldCache =
             new ConditionalWeakTable<PartModule, BaseField>();
 
         public static bool Available => RealBatterySettings.SystemHeatAvailable; // already guarded by the AssemblyLoader check there
@@ -39,10 +50,20 @@ namespace RealBattery
                     types: new[] { typeof(string), typeof(float), typeof(float), typeof(bool) },
                     modifiers: null
                 );
-                // moduleUsed is a plain public field on ModuleSystemHeat (not a KSPField, not a
-                // property) — GetField, not GetProperty. Using GetProperty here always returned
-                // null, silently no-opping MarkUsed()/AddFlux()'s "mark used" side effect.
-                _moduleUsedField = _moduleType.GetField("moduleUsed", BindingFlags.Instance | BindingFlags.Public);
+                _setEnabledMethod = _moduleType.GetMethod(
+                    "SetSystemHeatModuleEnabled",
+                    BindingFlags.Instance | BindingFlags.Public,
+                    binder: null,
+                    types: new[] { typeof(bool) },
+                    modifiers: null
+                );
+                _moduleIdField = _moduleType.GetField("moduleID", BindingFlags.Instance | BindingFlags.Public);
+
+                // HeatLoop exposes the convection terms SystemHeat's own radiators use.
+                _loopProp = _moduleType.GetProperty("Loop", BindingFlags.Instance | BindingFlags.Public);
+                Type loopType = _loopProp?.PropertyType;
+                _loopConvFluxProp = loopType?.GetProperty("ConvectionFlux", BindingFlags.Instance | BindingFlags.Public);
+                _loopConvTempProp = loopType?.GetProperty("ConvectionTemperature", BindingFlags.Instance | BindingFlags.Public);
             }
             catch
             {
@@ -51,7 +72,9 @@ namespace RealBattery
             }
         }
 
-        // Returns the PartModule instance if present on the part.
+        // Returns RealBattery's own ModuleSystemHeat on the part (matched by moduleID), so a
+        // heat module that another mod put on the same part is never driven or switched off by
+        // mistake. Falls back to the first ModuleSystemHeat for parts configured without our ID.
         public static PartModule GetModule(Part part)
         {
             if (part == null) return null;
@@ -60,8 +83,16 @@ namespace RealBattery
             EnsureCache();
             if (_moduleType == null) return null;
 
-            // KSP provides a string lookup that doesn't require the type.
-            return part.Modules.GetModule("ModuleSystemHeat");
+            PartModule first = null;
+            for (int i = 0; i < part.Modules.Count; i++)
+            {
+                PartModule pm = part.Modules[i];
+                if (pm == null || pm.moduleName != "ModuleSystemHeat") continue;
+                if (first == null) first = pm;
+                if (_moduleIdField != null && (_moduleIdField.GetValue(pm) as string) == ModuleId)
+                    return pm;
+            }
+            return first;
         }
 
         private static BaseField ResolveLoopTempField(PartModule sh) =>
@@ -81,20 +112,69 @@ namespace RealBattery
             return true;
         }
 
-        public static void MarkUsed(PartModule sh)
+        private static BaseField ResolveLoopNominalField(PartModule sh) =>
+            sh.Fields?["nominalLoopTemperature"];
+
+        // Nominal (target) temperature of the loop the module is on.
+        public static bool TryGetLoopNominalK(PartModule sh, out float nominalK)
         {
-            if (sh == null) return;
+            nominalK = 0f;
+            if (sh == null) return false;
+
+            BaseField f = _loopNominalFieldCache.GetValue(sh, ResolveLoopNominalField);
+            if (f == null) return false;
+
+            var v = f.GetValue(sh);
+            if (v == null) return false;
+            nominalK = Convert.ToSingle(v);
+            return true;
+        }
+
+        // Adds the module to (or removes it from) SystemHeat's simulation through SystemHeat's
+        // own switch, which also shows/hides the module's PAW group. Returns false when the call
+        // could not be made, so the caller can retry on a later tick.
+        public static bool SetEnabled(PartModule sh, bool enabled)
+        {
+            if (sh == null) return false;
 
             EnsureCache();
-            if (_moduleUsedField == null) return;
+            if (_setEnabledMethod == null) return false;
 
             try
             {
-                _moduleUsedField.SetValue(sh, true);
+                _setEnabledMethod.Invoke(sh, new object[] { enabled });
+                return true;
             }
             catch
             {
-                // Never throw.
+                // Never throw (e.g. SystemHeat's simulator not available yet).
+                return false;
+            }
+        }
+
+        // Reads the loop's convection terms: convFlux is SystemHeat's convective coefficient
+        // (kW per K per m2 of convective area, before the part and area factors) and ambientK the
+        // external temperature (space temperature in vacuum). False when the loop is not ready.
+        public static bool TryGetLoopConvection(PartModule sh, out float convFlux, out float ambientK)
+        {
+            convFlux = 0f;
+            ambientK = 0f;
+            if (sh == null) return false;
+
+            EnsureCache();
+            if (_loopProp == null || _loopConvFluxProp == null || _loopConvTempProp == null) return false;
+
+            try
+            {
+                object loop = _loopProp.GetValue(sh, null);
+                if (loop == null) return false;
+                convFlux = (float)_loopConvFluxProp.GetValue(loop, null);
+                ambientK = (float)_loopConvTempProp.GetValue(loop, null);
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -111,9 +191,6 @@ namespace RealBattery
 
             try
             {
-                // Mark module used if possible.
-                _moduleUsedField?.SetValue(sh, true);
-
                 _addFluxMethod.Invoke(sh, new object[] { source, targetK, fluxW, useForNominal });
             }
             catch
