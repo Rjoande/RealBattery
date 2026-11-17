@@ -16,7 +16,7 @@ namespace RealBattery
         {
             tempK = 0f;
             // Loaded module path
-            var sh = part?.Modules?.GetModule("ModuleSystemHeat");
+            var sh = SystemHeatBridge.GetModule(part);
             if (sh != null)
             {
                 var f = sh.Fields["currentLoopTemperature"] ?? sh.Fields["loopTemperature"];
@@ -150,6 +150,7 @@ namespace RealBattery
                 {
                     var pm = part.Modules["RealBattery"];
                     if (pm == null) continue;
+                    if (pm is RealBattery rbActive && !rbActive.moduleActive) continue; // "No battery" subtype
 
                     bool isEnabled = true;
                     var disabledField = pm.Fields["BatteryDisabled"];
