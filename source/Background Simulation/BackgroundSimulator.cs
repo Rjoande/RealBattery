@@ -16,7 +16,7 @@ namespace RealBattery
         {
             tempK = 0f;
             // Loaded module path
-            var sh = part?.Modules?.GetModule("ModuleSystemHeat");
+            var sh = SystemHeatBridge.GetModule(part);
             if (sh != null)
             {
                 var f = sh.Fields["currentLoopTemperature"] ?? sh.Fields["loopTemperature"];

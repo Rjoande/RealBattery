@@ -335,10 +335,13 @@ namespace RealBattery
         // Auxiliary resource flows from the active chemistry (RESOURCE_EXTRA); empty when none.
         private List<ResourceRequirement> _resourceExtras = new List<ResourceRequirement>();
 
-        // True after we've sent an explicit zero-flux to SystemHeat because either
-        // EnableHeatSimulation or UseSystemHeat is off. Prevents re-sending every FixedUpdate.
-        // Reset when both settings are on again, so toggles work symmetrically.
-        private bool _shSilenced = false;
+        // Last state applied to our SystemHeat module by SyncSystemHeatState(): whether it takes
+        // part in the heat loop (and shows its PAW group) or is switched off.
+        private bool _shStateApplied = false;
+        private bool _shWanted = true;
+
+        // Last passive-cooling flux sent to SystemHeat (kW, <= 0); avoids resending an unchanged value.
+        private float _shPassiveFlux = 0f;
 
         // Physics-tick de-dup guard for the InfiniteCycles thermal cap block in
         // ApplyThermalEffects: PartModule.FixedUpdate (this force-tick) and
@@ -454,32 +457,20 @@ namespace RealBattery
             // 7) Edge detectors & final UI state
             lastDisabled = BatteryDisabled; // initialize edge detector
 
-            // 8) Initial SystemHeat handshake after scene re-entry.
-            // Gate on SystemHeatAvailable (assembly present) rather than UseSystemHeat,
-            // so we can still silence a residual flux when the user has SH installed but
-            // has opted out via UseSystemHeat = false.
+            // 8) Initial SystemHeat handshake after scene re-entry: declare the operating target
+            // right away, so the loop shows no default value before the first FixedUpdate.
+            // SyncSystemHeatState() switches the module off later if it turns out to be unwanted.
             if (HighLogic.LoadedSceneIsFlight
                 && !state.HasFlag(StartState.PreLaunch)
-                && RealBatterySettings.SystemHeatAvailable)
+                && moduleActive
+                && RealBatterySettings.EnableHeatSimulation
+                && RealBatterySettings.UseSystemHeat)
             {
                 if (systemHeat == null)
                     systemHeat = SystemHeatBridge.GetModule(part);
 
                 if (systemHeat != null)
-                {
-                    if (!RealBatterySettings.EnableHeatSimulation || !RealBatterySettings.UseSystemHeat)
-                    {
-                        // Heat sim or SH integration disabled at scene load: send an explicit zero
-                        // so SystemHeat doesn't show a residual/default value before the first FixedUpdate runs.
-                        smoothFlux = 0f;
-                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", 0f, 0f, true);
-                        _shSilenced = true;
-                    }
-                    else
-                    {
-                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", TempOptimal, (float)EPS, true);
-                    }
-                }
+                    SendHeatSH(TempOptimal, (float)EPS);
             }
         }
 
@@ -607,14 +598,15 @@ namespace RealBattery
                 if (systemHeat == null)
                     systemHeat = SystemHeatBridge.GetModule(part);
 
-                SystemHeatBridge.AddFlux(systemHeat, "RealBattery", TempOptimal, 0f, true);
+                SendHeatSH(TempOptimal, 0f);
             }
         }
         public void FixedUpdate()
         {
             // Before the moduleActive gate: switching to the "No battery" subtype must still
-            // hide the PAW fields and disarm staging.
+            // hide the PAW fields, disarm staging and switch the SystemHeat module off.
             RefreshAfterSubtypeSwitch();
+            SyncSystemHeatState();
 
             if (!moduleActive) return;
 
@@ -936,7 +928,7 @@ namespace RealBattery
                     if (ActualLife < 0.01 && !isRunaway && !forcedRunawayActive && Math.Abs(smoothFlux) > 1e-6f)
                     {
                         smoothFlux = 0f;
-                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", 0f, 0f, true);
+                        SendHeatSH(0f, 0f);
                         RBLog.Info($"[RealBattery] Cleared residual SystemHeat flux on '{part.partInfo?.title}' after battery death.");
                     }
                 }
@@ -960,9 +952,6 @@ namespace RealBattery
             if (HighLogic.LoadedSceneIsEditor)
             {
                 double sign = 0;
-
-                if (systemHeat != null)
-                    SystemHeatBridge.MarkUsed(systemHeat);
 
                 if (SimulationMode == Localizer.Format("#LOC_RB_SimMode_Discharge"))
                     sign = -1.0;
@@ -1556,35 +1545,10 @@ namespace RealBattery
         private void ApplyThermalEffects(double EC_power)
         {
             bool heatSimOn = RealBatterySettings.EnableHeatSimulation;
-            bool useSHOn = RealBatterySettings.UseSystemHeat;
 
-            // If we shouldn't be feeding SystemHeat (heat sim off, or SH integration off),
-            // send a one-shot zero to silence the loop. SH seems to treat registered-but-silent
-            // modules as having a residual/default value.
-            if (!heatSimOn || !useSHOn)
-            {
-                if (RealBatterySettings.SystemHeatAvailable && !_shSilenced)
-                {
-                    if (systemHeat == null)
-                        systemHeat = SystemHeatBridge.GetModule(part);
-                    if (systemHeat != null)
-                    {
-                        smoothFlux = 0f;
-                        SystemHeatBridge.AddFlux(systemHeat, "RealBattery", 0f, 0f, true);
-                        _shSilenced = true;
-                        RBLog.Info($"[ApplyThermalEffects] Cleared SystemHeat flux on '{part.partInfo?.title}' (heat sim or SH integration disabled).");
-                    }
-                }
-
-                // If heat sim is fully off, bail entirely.
-                // Otherwise (heat sim on, SH off) fall through so the stock heat path still runs.
-                if (!heatSimOn) return;
-            }
-            else
-            {
-                // Both heat sim and SH integration on: clear flag so off-branch can re-trigger later.
-                _shSilenced = false;
-            }
+            // Heat sim fully off: nothing to do. With heat sim on and SH integration off, the
+            // stock heat path below still runs (SyncSystemHeatState() has silenced the SH module).
+            if (!heatSimOn) return;
 
             // Resolve heat backend and current temperature once
             // Always refresh SystemHeat module if feature is enabled.
@@ -1705,7 +1669,7 @@ namespace RealBattery
 
                     if (!isRunaway) flux /= EngBonus;
 
-                    SendThermalFlux("RealBattery", flux, smooth: true);
+                    SendThermalFlux(flux, smooth: true);
                 }
                 else if (useSH && systemHeat != null)
                 {
@@ -1713,7 +1677,7 @@ namespace RealBattery
                     // so the loop doesn't collapse toward 0 K between active cycles (SystemHeat
                     // only — stock has no equivalent "declare idle" concept).
                     smoothFlux = 0f;
-                    SendThermalFlux("RealBattery", 0f, smooth: false);
+                    SendThermalFlux(0f, smooth: false);
                 }
             }
 
@@ -1758,7 +1722,7 @@ namespace RealBattery
                     // preserves the exact previous value at the reference 50 Hz / 0.02 s physics
                     // tick (warp 1x), but the term no longer depends on the actual timestep.
                     float heatBoost = severity * (float)sc.maxAmount * 0.02f;
-                    SendThermalFlux("RealBattery", heatBoost * (float)ThermalLoss, smooth: false);
+                    SendThermalFlux(heatBoost * (float)ThermalLoss, smooth: false);
 
                     RBLog.Verbose($"[ApplyThermalEffects] InfiniteCycles thermal cap: " +
                                   $"severity={severity:F2}, cap={ThermalCapFactor:F3}, " +
@@ -1824,7 +1788,7 @@ namespace RealBattery
         //     hard reset (silencing, idle) should set smoothFlux = 0f themselves before calling
         //     with fluxKW = 0f, smooth = false.
         //   - Stock: fluxKW is sent as-is via part.AddThermalFlux — no scaling, never smoothed.
-        private void SendThermalFlux(string sourceId, float fluxKW, bool smooth)
+        private void SendThermalFlux(float fluxKW, bool smooth)
         {
             bool useSH = RealBatterySettings.UseSystemHeat && systemHeat != null;
             if (useSH)
@@ -1841,12 +1805,93 @@ namespace RealBattery
                 {
                     toSend = scaled;
                 }
-                SystemHeatBridge.AddFlux(systemHeat, sourceId, TempOptimal, toSend, true);
+                SendHeatSH(TempOptimal, toSend);
             }
             else
             {
                 part.AddThermalFlux(fluxKW);
             }
+        }
+
+        // Sends the battery's own heat to our SystemHeat module, followed by the passive cooling
+        // that offsets it. Every heat update goes through here so the two stay paired: the
+        // module's net flux must never go negative, because SystemHeat drops a module with
+        // negative net flux from the loop's nominal temperature, which would let the loop sink
+        // toward ambient. Passive cooling is therefore capped at the heat it offsets; with a net
+        // of exactly zero SystemHeat's own decay brings an overheated loop back to nominal.
+        private void SendHeatSH(float targetK, float fluxKW)
+        {
+            SystemHeatBridge.AddFlux(systemHeat, "RealBattery", targetK, fluxKW, true);
+
+            float passive = fluxKW > 0f ? -Math.Min(fluxKW, PassiveCoolingCapKW()) : 0f;
+            if (passive == _shPassiveFlux) return;
+
+            _shPassiveFlux = passive;
+            SystemHeatBridge.AddFlux(systemHeat, "RealBattery_Passive", 0f, passive, false);
+        }
+
+        // Heat (kW) a battery can shed on its own under SystemHeat, without radiators:
+        // radiation (emissivity x sigma x A x (T^4 - Tamb^4)) plus, in an atmosphere, convection
+        // with the same formula SystemHeat's radiators use. A = PassiveAreaFactor x V^(2/3).
+        // Cryo chemistries are excluded: ambient can only warm them. Zero while the loop is still
+        // below its nominal temperature, so a cold loop warms up to its operating point unhindered.
+        private float PassiveCoolingCapKW()
+        {
+            const double STEFAN_BOLTZMANN = 5.670374e-8; // W / (m2 K4)
+
+            if (KeepWarmMode == "cryo" || _rbVolume <= 0.0 || systemHeat == null) return 0f;
+            if (!SystemHeatBridge.TryGetLoopTempK(systemHeat, out float loopK)) return 0f;
+
+            if (!SystemHeatBridge.TryGetLoopNominalK(systemHeat, out float nominalK))
+                nominalK = TempOptimal;
+            if (loopK < nominalK - 0.01f) return 0f;
+
+            if (!SystemHeatBridge.TryGetLoopConvection(systemHeat, out float convFlux, out float ambientK))
+            {
+                convFlux = 0f;
+                ambientK = (float)PhysicsGlobals.SpaceTemperature;
+            }
+            if (loopK <= ambientK) return 0f;
+
+            double area = RealBatteryTuning.PassiveAreaFactor * Math.Pow(_rbVolume / 1000.0, 2.0 / 3.0);
+            double radiative = RealBatteryTuning.PassiveEmissivity * STEFAN_BOLTZMANN * area
+                               * (Math.Pow(loopK, 4.0) - Math.Pow(ambientK, 4.0)) / 1000.0;
+            double convective = (loopK - ambientK) * convFlux * part.heatConvectiveConstant * area * 0.5;
+
+            return (float)Math.Max(0.0, radiative + convective);
+        }
+
+        // Keeps our SystemHeat module in step with whether this battery uses it: switched off
+        // (out of the heat loop, PAW group hidden) for the "No battery" subtype and whenever the
+        // heat simulation or the SystemHeat integration is disabled in the settings.
+        private void SyncSystemHeatState()
+        {
+            if (!RealBatterySettings.SystemHeatAvailable) return;
+            if (!HighLogic.LoadedSceneIsFlight && !HighLogic.LoadedSceneIsEditor) return;
+
+            bool wanted = moduleActive
+                          && RealBatterySettings.EnableHeatSimulation
+                          && RealBatterySettings.UseSystemHeat;
+            if (_shStateApplied && wanted == _shWanted) return;
+
+            if (systemHeat == null)
+                systemHeat = SystemHeatBridge.GetModule(part);
+            if (systemHeat == null) return;
+
+            if (!wanted)
+            {
+                // Leave no residual source behind on the module.
+                smoothFlux = 0f;
+                SendHeatSH(0f, 0f);
+                SystemHeatBridge.AddFlux(systemHeat, "RealBattery_Cryo", 0f, 0f, true);
+            }
+
+            if (!SystemHeatBridge.SetEnabled(systemHeat, wanted)) return; // retried next tick
+
+            _shWanted = wanted;
+            _shStateApplied = true;
+            if (RBLog.VerboseEnabled)
+                RBLog.Verbose($"[SyncSystemHeatState] SystemHeat module {(wanted ? "enabled" : "disabled")} on '{part.partInfo?.title}'.");
         }
 
         public void UpdateBatteryLife()
