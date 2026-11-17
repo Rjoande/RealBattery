@@ -53,7 +53,7 @@ To install an extra, simply place the corresponding patch into your `GameData` f
 
 ## Installation
 
-**Via [CKAN](https://github.com/KSP-CKAN/CKAN)**: coming soon — RealBattery Recharged is awaiting indexing. Once listed, search for `RealBattery` and dependencies will be installed automatically. The `Extras/` patches are not installed by CKAN; copy them manually from the release zip if you want them.
+**Via [CKAN](https://github.com/KSP-CKAN/CKAN)** (recommended): search for `RealBattery` and install it; dependencies will be installed automatically. The `Extras/` patches are not installed by CKAN; copy them manually from the release zip if you want them.
 
 **Manually:**
 
