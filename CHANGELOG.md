@@ -4,10 +4,14 @@
 
 ### Minor Improvements
 - **No battery option for pods and probe cores:** crewed parts and command parts that offer a choice of battery chemistry now also have a **No battery** variant in the editor ([#22](https://github.com/Rjoande/RealBattery/issues/22)) - thanks to GitHub user **ostrkrs** for the suggestion! Parts with a single, historically chosen chemistry keep their battery.
+- **Passive cooling with SystemHeat:** batteries now shed part of their own heat without radiators, by radiation everywhere and by convection in an atmosphere (the faster and denser the airflow, the more). Small batteries and slow discharges no longer need a radiator; large packs under sustained load still do. Cryogenic chemistries are excluded. Two new optional `REALBATTERY_TUNING` keys, `passiveAreaFactor` and `passiveEmissivity`, adjust it.
+- The SystemHeat section of a battery's part menu is now hidden, and the part leaves the heat loop, when it has nothing to do: on a part set to **No battery**, and when **Use SystemHeat** or the heat simulation is turned off in the difficulty settings.
 
 ### Bugfixes
 - Selecting a non-battery variant in the editor (the new No battery option, or the non-battery variants some HabTech2, OPT and Bluedog parts already had) now always hides the battery controls, disarms the battery's staging and removes its action group entries; previously this only happened if the chemistry changed at the same time.
 - A part without a battery no longer offers EVA refurbishing and no longer appears in the MFD battery lists.
+- With SystemHeat, batteries added by the generic patches (parts of mods without a dedicated RealBattery patch) now get their heat loop module like every other battery.
+- With SystemHeat, RealBattery now always drives its own heat module, even on a part where another mod added a second one.
 
 ## v3.4.5
 
