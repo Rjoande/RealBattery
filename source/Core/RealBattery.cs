@@ -55,6 +55,9 @@ namespace RealBattery
         // Time-based like GUI_POWER_SMOOTH_TAU_S above: identical settle time at warp 1x,
         // correct (framerate/timewarp-independent) elsewhere.
         private const double SMOOTH_FLUX_TAU_S = 2.0;
+        // Time constant of the passive-cooling ramp: it fades in/out over a second or two
+        // instead of stepping when the loop crosses its nominal temperature.
+        private const double PASSIVE_FLUX_TAU_S = 0.5;
 
         // --- Resource IDs (cached) ---
         // Lazy-resolved on first access (not a static-field initializer): a missing
@@ -342,6 +345,10 @@ namespace RealBattery
 
         // Last passive-cooling flux sent to SystemHeat (kW, <= 0); avoids resending an unchanged value.
         private float _shPassiveFlux = 0f;
+
+        // Smoothed passive-cooling capacity (kW, >= 0) and the physics step it was last advanced in.
+        private float _shPassiveCap = 0f;
+        private float _shPassiveCapTime = -1f;
 
         // Physics-tick de-dup guard for the InfiniteCycles thermal cap block in
         // ApplyThermalEffects: PartModule.FixedUpdate (this force-tick) and
@@ -1823,7 +1830,26 @@ namespace RealBattery
         {
             SystemHeatBridge.AddFlux(systemHeat, "RealBattery", targetK, fluxKW, true);
 
-            float passive = fluxKW > 0f ? -Math.Min(fluxKW, PassiveCoolingCapKW()) : 0f;
+            float passive = 0f;
+            if (fluxKW > 0f)
+            {
+                // Advance the ramp once per physics step, however many heat updates land in it.
+                if (Time.fixedTime != _shPassiveCapTime)
+                {
+                    _shPassiveCapTime = Time.fixedTime;
+                    float cap = PassiveCoolingCapKW();
+                    double ratio = 1.0 - Math.Exp(-TimeWarp.fixedDeltaTime / PASSIVE_FLUX_TAU_S);
+                    _shPassiveCap += (float)ratio * (cap - _shPassiveCap);
+                    // Snap at the end of the ramp: full offset must give a net flux of exactly zero.
+                    if (Math.Abs(cap - _shPassiveCap) <= 0.001f * Math.Max(cap, _shPassiveCap))
+                        _shPassiveCap = cap;
+                }
+                passive = -Math.Min(fluxKW, _shPassiveCap);
+            }
+            else
+            {
+                _shPassiveCap = 0f;
+            }
             if (passive == _shPassiveFlux) return;
 
             _shPassiveFlux = passive;
