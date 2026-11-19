@@ -1,4 +1,4 @@
-RealBattery Recharged v3.4.3
+RealBattery Recharged v3.4.6
 =============================
 
 A complete overhaul of the stock electric system in Kerbal Space Program,
