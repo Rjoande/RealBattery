@@ -1,6 +1,6 @@
 # Changelog
 
-[Unreleased]
+## v3.4.6
 
 ### Minor Improvements
 - **No battery option for pods and probe cores:** crewed parts and command parts that offer a choice of battery chemistry now also have a **No battery** variant in the editor ([#22](https://github.com/Rjoande/RealBattery/issues/22)) - thanks to GitHub user **ostrkrs** for the suggestion! Parts with a single, historically chosen chemistry keep their battery.
