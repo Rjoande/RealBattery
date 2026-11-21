@@ -135,7 +135,7 @@ Localization is supported. If you'd like to help translate RealBattery into your
 Current languages:
 - English (`en-us`)
 - Italian (`it-it`)
-- Spanish (`en-es`)
+- Spanish (`es-es`)
 - French (`fr-fr`)
 - Simplified Chinese (`zh-cn`) by **Aebestach**
 - Russian (`ru`) by **ostrkrs**
