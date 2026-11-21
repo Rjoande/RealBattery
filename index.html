@@ -1,0 +1,1186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RealBattery Balancer</title>
+<meta name="description" content="Turn real-world battery specs into balanced RealBattery chemistry configs for Kerbal Space Program.">
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2330; --muted:#667085; --line:#e3e6eb;
+  --accent:#2f6fde; --accent-soft:#e8f0fd; --warn:#b54708; --warn-soft:#fff4e5;
+  --info-soft:#eef2f6; --ok:#067647; --code:#0f1420; --code-ink:#d6deeb; --new:#2f6fde; --ref:#8c8c8c;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11141a; --panel:#181c24; --ink:#e6e9ef; --muted:#98a2b3; --line:#2a303b;
+    --accent:#6ea0ff; --accent-soft:#1d2a44; --warn:#f5a524; --warn-soft:#2e2414;
+    --info-soft:#1f2430; --ok:#47cd89; --code:#0b0e14; --code-ink:#d6deeb; --new:#6ea0ff; --ref:#7a8394;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11141a; --panel:#181c24; --ink:#e6e9ef; --muted:#98a2b3; --line:#2a303b;
+  --accent:#6ea0ff; --accent-soft:#1d2a44; --warn:#f5a524; --warn-soft:#2e2414;
+  --info-soft:#1f2430; --ok:#47cd89; --code:#0b0e14; --code-ink:#d6deeb; --new:#6ea0ff; --ref:#7a8394;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif}
+a{color:var(--accent)}
+header{padding:16px 24px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;gap:6px 16px;align-items:baseline;flex-wrap:wrap}
+header h1{margin:0;font-size:20px}
+header .sub{color:var(--muted)}
+header .links{margin-left:auto;font-size:13px;display:flex;gap:14px}
+.level{max-width:1500px;margin:0 auto;padding:18px 24px 0}
+.level-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px;font-weight:700}
+.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.colstack{display:flex;flex-direction:column;gap:16px;min-width:0}
+@media (max-width:980px){.cols{grid-template-columns:1fr}.level{padding:16px 16px 0}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h2 .num{background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:0 7px;font-size:12px}
+h2 .aside{font-weight:400;font-size:12px;color:var(--muted)}
+h3{font-size:12px;margin:14px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:600px){.grid,.grid.three{grid-template-columns:1fr}}
+.full{grid-column:1/-1}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+.tip{display:inline-block;width:15px;height:15px;border-radius:50%;background:var(--line);color:var(--muted);font-size:10px;text-align:center;line-height:15px;cursor:help;margin-left:3px;font-weight:700}
+input[type=text],input[type=number],select,textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;min-width:0}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:.75}
+textarea{font-family:Consolas,"Cascadia Mono",monospace;font-size:12px;resize:vertical}
+.field{display:flex;gap:6px}
+.field input{flex:1}
+.field select{width:auto;flex:0 0 auto}
+.hint{font-size:11px;color:var(--muted);margin-top:2px}
+.hint.est{color:var(--warn)}
+.check{display:flex;align-items:center;gap:7px;margin:6px 0;font-weight:600;font-size:13px;cursor:pointer;color:var(--ink)}
+.check input{margin:0}
+.locked{opacity:.45;pointer-events:none}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper button{width:28px;height:28px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;cursor:pointer;font:inherit}
+.stepper b{min-width:14px;text-align:center}
+.colorfield{display:flex;gap:6px;align-items:center}
+.chip{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);flex:0 0 auto;background-image:linear-gradient(45deg,var(--line) 25%,transparent 25%,transparent 75%,var(--line) 75%),linear-gradient(45deg,var(--line) 25%,transparent 25%,transparent 75%,var(--line) 75%);background-size:10px 10px;background-position:0 0,5px 5px;position:relative;overflow:hidden}
+.chip i{position:absolute;inset:0}
+.colorfield input[type=color]{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;padding:0;background:none;flex:0 0 auto;cursor:pointer}
+.cwarn{color:var(--warn);font-size:11px;min-height:0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 5px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600}
+td.v{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+td.v.adj{color:var(--accent)}
+.why{font-size:11px;color:var(--muted);font-weight:400}
+.why.est{color:var(--warn)}
+.knob{display:flex;gap:4px;align-items:center}
+.knob select{padding:3px 4px;font-size:12px;width:auto}
+.knob input{width:70px;padding:3px 5px;font-size:12px}
+.iconbtn{border:none;background:none;color:var(--accent);cursor:pointer;font-size:15px;padding:2px 4px}
+.warns div{padding:7px 10px;border-radius:6px;margin-bottom:6px;font-size:12.5px}
+.warns .w{background:var(--warn-soft);color:var(--warn)}
+.warns .i{background:var(--info-soft);color:var(--muted)}
+.warns .okm{color:var(--ok);padding-left:0}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:600px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.card{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.card .k{font-size:11px;color:var(--muted)}
+.card .val{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.card .cmp{font-size:11px;color:var(--muted)}
+.partpick{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.thumb{width:64px;height:64px;border-radius:8px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--bg);overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:contain}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+@media (max-width:600px){.charts{grid-template-columns:1fr}}
+.inline-select{width:auto;display:inline-block;padding:2px 4px;font-size:12px}
+svg text{fill:var(--muted);font-size:11px}
+.legend{display:flex;gap:14px;font-size:12px;margin-top:4px;flex-wrap:wrap}
+.legend span::before{content:"";display:inline-block;width:12px;height:3px;margin-right:5px;vertical-align:middle;background:currentColor}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tabs button{border:1px solid var(--line);border-bottom:none;background:var(--bg);color:var(--muted);padding:6px 10px;border-radius:6px 6px 0 0;cursor:pointer;font:inherit;font-size:12.5px}
+.tabs button.on{background:var(--code);color:var(--code-ink);border-color:var(--code)}
+pre{margin:0;background:var(--code);color:var(--code-ink);padding:12px 14px;border-radius:0 6px 6px 6px;overflow:auto;font:12px/1.5 Consolas,"Cascadia Mono",monospace;max-height:420px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%}
+.row{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.row label.check{margin:0;font-weight:400}
+.btn{border:1px solid var(--accent);background:var(--accent);color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font:inherit;font-size:13px}
+.btn.ghost{background:transparent;color:var(--accent)}
+.extra-row{display:grid;grid-template-columns:1.4fr .8fr 1fr 1fr 28px;gap:6px;margin-bottom:6px;align-items:center}
+@media (max-width:600px){.extra-row{grid-template-columns:1fr 1fr}}
+.extra-head{font-size:11px;color:var(--muted)}
+footer{max-width:1500px;margin:0 auto;padding:18px 24px 30px;color:var(--muted);font-size:12px}
+footer code{font-size:11px}
+details summary{cursor:pointer}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:.95}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="ico-battery" viewBox="0 0 64 64">
+      <rect x="20" y="10" width="24" height="46" rx="4" fill="none" stroke="var(--muted)" stroke-width="3"/>
+      <rect x="27" y="5" width="10" height="6" rx="1.5" fill="var(--muted)"/>
+      <rect x="25" y="34" width="14" height="17" rx="1.5" fill="var(--accent)" opacity=".75"/>
+    </symbol>
+    <symbol id="ico-upgrade" viewBox="0 0 64 64">
+      <rect x="12" y="12" width="24" height="44" rx="4" fill="none" stroke="var(--muted)" stroke-width="3"/>
+      <rect x="19" y="7" width="10" height="6" rx="1.5" fill="var(--muted)"/>
+      <rect x="17" y="34" width="14" height="17" rx="1.5" fill="var(--accent)" opacity=".75"/>
+      <path d="M50 52 V20 M40 30 L50 18 L60 30" fill="none" stroke="var(--ok)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <h1>RealBattery Balancer</h1>
+  <span class="sub">Turn real-world battery specs into balanced RealBattery configs</span>
+  <span class="links"><a href="https://github.com/Rjoande/RealBattery/wiki/For-Modders" target="_blank" rel="noopener">For Modders</a><a href="https://github.com/Rjoande/RealBattery" target="_blank" rel="noopener">RealBattery</a></span>
+</header>
+
+<!-- ============================== LEVEL 1: INPUT ============================== -->
+<div class="level">
+  <p class="level-title">Input</p>
+  <div class="cols">
+    <div class="colstack">
+      <section>
+        <h2><span class="num">1</span>Identity</h2>
+        <div class="grid">
+          <div><label for="title">Title <span class="tip" title="Full name shown in the part switcher, e.g. 'Lithium-Sulfur'.">?</span></label><input type="text" id="title" data-k placeholder="Lithium-Sulfur"></div>
+          <div><label for="short">Short name <span class="tip" title="Abbreviation shown in the PAW, e.g. 'Li-S'.">?</span></label><input type="text" id="short" data-k placeholder="Li-S"></div>
+          <div><label for="cid">ChemistryID <span class="tip" title="Unique identifier: letters, digits and underscores. Also the B9PartSwitch subtype and tank type name, and the suffix of the localization keys.">?</span></label><input type="text" id="cid" data-k placeholder="LiS"><div class="hint" id="cidHint"></div></div>
+          <div><label for="lang">Language of the texts <span class="tip" title="The Localization block is written for this language, with the descSum wording RealBattery uses in it.">?</span></label><select id="lang" data-k></select></div>
+          <div class="full"><label for="desc">Description <span class="tip" title="Detail text of the subtype and of the upgrade (descDet key).">?</span></label><textarea id="desc" data-k rows="2" placeholder="A short description of the chemistry, its strengths and its drawbacks."></textarea>
+            <label class="check" style="font-weight:400"><input type="checkbox" id="autoWarn" data-k checked> Add gameplay warnings to the description <span class="tip" title="Appends the standard red lines RealBattery uses, in the chosen language: cannot be stopped (FixedOutput), needs operating temperature (KeepWarm warm), cryogenic cooling (cryo), spontaneous runaway (SelfRunaway), not EVA-serviceable (EVA refurbish disabled).">?</span></label></div>
+          <div><label for="col1">Primary color <span class="tip" title="Any B9PartSwitch color: #RGB, #RGBA, #RRGGBB, #RRGGBBAA, floats '1, 0, 0' or a named color (case sensitive).">?</span></label>
+            <div class="colorfield"><span class="chip"><i id="chip1"></i></span><input type="text" id="col1" data-k placeholder="Silver"><input type="color" id="pick1" title="Pick a color"></div>
+            <div class="cwarn" id="cw1"></div></div>
+          <div><label for="col2">Secondary color</label>
+            <div class="colorfield"><span class="chip"><i id="chip2"></i></span><input type="text" id="col2" data-k placeholder="Sunflower"><input type="color" id="pick2" title="Pick a color"></div>
+            <div class="cwarn" id="cw2"></div></div>
+          <div class="full hint">Named colors: <a href="https://github.com/blowfishpro/B9PartSwitch/wiki/Valid-Color-Formats" target="_blank" rel="noopener">B9PartSwitch · Valid Color Formats</a></div>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="num">2</span>Real-world values</h2>
+        <div class="grid">
+          <div class="full"><label for="tpl">Defaults from <span class="tip" title="Empty fields take the real-world equivalent of this RealBattery chemistry (shown as placeholders).">?</span></label><select id="tpl" data-k></select></div>
+        </div>
+        <label class="check"><input type="checkbox" id="cellOn" data-k> Derive densities from a cell datasheet</label>
+        <div id="cellBox" class="grid three locked">
+          <div><label for="cellCap">Capacity</label><div class="field"><input type="text" id="cellCap" data-k placeholder="3400"><select id="cellCapU" data-k><option value="mAh">mAh</option><option value="Ah">Ah</option><option value="Wh">Wh</option><option value="kJ">kJ</option><option value="J">J</option></select></div></div>
+          <div><label for="cellV">Nominal voltage <span class="tip" title="Empty = typical nominal cell voltage of the default chemistry (Wikipedia comparison table).">?</span></label><div class="field"><input type="text" id="cellV" data-k><span style="align-self:center;padding:0 4px">V</span></div></div>
+          <div><label for="cellM">Cell mass</label><div class="field"><input type="text" id="cellM" data-k placeholder="45"><select id="cellMU" data-k><option value="g">g</option><option value="kg">kg</option></select></div></div>
+          <div><label for="cellSize">Cell size</label><select id="cellSize" data-k></select>
+            <div class="field" id="cellVolBox" style="margin-top:6px"><input type="text" id="cellVol" data-k placeholder="16.5" aria-label="Cell volume"><select id="cellVolU" data-k aria-label="Volume unit"><option value="cm3">cm³</option><option value="L">L</option></select></div></div>
+          <div class="full hint" id="cellOut"></div>
+        </div>
+        <p class="hint">Every field accepts a single value or a range like <b>300-500</b> (reduced to its geometric mean). Empty = default (placeholder).</p>
+        <div class="grid" id="realFields"></div>
+        <label class="check"><input type="checkbox" id="primary" data-k> Primary cell (non-rechargeable) <span class="tip" title="Sets HighEClevel = 2, a zero charge curve and 1 cycle, and adds the 'Not rechargeable' line to the summary.">?</span></label>
+      </section>
+    </div>
+
+    <div class="colstack">
+      <section>
+        <h2><span class="num">3</span>Gameplay fields <span class="aside">empty or unchecked = standard of most RB chemistries</span></h2>
+        <div class="grid">
+          <div><label for="topt">TempOptimal <span class="tip" title="Target temperature for the SystemHeat loop.">?</span></label><div class="field"><input type="text" id="topt" data-k><select id="toptU" data-k class="tunit"></select></div></div>
+          <div><label for="rhf">RunawayHeatFactor <span class="tip" title="Heat multiplier during thermal runaway. 0 = derive it from the C-rate.">?</span></label><input type="text" id="rhf" data-k></div>
+          <div><label>EVA minimum level <span class="tip" title="Engineer level needed to refurbish or upgrade this battery on EVA.">?</span></label>
+            <div class="stepper" id="evaBox"><button type="button" data-step="-1">−</button><b id="evaLv">1</b><button type="button" data-step="1">+</button></div></div>
+          <div><label for="evaRef">EVA refurbish <span class="tip" title="Disabled also disables the EVA chemistry upgrade.">?</span></label>
+            <select id="evaRef" data-k><option value="true">enabled</option><option value="false">disabled</option></select></div>
+          <div class="full"><label class="check"><input type="checkbox" id="kwOn" data-k> KeepWarm mode <span class="tip" title="warm: molten-salt logic, upkeep needed below TempKeepWarmHi. cryo: cryogenic logic, upkeep needed above TempKeepWarmLo.">?</span></label>
+            <div id="kwBox" class="grid three">
+              <div><label for="kwMode">Mode</label><select id="kwMode" data-k><option value="warm">warm (molten salt)</option><option value="cryo">cryo</option></select></div>
+              <div><label for="kwLo">TempKeepWarmLo (K)</label><input type="text" id="kwLo" data-k></div>
+              <div><label for="kwHi">TempKeepWarmHi (K)</label><input type="text" id="kwHi" data-k></div>
+            </div></div>
+          <div class="full"><label class="check"><input type="checkbox" id="csOn" data-k> CrateScale <span class="tip" title="Scales the C-rate with the number of batteries on the vessel: 'add' saturates up to the factor, 'reduce' decreases towards 0. The factor sets the steepness of both curves.">?</span></label>
+            <div id="csBox" class="grid">
+              <div><label for="csMode">Mode</label><select id="csMode" data-k><option value="add">add</option><option value="reduce">reduce</option></select></div>
+              <div><label for="csF">CrateScaleFactor</label><input type="text" id="csF" data-k></div>
+            </div></div>
+          <div class="full grid">
+            <label class="check"><input type="checkbox" id="fixedOut" data-k> FixedOutput <span class="tip" title="Delivers a constant discharge rate whatever the load, like a thermal battery.">?</span></label>
+            <label class="check"><input type="checkbox" id="staged" data-k> BatteryStaged <span class="tip" title="Starts inactive and is switched on once by staging.">?</span></label>
+            <label class="check"><input type="checkbox" id="infCycles" data-k> InfiniteCycles <span class="tip" title="No charge/discharge wear; a reversible thermal capacity factor replaces it (superconductors).">?</span></label>
+            <label class="check"><input type="checkbox" id="lifeDecay" data-k> LifeDecay <span class="tip" title="Self-discharge wears the battery life (capacity) instead of the charge, as radioactive decay does.">?</span></label>
+            <label class="check"><input type="checkbox" id="selfRun" data-k> SelfRunaway <span class="tip" title="Rolls an hourly chance of a spontaneous thermal runaway (R.I.P. event), set by RunawayBaseChance.">?</span></label>
+            <div id="rbcBox"><label for="rbc">RunawayBaseChance</label><div class="field"><input type="text" id="rbc" data-k placeholder="1"><select id="rbcU" data-k><option value="pct">%/hour</option><option value="frac">fraction/hour</option></select></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="num">4</span>Auxiliary resources <span class="aside">RESOURCE_EXTRA</span></h2>
+        <label class="check"><input type="checkbox" id="rexOn" data-k> Tie extra resources to charge/discharge <span class="tip" title="Inputs block the whole transfer when they are not available; outputs are dumped when tanks are full; with Kerbalism they are not simulated on unloaded vessels.">?</span></label>
+        <div id="rexBox">
+          <div class="extra-row extra-head"><span>Resource</span><span>Ratio <span class="tip" title="Resource units per unit of StoredCharge actually converted.">?</span></span><span>Mode</span><span>Type</span><span></span></div>
+          <div id="rexRows"></div>
+          <button class="btn ghost" type="button" id="rexAdd">+ Add resource</button>
+          <datalist id="resList"><option value="Hydrogen"><option value="Oxygen"><option value="Water"><option value="LqdHydrogen"><option value="LqdOxygen"><option value="Lithium"><option value="XenonGas"><option value="Ore"><option value="SpareParts"></datalist>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="num">5</span>Career unlock</h2>
+        <div class="grid">
+          <div><label for="tree">Tech tree</label><select id="tree" data-k><option value="both" selected>Stock + CTT override</option><option value="stock">Stock</option><option value="ctt">Community Tech Tree</option><option value="custom">Custom</option></select></div>
+          <div id="attachBox"><label for="attach">Or attach to existing upgrade <span class="tip" title="Reuse a RealBattery upgrade: the subtype unlocks with it and no PARTUPGRADE is generated.">?</span></label><select id="attach" data-k></select></div>
+          <div id="stockNodeBox"><label for="stockNode">Tech node</label><select id="stockNode" data-k></select></div>
+          <div id="cttNodeBox"><label for="cttNode">CTT node</label><select id="cttNode" data-k></select></div>
+          <div id="customNodeBox"><label for="customNode">Tech node id <span class="tip" title="RDNode id of your tech tree.">?</span></label><input type="text" id="customNode" data-k placeholder="myTechNode"></div>
+          <div id="costBox"><label for="entryCost">Entry cost (√)</label><input type="text" id="entryCost" data-k></div>
+          <div id="upTitleBox"><label for="upTitle">Upgrade title</label><input type="text" id="upTitle" data-k></div>
+          <div class="full" id="iconBox"><label for="icon">Part icon <span class="tip" title="Existing part whose model is shown as the upgrade icon. For your own icon part, choose Custom and type its name.">?</span></label>
+            <div class="partpick" style="margin:0"><div class="thumb" style="width:48px;height:48px"><svg width="44" height="44" viewBox="0 0 64 64"><use href="#ico-upgrade"/></svg></div>
+              <select id="icon" data-k style="max-width:340px"></select><input type="text" id="iconCustom" data-k placeholder="part name" style="max-width:180px"></div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== LEVEL 2: PREVIEW ============================== -->
+<div class="level">
+  <p class="level-title">Preview</p>
+  <div class="cols">
+    <section>
+      <h2><span class="num">6</span>Balanced values <label class="check" style="margin:0 0 0 auto;font-weight:400"><input type="checkbox" id="roundOn" data-k checked> Round values <span class="tip" title="Rounds the proposed values before the adjustments, to the precision of the RealBattery configs.">?</span></label></h2>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th><th>Adjust <span class="tip" title="× multiply, + add, = override. Applied after balancing (and rounding); dependent values follow.">?</span></th><th></th></tr></thead>
+        <tbody id="balRows"></tbody>
+      </table>
+      <h3>Checks</h3>
+      <div class="warns" id="warns"></div>
+    </section>
+
+    <section>
+      <h2><span class="num">7</span>On a stock part</h2>
+      <div class="partpick">
+        <div class="thumb" id="partThumb"><svg width="56" height="56" viewBox="0 0 64 64"><use href="#ico-battery"/></svg></div>
+        <div style="flex:1;min-width:0"><label for="part">Battery</label><select id="part" data-k></select></div>
+        <div style="flex:1;min-width:0"><label for="cmp">Compare with</label><select id="cmp" data-k></select></div>
+      </div>
+      <div class="cards" id="cards"></div>
+      <div class="charts">
+        <div>
+          <label>Radar <span class="tip" title="Same axes as the wiki charts, log-normalized over every RealBattery chemistry plus this one.">?</span></label>
+          <svg viewBox="0 0 240 220" width="100%" id="radar" role="img" aria-label="Radar chart"></svg>
+          <div class="legend" id="radarLegend"></div>
+        </div>
+        <div>
+          <label for="curvePreset">Charge efficiency curve <select id="curvePreset" data-k class="inline-select"><option value="flat">Flat</option><option value="bell">Bell</option><option value="fading">Fading near full</option><option value="custom">Custom</option></select></label>
+          <svg viewBox="0 0 240 170" width="100%" id="curveSvg" role="img" aria-label="Charge efficiency curve"></svg>
+          <div class="row" style="margin:0 0 6px"><span class="hint" style="margin:0">Nodes</span>
+            <div class="stepper" id="nodeBox"><button type="button" data-nodes="-1" aria-label="Fewer nodes">−</button><b id="nodeCount">4</b><button type="button" data-nodes="1" aria-label="More nodes">+</button></div>
+            <span class="hint" style="margin:0">Drag the points to edit.</span></div>
+          <textarea id="curveText" data-k rows="5" aria-label="Curve keys"></textarea>
+          <div class="hint">Keys <code>SoC efficiency</code>, one per line. Editing switches the preset to Custom.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ============================== LEVEL 3: OUTPUT ============================== -->
+<div class="level">
+  <p class="level-title">Output</p>
+  <section>
+    <h2><span class="num">8</span>Configs</h2>
+    <div class="tabs" id="tabs"></div>
+    <pre id="code"></pre>
+    <div class="row" id="resOpts" style="margin-top:8px" hidden>
+      <span>Patch: edit existing resource nodes <span class="tip" title="Checked: @RESOURCE[...] edits a resource the part already has. Unchecked: RESOURCE { name = ... } adds it.">?</span></span>
+      <label class="check"><input type="checkbox" id="resEcMod" data-k checked> ElectricCharge</label>
+      <label class="check"><input type="checkbox" id="resScMod" data-k> StoredCharge</label>
+    </div>
+    <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn ghost" type="button" id="copyBtn">Copy block</button></div>
+    <h3>Export a single .cfg</h3>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="exChem" data-k checked> REALBATTERY_CHEMISTRY</label>
+      <label class="check"><input type="checkbox" id="exTank" data-k checked> B9_TANK_TYPE</label>
+      <label class="check"><input type="checkbox" id="exUp" data-k checked> PARTUPGRADE</label>
+      <label class="check"><input type="checkbox" id="exLoc" data-k checked> Localization</label>
+      <button class="btn" type="button" id="dlBtn">Download .cfg</button>
+    </div>
+    <p class="hint">The SUBTYPE and RESOURCE blocks are meant for your own part patches and are not in the file.</p>
+    <h3>Project</h3>
+    <div class="row">
+      <button class="btn ghost" type="button" id="expJson">Export JSON</button>
+      <button class="btn ghost" type="button" id="impJson">Import JSON</button>
+      <input type="file" id="impFile" accept=".json,application/json" hidden>
+      <button class="btn ghost" type="button" id="shareBtn">Copy share link</button>
+      <button class="btn ghost" type="button" id="resetAll">Reset all</button>
+      <span class="hint">The draft is saved in this browser.</span>
+    </div>
+  </section>
+</div>
+
+<footer><div id="foot"></div>
+  <div class="row"><label for="theme" style="margin:0">Theme</label><select id="theme" class="inline-select"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const DATA = {"meta":{"rbVersion":"3.4.6","generated":"2026-11-21","anchorSource":"Wikipedia (en), Comparison of commercial battery types, rev. 1380722000, read 2026-11-21","upgradeTitleKey":"#LOC_RB_Upgrade{id}_title","defaultPartIcon":"batteryPack"},"fits":{"whkg":{"law":"power","a":0.07728,"b":1.258,"rmsLog":0.343,"range":[30.0,353.5533905932738]},"whl":{"law":"power","a":0.291,"b":1.048,"rmsLog":0.208,"range":[60.0,500.0]},"wkgPeak":{"law":"ratio","k":0.3502,"rmsLog":0.224,"n":5},"thermalLoss":{"law":"ratio","k":0.9727,"rmsLog":0.0269,"n":4},"selfDischarge":{"law":"ratio","k":0.4862,"rmsLog":0.529,"n":4},"cycles":{"law":"ratio","k":0.9553,"rmsLog":0.48,"n":7},"peakToContinuous":{"k":9.946,"n":9},"fundsPerUsd":0.5},"fitResiduals":{"whkg":{"PbAc":0.52,"NiCd":1.79,"NiH2":0.854,"NiZn":1.18,"AgOx":0.85,"RBZebra":1.31,"Li_ion":0.735,"Li_poly":1.07,"SSB":1.21},"whl":{"PbAc":0.839,"NiCd":1.38,"NiH2":0.943,"NiZn":0.845,"AgOx":0.767,"Li_ion":1.12,"Li_poly":1.26},"wkgPeak":{"PbAc":1.35,"NiCd":0.824,"NiH2":1.24,"NiZn":0.952,"RBZebra":0.761},"thermalLoss":{"PbAc":0.959,"NiCd":0.997,"NiH2":1.03,"Li_ion":1.02},"selfDischarge":{"PbAc":1.19,"NiCd":0.617,"Li_ion":2.2,"Li_poly":0.617},"cycles":{"PbAc":1.11,"NiCd":1.05,"NiH2":1.05,"NiZn":1.05,"RBZebra":1.57,"Li_ion":1.51,"SSB":0.331},"peakToContinuous":{"PbAc":75.0,"NiCd":10.0,"NiH2":25.0,"NiZn":47.6,"AgOx":10.0,"RBZebra":1.2,"Li_ion":4.0,"Li_poly":6.67,"SSB":3.33}},"standards":{"HighEClevel":"0.95","LowEClevel":"0.90","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","TempOptimal":350.0,"RunawayHeatFactor":0.0,"EVAminLevel":1,"EvaRefurbishEnabled":"true","FixedOutput":"false","BatteryStaged":"false","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false","RunawayGap":100.0,"CrateScale":"false","CrateScaleFactor":3.0,"RunawayDisabled":99999.0},"standardCounts":{"HighEClevel":{"0.95":14,"2":4},"LowEClevel":{"0.90":18},"KeepWarmMode":{"false":14,"warm":2,"cryo":2},"TempKeepWarmLo":{"500":14,"320":2,"400":1,"900":1},"TempKeepWarmHi":{"600":14,"370":2,"500":1,"1000":1},"TempOptimal":{"350":11,"800":2,"300":2,"600":1,"750":1,"1200":1},"RunawayHeatFactor":{"0":6,"0.8":1,"1":1,"1.2":1,"1.5":1,"1.6":1,"0.7":1,"2":1,"2.2":1,"130":1,"90":1,"750":1,"400":1},"EVAminLevel":{"3":4,"1":4,"5":4,"2":3,"4":2,"0":1},"EvaRefurbishEnabled":{"true":13,"false":5},"FixedOutput":{"false":17,"true":1},"BatteryStaged":{"false":17,"true":1},"SelfRunaway":{"false":16,"true":2},"RunawayBaseChance":{"0.0":16,"0.01":2},"LifeDecay":{"false":16,"true":2},"InfiniteCycles":{"false":17,"true":1},"RunawayGap":{"100.0":9,"10.0":2,"50.0":1,"500.0":1,"700.0":1}},"spareParts":{"unitCost":12.6,"density":0.00378},"curvePresets":{"flat":[[0.0,0.955],[0.2,1.0],[0.8,1.0],[1.0,0.955]],"bell":[[0.0,0.9],[0.25,0.97],[0.5,1.0],[0.75,0.97],[1.0,0.9]],"fading":[[0.0,1.0],[0.6,0.98],[0.85,0.9],[0.95,0.7],[1.0,0.5]]},"anchors":{"PbAc":{"whkg":[30,50],"whl":[60,75],"wkg":[80,200],"usdkwh":[76,194],"eff":[50,92],"sdMonth":[3,20],"cycles":[50,100],"volt":2.1},"NiCd":{"whkg":[30,30],"whl":[100,100],"wkg":[150,200],"usdkwh":null,"eff":[70,90],"sdMonth":[10,10],"cycles":[500,500],"volt":1.2},"NiH2":{"whkg":[45,65],"whl":[60,60],"wkg":[150,200],"usdkwh":null,"eff":[85,85],"sdMonth":null,"cycles":[20000,20000],"volt":1.25},"NiZn":{"whkg":[100,100],"whl":[280,280],"wkg":[3000,3000],"usdkwh":[333,500],"eff":null,"sdMonth":null,"cycles":[800,800],"volt":1.65},"AgOx":{"whkg":[130,130],"whl":[500,500],"wkg":null,"usdkwh":null,"eff":null,"sdMonth":null,"cycles":null,"volt":1.55},"RBZebra":{"whkg":[100,100],"whl":null,"wkg":[150,150],"usdkwh":null,"eff":null,"sdMonth":null,"cycles":[2000,4500],"volt":null},"Li_ion":{"whkg":[160,300],"whl":[250,842],"wkg":null,"usdkwh":[108,108],"eff":[80,90],"sdMonth":[0.35,2.5],"cycles":[400,1200],"volt":3.6},"Li_poly":{"whkg":[100,265],"whl":[250,670],"wkg":null,"usdkwh":null,"eff":null,"sdMonth":[5,5],"cycles":null,"volt":3.7},"SSB":{"whkg":[250,500],"whl":null,"wkg":null,"usdkwh":null,"eff":null,"sdMonth":null,"cycles":[10000,100000],"volt":null}},"chemistries":[{"id":"TBat","tank":"TBat","title":"Thermal","short":"Thermal","color":"#AAAA00","primaryColor":"#E06633","secondaryColor":"#FFFF30","SC":0.1,"EC":0.6,"tankMass":0.002,"tankCost":4.0,"Crate":6.0,"fields":{"ChemistryID":"TBat","displayName":"#LOC_RB_short_TBat","title":"#LOC_RB_title_TBat","descriptionSummary":"#LOC_RB_descSum_TBat","descriptionDetail":"#LOC_RB_descDet_TBat","HighEClevel":"2","LowEClevel":"0.90","Crate":"6","CycleDurability":"1","SelfDischargeRate":"0","EvaRefurbishEnabled":"false","EVAminLevel":"3","SparePartsPerKWh":"4","ThermalLoss":"0.6","TempOptimal":"800","TempOverheat":"1300","TempRunaway":"99999","RunawayHeatFactor":"0","FixedOutput":"true","BatteryStaged":"true","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.0],[1.0,0.0]],"game":{"whkg":50.0,"whl":100.0,"wkgPeak":300.0,"fundsPerKWh":40.0,"peakToContinuous":0.9999999999999998},"radar":{"Mass":50.0,"Cost":0.025,"Capacity":0.1,"Power":0.6000000000000001,"Cycles":null,"Heat":1.6666666666666667}},{"id":"PbAc","tank":"PbAc","title":"Lead-acid","short":"Pb-Ac","color":"#AAAA00","primaryColor":"#575961","secondaryColor":"#FFFF30","SC":0.02,"EC":0.3,"tankMass":0.005,"tankCost":1.0,"Crate":0.2,"fields":{"ChemistryID":"PbAc","displayName":"#LOC_RB_short_PbAc","title":"#LOC_RB_title_PbAc","descriptionSummary":"#LOC_RB_descSum_PbAc","descriptionDetail":"#LOC_RB_descDet_PbAc","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"0.2","CycleDurability":"75","SelfDischargeRate":"0.045","EvaRefurbishEnabled":"true","EVAminLevel":"0","SparePartsPerKWh":"35","ThermalLoss":"0.3","TempOptimal":"350","TempOverheat":"440","TempRunaway":"540","RunawayHeatFactor":"0.8","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.55],[0.3,0.65],[0.5,0.7],[0.8,0.6],[1.0,0.5]],"game":{"whkg":4.0,"whl":20.0,"wkgPeak":60.0,"fundsPerKWh":50.0,"peakToContinuous":75.0},"radar":{"Mass":4.0,"Cost":0.02,"Capacity":0.02,"Power":0.004,"Cycles":75.0,"Heat":3.3333333333333335}},{"id":"NiCd","tank":"NiCd","title":"Nickel-Cadmium","short":"NiCd","color":"#E19400","primaryColor":"#B3A15D","secondaryColor":"#FFD98F","SC":0.05,"EC":0.25,"tankMass":0.005,"tankCost":2.0,"Crate":0.5,"fields":{"ChemistryID":"NiCd","displayName":"#LOC_RB_short_NiCd","title":"#LOC_RB_title_NiCd","descriptionSummary":"#LOC_RB_descSum_NiCd","descriptionDetail":"#LOC_RB_descDet_NiCd","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"0.5","CycleDurability":"500","SelfDischargeRate":"0.03","EvaRefurbishEnabled":"true","EVAminLevel":"1","SparePartsPerKWh":"14","ThermalLoss":"0.2","TempOptimal":"350","TempOverheat":"390","TempRunaway":"490","RunawayHeatFactor":"1","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.7],[0.5,0.75],[0.9,0.8],[1.0,0.65]],"game":{"whkg":10.0,"whl":50.0,"wkgPeak":50.0,"fundsPerKWh":40.0,"peakToContinuous":10.0},"radar":{"Mass":10.0,"Cost":0.025,"Capacity":0.05,"Power":0.025,"Cycles":500.0,"Heat":5.0}},{"id":"NiZn","tank":"NiZn","title":"Nickel-Zinc","short":"NiZn","color":"#B3A15D","primaryColor":"#B3A15D","secondaryColor":"#7D80B0","SC":0.09,"EC":3.0,"tankMass":0.003,"tankCost":9.0,"Crate":0.7,"fields":{"ChemistryID":"NiZn","displayName":"#LOC_RB_short_NiZn","title":"#LOC_RB_title_NiZn","descriptionSummary":"#LOC_RB_descSum_NiZn","descriptionDetail":"#LOC_RB_descDet_NiZn","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"0.7","CycleDurability":"800","SelfDischargeRate":"0.04","EvaRefurbishEnabled":"true","EVAminLevel":"1","SparePartsPerKWh":"8","ThermalLoss":"0.15","TempOptimal":"350","TempOverheat":"390","TempRunaway":"490","RunawayHeatFactor":"1.2","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,1.0],[0.6,0.98],[0.85,0.9],[0.95,0.7],[1.0,0.5]],"game":{"whkg":30.0,"whl":90.0,"wkgPeak":1000.0,"fundsPerKWh":100.0,"peakToContinuous":47.61904761904762},"radar":{"Mass":30.0,"Cost":0.01,"Capacity":0.09,"Power":0.063,"Cycles":800.0,"Heat":6.666666666666667}},{"id":"AgOx","tank":"AgOx","title":"Silver oxide","short":"Ag-Ox","color":"#FF0D0D","primaryColor":"#C0C0C0","secondaryColor":"#FF0D0D","SC":0.15,"EC":1.5,"tankMass":0.005,"tankCost":5.0,"Crate":1.0,"fields":{"ChemistryID":"AgOx","displayName":"#LOC_RB_short_AgOx","title":"#LOC_RB_title_AgOx","descriptionSummary":"#LOC_RB_descSum_AgOx","descriptionDetail":"#LOC_RB_descDet_AgOx","HighEClevel":"2","LowEClevel":"0.90","Crate":"1","CycleDurability":"1","SelfDischargeRate":"0.025","EvaRefurbishEnabled":"true","EVAminLevel":"1","SparePartsPerKWh":"5","ThermalLoss":"0.3","TempOptimal":"350","TempOverheat":"420","TempRunaway":"520","RunawayHeatFactor":"1.5","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.0],[1.0,0.0]],"game":{"whkg":30.0,"whl":150.0,"wkgPeak":300.0,"fundsPerKWh":33.333333333333336,"peakToContinuous":10.0},"radar":{"Mass":30.0,"Cost":0.03,"Capacity":0.15,"Power":0.15,"Cycles":null,"Heat":3.3333333333333335}},{"id":"AgZn","tank":"AgZn","title":"Silver-Zinc","short":"Ag-Zn","color":"#7D80B0","primaryColor":"#C0C0C0","secondaryColor":"#7D80B0","SC":0.15,"EC":1.5,"tankMass":0.005,"tankCost":6.0,"Crate":1.5,"fields":{"ChemistryID":"AgZn","displayName":"#LOC_RB_short_AgZn","title":"#LOC_RB_title_AgZn","descriptionSummary":"#LOC_RB_descSum_AgZn","descriptionDetail":"#LOC_RB_descDet_AgZn","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"1.5","CycleDurability":"50","SelfDischargeRate":"0.025","EvaRefurbishEnabled":"true","EVAminLevel":"1","SparePartsPerKWh":"5","ThermalLoss":"0.3","TempOptimal":"350","TempOverheat":"420","TempRunaway":"520","RunawayHeatFactor":"1.6","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.6],[0.3,0.75],[0.6,0.85],[0.85,0.7],[1.0,0.5]],"game":{"whkg":30.0,"whl":150.0,"wkgPeak":300.0,"fundsPerKWh":40.0,"peakToContinuous":6.666666666666667},"radar":{"Mass":30.0,"Cost":0.024999999999999998,"Capacity":0.15,"Power":0.22499999999999998,"Cycles":50.0,"Heat":3.3333333333333335}},{"id":"NiH2","tank":"NiH2","title":"Nickel-Hydrogen","short":"NiH2","color":"#B3A15D","primaryColor":"#B3A15D","secondaryColor":"#FFFFFF","SC":0.02,"EC":0.15,"tankMass":0.002,"tankCost":3.0,"Crate":0.3,"fields":{"ChemistryID":"NiH2","displayName":"#LOC_RB_short_NiH2","title":"#LOC_RB_title_NiH2","descriptionSummary":"#LOC_RB_descSum_NiH2","descriptionDetail":"#LOC_RB_descDet_NiH2","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"0.3","CycleDurability":"20000","SelfDischargeRate":"0.15","EvaRefurbishEnabled":"true","EVAminLevel":"2","SparePartsPerKWh":"19","ThermalLoss":"0.15","TempOptimal":"350","TempOverheat":"410","TempRunaway":"510","RunawayHeatFactor":"0.7","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.8],[0.2,0.85],[0.8,0.85],[1.0,0.8]],"game":{"whkg":10.0,"whl":20.0,"wkgPeak":75.0,"fundsPerKWh":150.0,"peakToContinuous":25.0},"radar":{"Mass":10.0,"Cost":0.006666666666666667,"Capacity":0.02,"Power":0.006,"Cycles":20000.0,"Heat":6.666666666666667}},{"id":"RBZebra","tank":"RBZebra","title":"KERBA","short":"KERBA","color":"#E66C2C","primaryColor":"#B3A15D","secondaryColor":"#E66C2C","SC":0.1,"EC":0.12,"tankMass":0.003,"tankCost":7.0,"Crate":1.0,"fields":{"ChemistryID":"RBZebra","displayName":"#LOC_RB_short_Zebra","title":"#LOC_RB_title_Zebra","descriptionSummary":"#LOC_RB_descSum_Zebra","descriptionDetail":"#LOC_RB_descDet_Zebra","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"1","CycleDurability":"4500","SelfDischargeRate":"0","EvaRefurbishEnabled":"true","EVAminLevel":"3","SparePartsPerKWh":"6","ThermalLoss":"0.1","TempOptimal":"600","TempOverheat":"1000","TempRunaway":"99999","RunawayHeatFactor":"0","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"warm","TempKeepWarmLo":"400","TempKeepWarmHi":"500","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.9],[0.3,0.95],[0.5,0.99],[0.8,0.95],[1.0,0.9]],"game":{"whkg":33.333333333333336,"whl":100.0,"wkgPeak":40.0,"fundsPerKWh":70.0,"peakToContinuous":1.2},"radar":{"Mass":33.333333333333336,"Cost":0.014285714285714287,"Capacity":0.1,"Power":0.1,"Cycles":4500.0,"Heat":10.0}},{"id":"Li_ion","tank":"Li_ion","title":"Lithium-Ion","short":"Li-Ion","color":"#32BB32","primaryColor":"#BFC2C7","secondaryColor":"#50D050","SC":0.2,"EC":0.8,"tankMass":0.004,"tankCost":9.0,"Crate":1.0,"fields":{"ChemistryID":"Li_ion","displayName":"#LOC_RB_short_Li_ion","title":"#LOC_RB_title_Li_ion","descriptionSummary":"#LOC_RB_descSum_Li_ion","descriptionDetail":"#LOC_RB_descDet_Li_ion","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"1","CycleDurability":"1000","SelfDischargeRate":"0.01","EvaRefurbishEnabled":"true","EVAminLevel":"2","SparePartsPerKWh":"13","ThermalLoss":"0.15","TempOptimal":"350","TempOverheat":"480","TempRunaway":"580","RunawayHeatFactor":"2","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.8],[0.3,0.85],[0.6,0.9],[0.85,0.85],[1.0,0.8]],"game":{"whkg":50.0,"whl":200.0,"wkgPeak":200.0,"fundsPerKWh":45.0,"peakToContinuous":4.0},"radar":{"Mass":50.0,"Cost":0.022222222222222223,"Capacity":0.2,"Power":0.2,"Cycles":1000.0,"Heat":6.666666666666667}},{"id":"Li_poly","tank":"Li_poly","title":"Lithium-Polymer","short":"Li-Poly","color":"#E09100","primaryColor":"#BFC2C7","secondaryColor":"#FFA500","SC":0.2,"EC":4.0,"tankMass":0.004,"tankCost":10.0,"Crate":3.0,"fields":{"ChemistryID":"Li_poly","displayName":"#LOC_RB_short_Li_poly","title":"#LOC_RB_title_Li_poly","descriptionSummary":"#LOC_RB_descSum_Li_poly","descriptionDetail":"#LOC_RB_descDet_Li_poly","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"3","CycleDurability":"600","SelfDischargeRate":"0.015","EvaRefurbishEnabled":"true","EVAminLevel":"2","SparePartsPerKWh":"12","ThermalLoss":"0.25","TempOptimal":"350","TempOverheat":"470","TempRunaway":"520","RunawayHeatFactor":"2.2","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.9],[0.2,0.95],[0.8,0.95],[1.0,0.9]],"game":{"whkg":50.0,"whl":200.0,"wkgPeak":1000.0,"fundsPerKWh":50.0,"peakToContinuous":6.666666666666666},"radar":{"Mass":50.0,"Cost":0.02,"Capacity":0.2,"Power":0.6000000000000001,"Cycles":600.0,"Heat":4.0}},{"id":"Graphene","tank":"Graphene","title":"Graphene","short":"Graphene","color":"#5B9BD5","primaryColor":"#000000","secondaryColor":"#909090","SC":0.45,"EC":3.0,"tankMass":0.0015,"tankCost":14.0,"Crate":5.0,"fields":{"ChemistryID":"Graphene","displayName":"#LOC_RB_title_Graphene","title":"#LOC_RB_title_Graphene","descriptionSummary":"#LOC_RB_descSum_Graphene","descriptionDetail":"#LOC_RB_descDet_Graphene","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"5","CycleDurability":"2500","SelfDischargeRate":"0.002","EvaRefurbishEnabled":"true","EVAminLevel":"3","SparePartsPerKWh":"4","ThermalLoss":"0.03","TempOptimal":"350","TempOverheat":"500","TempRunaway":"600","RunawayHeatFactor":"130","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.9],[0.25,0.96],[0.5,0.97],[0.75,0.96],[1.0,0.92]],"game":{"whkg":300.0,"whl":450.0,"wkgPeak":2000.0,"fundsPerKWh":31.11111111111111,"peakToContinuous":1.3333333333333333},"radar":{"Mass":300.0,"Cost":0.03214285714285715,"Capacity":0.45,"Power":2.25,"Cycles":2500.0,"Heat":33.333333333333336}},{"id":"SSB","tank":"SSB","title":"Solid-State Battery","short":"SSB","color":"#33B2B2","primaryColor":"#BFC2C7","secondaryColor":"#94E0E0","SC":0.3,"EC":2.0,"tankMass":0.002,"tankCost":12.0,"Crate":2.0,"fields":{"ChemistryID":"SSB","displayName":"#LOC_RB_short_SSB","title":"#LOC_RB_title_SSB","descriptionSummary":"#LOC_RB_descSum_SSB","descriptionDetail":"#LOC_RB_descDet_SSB","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"2","CycleDurability":"10000","SelfDischargeRate":"0.003","EvaRefurbishEnabled":"true","EVAminLevel":"3","SparePartsPerKWh":"2","ThermalLoss":"0.05","TempOptimal":"350","TempOverheat":"520","TempRunaway":"620","RunawayHeatFactor":"90","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.9],[0.2,0.95],[0.8,0.95],[1.0,0.9]],"game":{"whkg":150.0,"whl":300.0,"wkgPeak":1000.0,"fundsPerKWh":40.0,"peakToContinuous":3.3333333333333335},"radar":{"Mass":150.0,"Cost":0.024999999999999998,"Capacity":0.3,"Power":0.6,"Cycles":10000.0,"Heat":20.0}},{"id":"NukeCell","tank":"NukeCell","title":"Hf-178m2","short":"Hf-178m2","color":"#10ADFF","primaryColor":"#4DC2FF","secondaryColor":"#A9A9A9","SC":1.8,"EC":5.0,"tankMass":0.007,"tankCost":200.0,"Crate":0.15,"fields":{"ChemistryID":"NukeCell","displayName":"#LOC_RB_short_Nuke","title":"#LOC_RB_short_Nuke","descriptionSummary":"#LOC_RB_descSum_Nuke","descriptionDetail":"#LOC_RB_descDet_Nuke","HighEClevel":"2","LowEClevel":"0.90","Crate":"0.15","CycleDurability":"1","SelfDischargeRate":"0.0000525","EvaRefurbishEnabled":"false","EVAminLevel":"5","SparePartsPerKWh":"3","ThermalLoss":"0.1","TempOptimal":"750","TempOverheat":"1500","TempRunaway":"2000","RunawayHeatFactor":"750","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"true","RunawayBaseChance":"0.01","LifeDecay":"true","InfiniteCycles":"false"},"curve":[[0.0,0.0],[1.0,0.0]],"game":{"whkg":257.14285714285717,"whl":1800.0,"wkgPeak":714.2857142857142,"fundsPerKWh":111.11111111111111,"peakToContinuous":18.51851851851852},"radar":{"Mass":257.14285714285717,"Cost":0.009000000000000001,"Capacity":1.8,"Power":0.27,"Cycles":null,"Heat":10.0}},{"id":"HoCell","tank":"RB_HoCell","title":"Metastable Holmium","short":"Ho-166m","color":"#1DB700","primaryColor":"#1A2B1A","secondaryColor":"#39FF14","SC":0.9,"EC":0.5,"tankMass":0.006,"tankCost":280.0,"Crate":0.05,"fields":{"ChemistryID":"HoCell","displayName":"#LOC_RB_short_HoCell","title":"#LOC_RB_title_HoCell","descriptionSummary":"#LOC_RB_descSum_HoCell","descriptionDetail":"#LOC_RB_descDet_HoCell","HighEClevel":"2","LowEClevel":"0.90","Crate":"0.05","CycleDurability":"1","SelfDischargeRate":"0.00000136","EvaRefurbishEnabled":"false","EVAminLevel":"5","SparePartsPerKWh":"16","ThermalLoss":"0.06","TempOptimal":"800","TempOverheat":"1800","TempRunaway":"2500","RunawayHeatFactor":"400","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"true","RunawayBaseChance":"0.01","LifeDecay":"true","InfiniteCycles":"false"},"curve":[[0.0,0.0],[1.0,0.0]],"game":{"whkg":150.0,"whl":900.0,"wkgPeak":83.33333333333333,"fundsPerKWh":311.1111111111111,"peakToContinuous":11.111111111111109},"radar":{"Mass":150.0,"Cost":0.0032142857142857142,"Capacity":0.9,"Power":0.045000000000000005,"Cycles":null,"Heat":16.666666666666668}},{"id":"MgSb","tank":"RB_MgSb","title":"Magnesium-Antimony","short":"Mg||Sb","color":"#FF6600","primaryColor":"#3D3D3D","secondaryColor":"#FF6600","SC":0.25,"EC":0.4,"tankMass":0.002,"tankCost":11.0,"Crate":1.0,"fields":{"ChemistryID":"MgSb","displayName":"#LOC_RB_short_MgSb","title":"#LOC_RB_title_MgSb","descriptionSummary":"#LOC_RB_descSum_MgSb","descriptionDetail":"#LOC_RB_descDet_MgSb","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"1","CycleDurability":"30000","SelfDischargeRate":"0","EvaRefurbishEnabled":"true","EVAminLevel":"4","SparePartsPerKWh":"4","ThermalLoss":"0.25","TempOptimal":"1200","TempOverheat":"1500","TempRunaway":"99999","RunawayHeatFactor":"0","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"warm","TempKeepWarmLo":"900","TempKeepWarmHi":"1000","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.7],[0.1,0.98],[0.9,0.97],[1.0,0.9]],"game":{"whkg":125.0,"whl":250.0,"wkgPeak":200.0,"fundsPerKWh":44.0,"peakToContinuous":1.6},"radar":{"Mass":125.0,"Cost":0.022727272727272728,"Capacity":0.25,"Power":0.25,"Cycles":30000.0,"Heat":4.0}},{"id":"QET","tank":"RB_QET","title":"Quantum Cells","short":"QET","color":"#C724FF","primaryColor":"#150029","secondaryColor":"#c724ff","SC":0.02,"EC":8.0,"tankMass":0.0015,"tankCost":16.0,"Crate":10.0,"fields":{"ChemistryID":"QET","displayName":"#LOC_RB_short_QET","title":"#LOC_RB_title_QET","descriptionSummary":"#LOC_RB_descSum_QET","descriptionDetail":"#LOC_RB_descDet_QET","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"10","CrateScale":"add","CycleDurability":"2000","SelfDischargeRate":"0","EvaRefurbishEnabled":"false","EVAminLevel":"5","SparePartsPerKWh":"370","ThermalLoss":"0.001","TempOptimal":"300","TempOverheat":"400","TempRunaway":"410","RunawayHeatFactor":"0","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"cryo","TempKeepWarmLo":"320","TempKeepWarmHi":"370","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.97],[1.0,0.97]],"game":{"whkg":13.333333333333334,"whl":20.0,"wkgPeak":5333.333333333333,"fundsPerKWh":800.0,"peakToContinuous":40.0},"radar":{"Mass":13.333333333333334,"Cost":0.00125,"Capacity":0.02,"Power":0.2,"Cycles":2000.0,"Heat":1000.0}},{"id":"SMES","tank":"RB_SMES","title":"Superconductors","short":"SMES","color":"#00AEC2","primaryColor":"#0D2B3E","secondaryColor":"#00E5FF","SC":0.02,"EC":6.0,"tankMass":0.001,"tankCost":15.0,"Crate":30.0,"fields":{"ChemistryID":"SMES","displayName":"#LOC_RB_short_SMES","title":"#LOC_RB_title_SMES","descriptionSummary":"#LOC_RB_descSum_SMES","descriptionDetail":"#LOC_RB_descDet_SMES","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"30","CycleDurability":"1","SelfDischargeRate":"0","EvaRefurbishEnabled":"false","EVAminLevel":"5","SparePartsPerKWh":"370","ThermalLoss":"0.003","TempOptimal":"300","TempOverheat":"400","TempRunaway":"410","RunawayHeatFactor":"0","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"cryo","TempKeepWarmLo":"320","TempKeepWarmHi":"370","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"true"},"curve":[[0.0,0.9],[1.0,0.95]],"game":{"whkg":20.0,"whl":20.0,"wkgPeak":6000.0,"fundsPerKWh":750.0,"peakToContinuous":10.0},"radar":{"Mass":20.0,"Cost":0.0013333333333333333,"Capacity":0.02,"Power":0.6,"Cycles":null,"Heat":333.3333333333333}},{"id":"VRFB","tank":"RB_VRFB","title":"Vanadium","short":"VRFB","color":"#1A6B9E","primaryColor":"#1A6B9E","secondaryColor":"#6DB8D4","SC":0.04,"EC":0.06,"tankMass":0.0025,"tankCost":2.0,"Crate":0.1,"fields":{"ChemistryID":"VRFB","displayName":"#LOC_RB_short_VRFB","title":"#LOC_RB_title_VRFB","descriptionSummary":"#LOC_RB_descSum_VRFB","descriptionDetail":"#LOC_RB_descDet_VRFB","HighEClevel":"0.95","LowEClevel":"0.90","Crate":"0.10","CrateScale":"add","CycleDurability":"40000","SelfDischargeRate":"0.00001","EvaRefurbishEnabled":"true","EVAminLevel":"4","SparePartsPerKWh":"13","ThermalLoss":"0.02","TempOptimal":"350","TempOverheat":"380","TempRunaway":"99999","RunawayHeatFactor":"0","FixedOutput":"false","BatteryStaged":"false","KeepWarmMode":"false","TempKeepWarmLo":"500","TempKeepWarmHi":"600","SelfRunaway":"false","RunawayBaseChance":"0.0","LifeDecay":"false","InfiniteCycles":"false"},"curve":[[0.0,0.7],[0.5,0.85],[1.0,0.7]],"game":{"whkg":16.0,"whl":40.0,"wkgPeak":24.0,"fundsPerKWh":50.0,"peakToContinuous":15.0},"radar":{"Mass":16.0,"Cost":0.02,"Capacity":0.04,"Power":0.004,"Cycles":40000.0,"Heat":50.0}}],"upgrades":[{"name":"RB_UpgradeAgZn","title":"Silver Batteries","techRequired":"basicScience","partIcon":"RB.AgZn","entryCost":15000.0,"techRequiredCTT":"electrics"},{"name":"RB_UpgradeGraphene","title":"Graphene-Silicon Supercells","techRequired":"largeElectrics","partIcon":"RB.Graphene","entryCost":120000.0,"techRequiredCTT":"experimentalElectrics"},{"name":"RB_UpgradeHoCell","title":"Long-lived Isotopic Cells","techRequired":"nuclearPropulsion","partIcon":"RB.HoCell","entryCost":2400000.0,"techRequiredCTT":"exoticNuclearPower"},{"name":"RB_UpgradeLiIon","title":"Lithium-Ion Batteries","techRequired":"advElectrics","partIcon":"RB.LiIon","entryCost":30000.0,"techRequiredCTT":"largeElectrics"},{"name":"RB_UpgradeLiPoly","title":"Lithium-Polymer Batteries","techRequired":"advElectrics","partIcon":"RB.LiPoly","entryCost":60000.0,"techRequiredCTT":"specializedElectrics"},{"name":"RB_UpgradeMgSb","title":"Liquid Metal Batteries","techRequired":"experimentalElectrics","partIcon":"RB.MgSb","entryCost":360000.0,"techRequiredCTT":"experimentalElectricalSystems"},{"name":"RB_UpgradeNiCd","title":"Nickel Batteries","techRequired":"basicScience","partIcon":"RB.NiCd","entryCost":7500.0},{"name":"RB_UpgradeNuke","title":"Metastable Isotopic Cells","techRequired":"nuclearPropulsion","partIcon":"RB.Nuke","entryCost":1200000.0,"techRequiredCTT":"expNuclearPower"},{"name":"RB_UpgradeQET","title":"Quantum Teleportation Cells","techRequired":"experimentalElectrics","partIcon":"RB.QET","entryCost":600000.0,"techRequiredCTT":"microwavePowerTransmission"},{"name":"RB_UpgradeSMES","title":"Superconducting Magnetic Cells","techRequired":"experimentalElectrics","partIcon":"RB.SMES","entryCost":480000.0,"techRequiredCTT":"exoticElectricalSystems"},{"name":"RB_UpgradeSSB","title":"Solid-State Batteries","techRequired":"specializedElectrics","partIcon":"RB.SSB","entryCost":240000.0,"techRequiredCTT":"highPowerElectricalSystems"},{"name":"RB_UpgradeVRFB","title":"Redox Flow Batteries","techRequired":"specializedElectrics","partIcon":"RB.VRFB","entryCost":180000.0,"techRequiredCTT":"highTechElectricalSystems"},{"name":"RB_UpgradeZebra","title":"Molten-salt Batteries","techRequired":"electrics","partIcon":"RB.Zebra","entryCost":20000.0,"techRequiredCTT":"advElectrics"}],"techTrees":{"stock":[{"id":"start","title":"Start","cost":0.0,"tier":1,"tierCost":0},{"id":"basicRocketry","title":"Basic Rocketry","cost":5.0,"tier":2,"tierCost":5},{"id":"engineering101","title":"Engineering 101","cost":5.0,"tier":2,"tierCost":5},{"id":"survivability","title":"Survivability","cost":15.0,"tier":2,"tierCost":5},{"id":"generalRocketry","title":"General Rocketry","cost":20.0,"tier":3,"tierCost":18},{"id":"stability","title":"Stability","cost":18.0,"tier":3,"tierCost":18},{"id":"advRocketry","title":"Advanced Rocketry","cost":45.0,"tier":4,"tierCost":45},{"id":"aviation","title":"Aviation","cost":45.0,"tier":4,"tierCost":45},{"id":"basicScience","title":"Basic Science","cost":45.0,"tier":4,"tierCost":45},{"id":"flightControl","title":"Flight Control","cost":45.0,"tier":4,"tierCost":45},{"id":"generalConstruction","title":"General Construction","cost":45.0,"tier":4,"tierCost":45},{"id":"advConstruction","title":"Advanced Construction","cost":90.0,"tier":5,"tierCost":90},{"id":"advFlightControl","title":"Advanced Flight Control","cost":90.0,"tier":5,"tierCost":90},{"id":"aerodynamicSystems","title":"Aerodynamics","cost":90.0,"tier":5,"tierCost":90},{"id":"electrics","title":"Electrics","cost":90.0,"tier":5,"tierCost":90},{"id":"fuelSystems","title":"Fuel Systems","cost":90.0,"tier":5,"tierCost":90},{"id":"heavyRocketry","title":"Heavy Rocketry","cost":90.0,"tier":5,"tierCost":90},{"id":"landing","title":"Landing","cost":90.0,"tier":5,"tierCost":90},{"id":"miniaturization","title":"Miniaturization","cost":90.0,"tier":5,"tierCost":90},{"id":"propulsionSystems","title":"Propulsion Systems","cost":90.0,"tier":5,"tierCost":90},{"id":"spaceExploration","title":"Space Exploration","cost":90.0,"tier":5,"tierCost":90},{"id":"actuators","title":"Actuators","cost":160.0,"tier":6,"tierCost":160},{"id":"advFuelSystems","title":"Adv. Fuel Systems","cost":160.0,"tier":6,"tierCost":160},{"id":"advAerodynamics","title":"Advanced Aerodynamics","cost":160.0,"tier":6,"tierCost":160},{"id":"advElectrics","title":"Advanced Electrics","cost":160.0,"tier":6,"tierCost":160},{"id":"advExploration","title":"Advanced Exploration","cost":160.0,"tier":6,"tierCost":160},{"id":"advLanding","title":"Advanced Landing","cost":160.0,"tier":6,"tierCost":160},{"id":"commandModules","title":"Command Modules","cost":160.0,"tier":6,"tierCost":160},{"id":"heavierRocketry","title":"Heavier Rocketry","cost":160.0,"tier":6,"tierCost":160},{"id":"precisionEngineering","title":"Precision Engineering","cost":160.0,"tier":6,"tierCost":160},{"id":"precisionPropulsion","title":"Precision Propulsion","cost":160.0,"tier":6,"tierCost":160},{"id":"specializedConstruction","title":"Specialized Construction","cost":160.0,"tier":6,"tierCost":160},{"id":"specializedControl","title":"Specialized Control","cost":160.0,"tier":6,"tierCost":160},{"id":"supersonicFlight","title":"Supersonic Flight","cost":160.0,"tier":6,"tierCost":160},{"id":"advMetalworks","title":"Advanced MetalWorks","cost":300.0,"tier":7,"tierCost":300},{"id":"composites","title":"Composites","cost":300.0,"tier":7,"tierCost":300},{"id":"electronics","title":"Electronics","cost":300.0,"tier":7,"tierCost":300},{"id":"fieldScience","title":"Field Science","cost":300.0,"tier":7,"tierCost":300},{"id":"heavyAerodynamics","title":"Heavy Aerodynamics","cost":300.0,"tier":7,"tierCost":300},{"id":"heavyLanding","title":"Heavy Landing","cost":300.0,"tier":7,"tierCost":300},{"id":"highAltitudeFlight","title":"High Altitude Flight","cost":300.0,"tier":7,"tierCost":300},{"id":"largeElectrics","title":"High-Power Electrics","cost":300.0,"tier":7,"tierCost":300},{"id":"largeVolumeContainment","title":"Large Volume Containment","cost":300.0,"tier":7,"tierCost":300},{"id":"nuclearPropulsion","title":"Nuclear Propulsion","cost":300.0,"tier":7,"tierCost":300},{"id":"scienceTech","title":"Scanning Tech","cost":300.0,"tier":7,"tierCost":300},{"id":"unmannedTech","title":"Unmanned Tech","cost":300.0,"tier":7,"tierCost":300},{"id":"advancedMotors","title":"Advanced Motors","cost":550.0,"tier":8,"tierCost":550},{"id":"advScienceTech","title":"Advanced Science Tech","cost":550.0,"tier":8,"tierCost":550},{"id":"advUnmanned","title":"Advanced Unmanned Tech","cost":550.0,"tier":8,"tierCost":550},{"id":"automation","title":"Automation","cost":550.0,"tier":8,"tierCost":550},{"id":"experimentalAerodynamics","title":"Experimental Aerodynamics","cost":550.0,"tier":8,"tierCost":550},{"id":"highPerformanceFuelSystems","title":"High-Performance Fuel Systems","cost":550.0,"tier":8,"tierCost":550},{"id":"hypersonicFlight","title":"Hypersonic Flight","cost":550.0,"tier":8,"tierCost":550},{"id":"ionPropulsion","title":"Ion Propulsion","cost":550.0,"tier":8,"tierCost":550},{"id":"metaMaterials","title":"Meta-Materials","cost":550.0,"tier":8,"tierCost":550},{"id":"nanolathing","title":"Nanolathing","cost":550.0,"tier":8,"tierCost":550},{"id":"specializedElectrics","title":"Specialized Electrics","cost":550.0,"tier":8,"tierCost":550},{"id":"veryHeavyRocketry","title":"Very Heavy Rocketry","cost":550.0,"tier":8,"tierCost":550},{"id":"aerospaceTech","title":"Aerospace Tech","cost":1000.0,"tier":9,"tierCost":1000},{"id":"experimentalElectrics","title":"Experimental Electrics","cost":1000.0,"tier":9,"tierCost":1000},{"id":"experimentalMotors","title":"Experimental Motors","cost":1000.0,"tier":9,"tierCost":1000},{"id":"experimentalScience","title":"Experimental Science","cost":1000.0,"tier":9,"tierCost":1000},{"id":"largeUnmanned","title":"Large Probes","cost":1000.0,"tier":9,"tierCost":1000}],"ctt":[{"id":"start","title":"Start","cost":0.0,"tier":1,"tierCost":0},{"id":"basicRocketry","title":"Basic Rocketry","cost":5.0,"tier":2,"tierCost":5},{"id":"engineering101","title":"Engineering 101","cost":5.0,"tier":2,"tierCost":5},{"id":"survivability","title":"Survivability","cost":15.0,"tier":2,"tierCost":5},{"id":"generalRocketry","title":"General Rocketry","cost":20.0,"tier":3,"tierCost":18},{"id":"stability","title":"Stability","cost":18.0,"tier":3,"tierCost":18},{"id":"advRocketry","title":"Advanced Rocketry","cost":45.0,"tier":4,"tierCost":45},{"id":"aviation","title":"Aviation","cost":45.0,"tier":4,"tierCost":45},{"id":"basicScience","title":"Basic Science","cost":45.0,"tier":4,"tierCost":45},{"id":"enhancedSurvivability","title":"Enhanced Survivability","cost":45.0,"tier":4,"tierCost":45},{"id":"flightControl","title":"Flight Control","cost":45.0,"tier":4,"tierCost":45},{"id":"generalConstruction","title":"General Construction","cost":45.0,"tier":4,"tierCost":45},{"id":"advConstruction","title":"Advanced Construction","cost":90.0,"tier":5,"tierCost":90},{"id":"advFlightControl","title":"Advanced Flight Control","cost":90.0,"tier":5,"tierCost":90},{"id":"aerodynamicSystems","title":"Aerodynamics","cost":90.0,"tier":5,"tierCost":90},{"id":"electrics","title":"Electrics","cost":90.0,"tier":5,"tierCost":90},{"id":"fuelSystems","title":"Fuel Systems","cost":90.0,"tier":5,"tierCost":90},{"id":"heavyRocketry","title":"Heavy Rocketry","cost":90.0,"tier":5,"tierCost":90},{"id":"landing","title":"Landing","cost":90.0,"tier":5,"tierCost":90},{"id":"miniaturization","title":"Miniaturization","cost":90.0,"tier":5,"tierCost":90},{"id":"propulsionSystems","title":"Propulsion Systems","cost":90.0,"tier":5,"tierCost":90},{"id":"recycling","title":"Recycling","cost":90.0,"tier":5,"tierCost":90},{"id":"simpleCommandModules","title":"Simple Command Modules","cost":90.0,"tier":5,"tierCost":90},{"id":"spaceExploration","title":"Space Exploration","cost":90.0,"tier":5,"tierCost":90},{"id":"storageTech","title":"Storage Technology","cost":90.0,"tier":5,"tierCost":90},{"id":"subsonicFlight","title":"Subsonic Flight","cost":90.0,"tier":5,"tierCost":90},{"id":"actuators","title":"Actuators","cost":160.0,"tier":6,"tierCost":160},{"id":"advFuelSystems","title":"Adv. Fuel Systems","cost":160.0,"tier":6,"tierCost":160},{"id":"advAerodynamics","title":"Advanced Aerodynamics","cost":160.0,"tier":6,"tierCost":160},{"id":"advElectrics","title":"Advanced Electrics","cost":160.0,"tier":6,"tierCost":160},{"id":"advExploration","title":"Advanced Exploration","cost":160.0,"tier":6,"tierCost":160},{"id":"advLanding","title":"Advanced Landing","cost":160.0,"tier":6,"tierCost":160},{"id":"commandModules","title":"Command Modules","cost":160.0,"tier":6,"tierCost":160},{"id":"efficientFlightSystems","title":"Efficient Flight Systems","cost":160.0,"tier":6,"tierCost":160},{"id":"heatManagementSystems","title":"Heat Management Systems","cost":160.0,"tier":6,"tierCost":160},{"id":"heavierRocketry","title":"Heavier Rocketry","cost":160.0,"tier":6,"tierCost":160},{"id":"hydroponics","title":"Hydroponics","cost":160.0,"tier":6,"tierCost":160},{"id":"precisionEngineering","title":"Precision Engineering","cost":160.0,"tier":6,"tierCost":160},{"id":"precisionPropulsion","title":"Precision Propulsion","cost":160.0,"tier":6,"tierCost":160},{"id":"specializedConstruction","title":"Specialized Construction","cost":160.0,"tier":6,"tierCost":160},{"id":"specializedControl","title":"Specialized Control","cost":160.0,"tier":6,"tierCost":160},{"id":"supersonicFlight","title":"Supersonic Flight","cost":160.0,"tier":6,"tierCost":160},{"id":"advActuators","title":"Advanced Actuators","cost":300.0,"tier":7,"tierCost":300},{"id":"advMetalworks","title":"Advanced MetalWorks","cost":300.0,"tier":7,"tierCost":300},{"id":"composites","title":"Composites","cost":300.0,"tier":7,"tierCost":300},{"id":"electronics","title":"Electronics","cost":300.0,"tier":7,"tierCost":300},{"id":"fieldScience","title":"Field Science","cost":300.0,"tier":7,"tierCost":300},{"id":"heavyAerodynamics","title":"Heavy Aerodynamics","cost":300.0,"tier":7,"tierCost":300},{"id":"heavyCommandModules","title":"Heavy Command Modules","cost":300.0,"tier":7,"tierCost":300},{"id":"heavyLanding","title":"Heavy Landing","cost":300.0,"tier":7,"tierCost":300},{"id":"highAltitudeFlight","title":"High Altitude Flight","cost":300.0,"tier":7,"tierCost":300},{"id":"largeElectrics","title":"High-Power Electrics","cost":300.0,"tier":7,"tierCost":300},{"id":"largeVolumeContainment","title":"Large Volume Containment","cost":300.0,"tier":7,"tierCost":300},{"id":"logistics","title":"Logistics","cost":300.0,"tier":7,"tierCost":300},{"id":"nuclearPower","title":"Nuclear Power","cost":300.0,"tier":7,"tierCost":300},{"id":"nuclearPropulsion","title":"Nuclear Propulsion","cost":300.0,"tier":7,"tierCost":300},{"id":"scienceTech","title":"Scanning Tech","cost":300.0,"tier":7,"tierCost":300},{"id":"unmannedTech","title":"Unmanned Tech","cost":300.0,"tier":7,"tierCost":300},{"id":"advHeatManagement","title":"Advanced Heat Management","cost":550.0,"tier":8,"tierCost":550},{"id":"advancedMotors","title":"Advanced Motors","cost":550.0,"tier":8,"tierCost":550},{"id":"advScienceTech","title":"Advanced Science Tech","cost":550.0,"tier":8,"tierCost":550},{"id":"advSolarTech","title":"Advanced Solar Technology","cost":550.0,"tier":8,"tierCost":550},{"id":"advUnmanned","title":"Advanced Unmanned Tech","cost":550.0,"tier":8,"tierCost":550},{"id":"automation","title":"Automation","cost":550.0,"tier":8,"tierCost":550},{"id":"experimentalActuators","title":"Experimental Actuators","cost":550.0,"tier":8,"tierCost":550},{"id":"experimentalAerodynamics","title":"Experimental Aerodynamics","cost":550.0,"tier":8,"tierCost":550},{"id":"highPerformanceFuelSystems","title":"High-Performance Fuel Systems","cost":550.0,"tier":8,"tierCost":550},{"id":"hypersonicFlight","title":"Hypersonic Flight","cost":550.0,"tier":8,"tierCost":550},{"id":"largeNuclearPower","title":"Improved Nuclear Power","cost":550.0,"tier":8,"tierCost":550},{"id":"improvedNuclearPropulsion","title":"Improved Nuclear Propulsion","cost":550.0,"tier":8,"tierCost":550},{"id":"ionPropulsion","title":"Ion Propulsion","cost":550.0,"tier":8,"tierCost":550},{"id":"metaMaterials","title":"Meta-Materials","cost":550.0,"tier":8,"tierCost":550},{"id":"nanolathing","title":"Nanolathing","cost":550.0,"tier":8,"tierCost":550},{"id":"nuclearFuelSystems","title":"Nuclear Fuel Systems","cost":550.0,"tier":8,"tierCost":550},{"id":"shortTermHabitation","title":"Short Term Habitation","cost":550.0,"tier":8,"tierCost":550},{"id":"specializedCommandModules","title":"Specialized Command Modules","cost":550.0,"tier":8,"tierCost":550},{"id":"specializedElectrics","title":"Specialized Electrics","cost":550.0,"tier":8,"tierCost":550},{"id":"specializedFlightSystems","title":"Specialized Flight Systems","cost":550.0,"tier":8,"tierCost":550},{"id":"specializedScienceTech","title":"Specialized Science Tech","cost":550.0,"tier":8,"tierCost":550},{"id":"veryHeavyRocketry","title":"Very Heavy Rocketry","cost":550.0,"tier":8,"tierCost":550},{"id":"advIonPropulsion","title":"Advanced Ion Propulsion","cost":1000.0,"tier":9,"tierCost":1000},{"id":"advPVMaterials","title":"Advanced Photovoltaic Materials","cost":1000.0,"tier":9,"tierCost":1000},{"id":"aerospaceComposites","title":"Aerospace Composites","cost":1000.0,"tier":9,"tierCost":1000},{"id":"aerospaceTech","title":"Aerospace Tech","cost":1000.0,"tier":9,"tierCost":1000},{"id":"cuttingEdgeSolarTech","title":"Cutting-Edge Solar Technology","cost":1000.0,"tier":9,"tierCost":1000},{"id":"exoticAlloys","title":"Exotic Alloys","cost":1000.0,"tier":9,"tierCost":1000},{"id":"experimentalElectrics","title":"Experimental Electrics","cost":1000.0,"tier":9,"tierCost":1000},{"id":"experimentalMotors","title":"Experimental Motors","cost":1000.0,"tier":9,"tierCost":1000},{"id":"experimentalRocketry","title":"Experimental Rocketry","cost":1000.0,"tier":9,"tierCost":1000},{"id":"experimentalScience","title":"Experimental Science","cost":1000.0,"tier":9,"tierCost":1000},{"id":"advNuclearPropulsion","title":"High Efficiency Nuclear Propulsion","cost":1000.0,"tier":9,"tierCost":1000},{"id":"advNuclearPower","title":"High Energy Nuclear Power","cost":1000.0,"tier":9,"tierCost":1000},{"id":"largeUnmanned","title":"Large Probes","cost":1000.0,"tier":9,"tierCost":1000},{"id":"longTermHabitation","title":"Long Term Habitation","cost":1000.0,"tier":9,"tierCost":1000},{"id":"longTermScienceTech","title":"Long Term Science Tech","cost":1000.0,"tier":9,"tierCost":1000},{"id":"mechatronics","title":"Mechatronics","cost":1000.0,"tier":9,"tierCost":1000},{"id":"offworldManufacturing","title":"Off-World Robotics","cost":1000.0,"tier":9,"tierCost":1000},{"id":"orbitalAssembly","title":"Orbital Assembly","cost":1000.0,"tier":9,"tierCost":1000},{"id":"specializedCommandCenters","title":"Specialized Command Centers","cost":1000.0,"tier":9,"tierCost":1000},{"id":"specializedFuelStorage","title":"Specialized Fuel Storage","cost":1000.0,"tier":9,"tierCost":1000},{"id":"specializedLanders","title":"Specialized Landers","cost":1000.0,"tier":9,"tierCost":1000},{"id":"advAerospaceEngineering","title":"Advanced Aerospace Engineering","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"advGriddedThrusters","title":"Advanced Electrostatic Thrusters","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"advLogistics","title":"Advanced Logistics","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"advOffworldMining","title":"Advanced Off-World Mining","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"artificialIntelligence","title":"Artificial Intelligence","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"exoticFuelStorage","title":"Exotic Fuel Storage","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"exoticSolarTech","title":"Exotic Solar Technology","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"expAircraftEngines","title":"Experimental Aircraft Engines","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"expNuclearPower","title":"Experimental Nuclear Power","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"expNuclearPropulsion","title":"Experimental Nuclear Propulsion","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"fusionPower","title":"Fusion Power","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"fusionRockets","title":"Fusion Rockets","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"giganticRocketry","title":"Gigantic Rocketry","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"heavyCommandCenters","title":"Heavy Command Centers","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"heavyLanders","title":"Heavy Landers","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"highTechElectricalSystems","title":"High Tech Electrical Systems","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"microwavePowerTransmission","title":"Microwave Power Transmission","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"orbitalMegastructures","title":"Orbital Megastructures","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"plasmaPropulsion","title":"Plasma Propulsion","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"scientificOutposts","title":"Scientific Outposts","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"specializedRadiators","title":"Specialized Radiators","cost":1500.0,"tier":10,"tierCost":1500.0},{"id":"advFusionReactions","title":"Advanced Fusion Reactions","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"advEMSystems","title":"Advanced Plasma Propulsion","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"colonization","title":"Colonization","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"colossalRocketry","title":"Colossal Rocketry","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"exoticNuclearPower","title":"Exotic Nuclear Power","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"exoticNuclearPropulsion","title":"Exotic Nuclear Propulsion","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"expGriddedThrusters","title":"Experimental Electrostatic Thrusters","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"extremeFuelStorage","title":"Extreme Fuel Storage","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"highEnergyScience","title":"High Energy Science","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"highPowerElectricalSystems","title":"High Power Electrical Systems","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"resourceExploitation","title":"Resource Exploitation","cost":2250.0,"tier":11,"tierCost":2250.0},{"id":"advColonization","title":"Advanced Colonization","cost":4000.0,"tier":12,"tierCost":4000.0},{"id":"antimatterPower","title":"Antimatter Power","cost":4000.0,"tier":12,"tierCost":4000.0},{"id":"appliedHighEnergyPhysics","title":"Applied High Energy Physics","cost":4000.0,"tier":12,"tierCost":4000.0},{"id":"exoticReactions","title":"Exotic Fusion Reactions","cost":4000.0,"tier":12,"tierCost":4000.0},{"id":"exoticRadiators","title":"Exotic Radiators","cost":4000.0,"tier":12,"tierCost":4000.0},{"id":"experimentalElectricalSystems","title":"Experimental Electrical Systems","cost":4000.0,"tier":12,"tierCost":4000.0},{"id":"specializedPlasmaGeneration","title":"Specialized Plasma Propulsion","cost":4000.0,"tier":12,"tierCost":4000.0},{"id":"exoticElectricalSystems","title":"Exotic Electrical Systems","cost":10000.0,"tier":13,"tierCost":10000.0},{"id":"exoticPlasmaPropulsion","title":"Exotic Plasma Propulsion","cost":10000.0,"tier":13,"tierCost":10000.0},{"id":"quantumReactions","title":"High Density Fusion Reactions","cost":10000.0,"tier":13,"tierCost":10000.0},{"id":"ultraHighEnergyPhysics","title":"Ultra High Energy Physics","cost":10000.0,"tier":13,"tierCost":10000.0},{"id":"unifiedFieldTheory","title":"Unified Field Theory","cost":10000.0,"tier":13,"tierCost":10000.0}]},"stockBatteries":[{"name":"batteryPack","title":"Z-100 Rechargeable Battery Pack","stockEC":100.0,"volume":30.0,"stockMass":0.005,"stockCost":80.0},{"name":"batteryBankMini","title":"Z-200 Rechargeable Battery Bank","stockEC":200.0,"volume":60.0,"stockMass":0.01,"stockCost":360.0},{"name":"ksp_r_largeBatteryPack","title":"Z-400 Rechargeable Battery","stockEC":400.0,"volume":120.0,"stockMass":0.02,"stockCost":550.0},{"name":"batteryBank","title":"Z-1k Rechargeable Battery Bank","stockEC":1000.0,"volume":300.0,"stockMass":0.05,"stockCost":880.0},{"name":"batteryBankLarge","title":"Z-4K Rechargeable Battery Bank","stockEC":4000.0,"volume":1200.0,"stockMass":0.2,"stockCost":4500.0}],"colors":{"KSPBadassGreen":"#B8CA72","KSPNotSoGoodOrange":"#FFB100","KSPUIGrey":"#363A3D","KSPUnnamedCyan":"#5FBDB9","KSPNeutralUIGrey":"#CAC6B7","KSPMellowYellow":"#FFF000","KSPYellowishGreen":"#65F552","KSPMETitle":"#FCCB44","CloudyBlue":"#ACC2D9","DarkPastelGreen":"#56AE57","Dust":"#B2996E","ElectricLime":"#A8FF04","FreshGreen":"#69D84F","LightEggplant":"#894585","NastyGreen":"#70B23F","ReallyLightBlue":"#D4FFFF","Tea":"#65AB7C","WarmPurple":"#952E8F","YellowishTan":"#FCFC81","Cement":"#A5A391","DarkGrassGreen":"#388004","DustyTeal":"#4C9085","GreyTeal":"#5E9B8A","MacaroniAndCheese":"#EFB435","PinkishTan":"#D99B82","Spruce":"#0A5F38","StrongBlue":"#0C06F7","ToxicGreen":"#61DE2A","WindowsBlue":"#3778BF","BlueBlue":"#2242C7","BlueWithAHintOfPurple":"#533CC6","Booger":"#9BB53C","BrightSeaGreen":"#05FFA6","DarkGreenBlue":"#1F6357","DeepTurquoise":"#017374","GreenTeal":"#0CB577","StrongPink":"#FF0789","Bland":"#AFA88B","DeepAqua":"#08787F","LavenderPink":"#DD85D7","LightMossGreen":"#A6C875","LightSeafoamGreen":"#A7FFB5","OliveYellow":"#C2B709","PigPink":"#E78EA5","DeepLilac":"#966EBD","Desert":"#CCAD60","DustyLavender":"#AC86A8","PurpleyGrey":"#947E94","Purply":"#983FB2","CandyPink":"#FF63E9","LightPastelGreen":"#B2FBA5","BoringGreen":"#63B365","KiwiGreen":"#8EE53F","LightGreyGreen":"#B7E1A1","OrangePink":"#FF6F52","TeaGreen":"#BDF8A3","VeryLightBrown":"#D3B683","EggShell":"#FFFCC4","EggplantPurple":"#430541","PowderPink":"#FFB2D0","ReddishGrey":"#997570","BabyShitBrown":"#AD900D","Liliac":"#C48EFD","StormyBlue":"#507B9C","UglyBrown":"#7D7103","Custard":"#FFFD78","DarkishPink":"#DA467D","DeepBrown":"#410200","GreenishBeige":"#C9D179","Manilla":"#FFFA86","OffBlue":"#5684AE","BattleshipGrey":"#6B7C85","BrownyGreen":"#6F6C0A","Bruise":"#7E4071","KelleyGreen":"#009337","SicklyYellow":"#D0E429","SunnyYellow":"#FFF917","Azul":"#1D5DEC","Darkgreen":"#054907","Green_Yellow":"#B5CE08","Lichen":"#8FB67B","LightLightGreen":"#C8FFB0","PaleGold":"#FDDE6C","SunYellow":"#FFDF22","TanGreen":"#A9BE70","Burple":"#6832E3","Butterscotch":"#FDB147","Toupe":"#C7AC7D","DarkCream":"#FFF39A","IndianRed":"#850E04","LightLavendar":"#EFC0FE","PoisonGreen":"#40FD14","BabyPukeGreen":"#B6C406","BrightYellowGreen":"#9DFF00","CharcoalGrey":"#3C4142","Squash":"#F2AB15","Cinnamon":"#AC4F06","LightPeaGreen":"#C4FE82","RadioactiveGreen":"#2CFA1F","RawSienna":"#9A6200","BabyPurple":"#CA9BF7","Cocoa":"#875F42","LightRoyalBlue":"#3A2EFE","Orangeish":"#FD8D49","RustBrown":"#8B3103","SandBrown":"#CBA560","Swamp":"#698339","TealishGreen":"#0CDC73","BurntSiena":"#B75203","Camo":"#7F8F4E","DuskBlue":"#26538D","Fern":"#63A950","OldRose":"#C87F89","PaleLightGreen":"#B1FC99","PeachyPink":"#FF9A8A","RosyPink":"#F6688E","LightBluishGreen":"#76FDA8","LightBrightGreen":"#53FE5C","LightNeonGreen":"#4EFD54","LightSeafoam":"#A0FEBF","TiffanyBlue":"#7BF2DA","WashedOutGreen":"#BCF5A6","BrownyOrange":"#CA6B02","NiceBlue":"#107AB0","Sapphire":"#2138AB","GreyishTeal":"#719F91","OrangeyYellow":"#FDB915","Parchment":"#FEFCAF","Straw":"#FCF679","VeryDarkBrown":"#1D0200","Terracota":"#CB6843","UglyBlue":"#31668A","ClearBlue":"#247AFD","Creme":"#FFFFB6","FoamGreen":"#90FDA9","Grey_Green":"#86A17D","LightGold":"#FDDC5C","SeafoamBlue":"#78D1B6","Topaz":"#13BBAF","VioletPink":"#FB5FFC","Wintergreen":"#20F986","YellowTan":"#FFE36E","DarkFuchsia":"#9D0759","IndigoBlue":"#3A18B1","LightYellowishGreen":"#C2FF89","PaleMagenta":"#D767AD","RichPurple":"#720058","SunflowerYellow":"#FFDA03","Green_Blue":"#01C08D","Leather":"#AC7434","RacingGreen":"#014600","VividPurple":"#9900FA","DarkRoyalBlue":"#02066F","Hazel":"#8E7618","MutedPink":"#D1768F","BoogerGreen":"#96B403","Canary":"#FDFF63","CoolGrey":"#95A3A6","DarkTaupe":"#7F684E","DarkishPurple":"#751973","TrueGreen":"#089404","CoralPink":"#FF6163","DarkSage":"#598556","DarkSlateBlue":"#214761","FlatBlue":"#3C73A8","Mushroom":"#BA9E88","RichBlue":"#021BF9","DirtyPurple":"#734A65","Greenblue":"#23C48B","IckyGreen":"#8FAE22","LightKhaki":"#E6F2A2","WarmBlue":"#4B57DB","DarkHotPink":"#D90166","DeepSeaBlue":"#015482","Carmine":"#9D0216","DarkYellowGreen":"#728F02","PalePeach":"#FFE5AD","PlumPurple":"#4E0550","GoldenRod":"#F9BC08","NeonRed":"#FF073A","OldPink":"#C77986","VeryPaleBlue":"#D6FFFE","BloodOrange":"#FE4B03","Grapefruit":"#FD5956","SandYellow":"#FCE166","ClayBrown":"#B2713D","DarkBlueGrey":"#1F3B4D","FlatGreen":"#699D4C","LightGreenBlue":"#56FCA2","WarmPink":"#FB5581","DodgerBlue":"#3E82FC","GrossGreen":"#A0BF16","Ice":"#D6FFFA","MetallicBlue":"#4F738E","PaleSalmon":"#FFB19A","SapGreen":"#5C8B15","Algae":"#54AC68","BlueyGrey":"#89A0B0","GreenyGrey":"#7EA07A","HighlighterGreen":"#1BFC06","LightLightBlue":"#CAFFFB","LightMint":"#B6FFBB","RawUmber":"#A75E09","VividBlue":"#152EFF","DeepLavender":"#8D5EB7","DullTeal":"#5F9E8F","LightGreenishBlue":"#63F7B4","MudGreen":"#606602","Pinky":"#FC86AA","RedWine":"#8C0034","ShitGreen":"#758000","TanBrown":"#AB7E4C","Darkblue":"#030764","Rosa":"#FE86A4","Lipstick":"#D5174E","PaleMauve":"#FED0FC","Claret":"#680018","Dandelion":"#FEDF08","Orangered":"#FE420F","PoopGreen":"#6F7C00","Ruby":"#CA0147","Dark":"#1B2431","GreenishTurquoise":"#00FBB0","PastelRed":"#DB5856","PissYellow":"#DDD618","BrightCyan":"#41FDFE","DarkCoral":"#CF524E","AlgaeGreen":"#21C36F","DarkishRed":"#A90308","ReddyBrown":"#6E1005","BlushPink":"#FE828C","CamouflageGreen":"#4B6113","LawnGreen":"#4DA409","Putty":"#BEAE8A","VibrantBlue":"#0339F8","DarkSand":"#A88F59","Purple_Blue":"#5D21D0","Saffron":"#FEB209","Twilight":"#4E518B","WarmBrown":"#964E02","Bluegrey":"#85A3B2","BubbleGumPink":"#FF69AF","DuckEggBlue":"#C3FBF4","GreenishCyan":"#2AFEB7","Petrol":"#005F6A","Royal":"#0C1793","Butter":"#FFFF81","DustyOrange":"#F0833A","PaleOliveGreen":"#B1D27B","Orangish":"#FC824A","Leaf":"#71AA34","LightBlueGrey":"#B7C9E2","DriedBlood":"#4B0101","LightishPurple":"#A552E6","RustyRed":"#AF2F0D","LavenderBlue":"#8B88F8","LightGrassGreen":"#9AF764","LightMintGreen":"#A6FBB2","Sunflower":"#FFC512","Velvet":"#750851","BrickOrange":"#C14A09","LightishRed":"#FE2F4A","PureBlue":"#0203E2","TwilightBlue":"#0A437A","VioletRed":"#A50055","YellowyBrown":"#AE8B0C","Carnation":"#FD798F","MuddyYellow":"#BFAC05","DarkSeafoamGreen":"#3EAF76","DeepRose":"#C74767","DustyRed":"#B9484E","Grey_Blue":"#647D8E","LemonLime":"#BFFE28","Purple_Pink":"#D725DE","BrownYellow":"#B29705","PurpleBrown":"#673A3F","Wisteria":"#A87DC2","BananaYellow":"#FAFE4B","LipstickRed":"#C0022F","WaterBlue":"#0E87CC","BrownGrey":"#8D8468","VibrantPurple":"#AD03DE","BabyGreen":"#8CFF9E","BarfGreen":"#94AC02","EggshellBlue":"#C4FFF7","SandyYellow":"#FDEE73","CoolGreen":"#33B864","Pale":"#FFF9D0","Blue_Grey":"#758DA3","HotMagenta":"#F504C9","Greyblue":"#77A1B5","Purpley":"#8756E4","BabyShitGreen":"#889717","BrownishPink":"#C27E79","DarkAquamarine":"#017371","Diarrhea":"#9F8303","LightMustard":"#F7D560","PaleSkyBlue":"#BDF6FE","TurtleGreen":"#75B84F","BrightOlive":"#9CBB04","DarkGreyBlue":"#29465B","GreenyBrown":"#696006","LemonGreen":"#ADF802","LightPeriwinkle":"#C1C6FC","SeaweedGreen":"#35AD6B","SunshineYellow":"#FFFD37","UglyPurple":"#A442A0","MediumPink":"#F36196","PukeBrown":"#947706","VeryLightPink":"#FFF4F2","Viridian":"#1E9167","Bile":"#B5C306","FadedYellow":"#FEFF7F","VeryPaleGreen":"#CFFDBC","VibrantGreen":"#0ADD08","BrightLime":"#87FD05","Spearmint":"#1EF876","LightAquamarine":"#7BFDC7","LightSage":"#BCECAC","Yellowgreen":"#BBF90F","BabyPoo":"#AB9004","DarkSeafoam":"#1FB57A","DeepTeal":"#00555A","Heather":"#A484AC","RustOrange":"#C45508","DirtyBlue":"#3F829D","FernGreen":"#548D44","BrightLilac":"#C95EFB","WeirdGreen":"#3AE57F","PeacockBlue":"#016795","AvocadoGreen":"#87A922","FadedOrange":"#F0944D","GrapePurple":"#5D1451","HotGreen":"#25FF29","LimeYellow":"#D0FE1D","Mango":"#FFA62B","Shamrock":"#01B44C","Bubblegum":"#FF6CB5","PurplishBrown":"#6B4247","VomitYellow":"#C7C10C","PaleCyan":"#B7FFFA","KeyLime":"#AEFF6E","TomatoRed":"#EC2D01","Lightgreen":"#76FF7B","Merlot":"#730039","NightBlue":"#040348","PurpleishPink":"#DF4EC8","Apple":"#6ECB3C","BabyPoopGreen":"#8F9805","GreenApple":"#5EDC1F","Heliotrope":"#D94FF5","Yellow_Green":"#C8FD3D","AlmostBlack":"#070D0D","CoolBlue":"#4984B8","LeafyGreen":"#51B73B","MustardBrown":"#AC7E04","Dusk":"#4E5481","DullBrown":"#876E4B","FrogGreen":"#58BC08","VividGreen":"#2FEF10","BrightLightGreen":"#2DFE54","FluroGreen":"#0AFF02","Kiwi":"#9CEF43","Seaweed":"#18D17B","NavyGreen":"#35530A","UltramarineBlue":"#1805DB","Iris":"#6258C4","PastelOrange":"#FF964F","YellowishOrange":"#FFAB0F","Perrywinkle":"#8F8CE7","Tealish":"#24BCA8","DarkPlum":"#3F012C","Pear":"#CBF85F","PinkishOrange":"#FF724C","MidnightPurple":"#280137","LightUrple":"#B36FF6","DarkMint":"#48C072","GreenishTan":"#BCCB7A","LightBurgundy":"#A8415B","TurquoiseBlue":"#06B1C4","UglyPink":"#CD7584","ElectricPink":"#FF0490","MutedPurple":"#805B87","MidGreen":"#50A747","Greyish":"#A8A495","NeonYellow":"#CFFF04","Banana":"#FFFF7E","CarnationPink":"#FF7FA7","Tomato":"#EF4026","Sea":"#3C9992","MuddyBrown":"#886806","TurquoiseGreen":"#04F489","Buff":"#FEF69E","Fawn":"#CFAF7B","MutedBlue":"#3B719F","PaleRose":"#FDC1C5","DarkMintGreen":"#20C073","Amethyst":"#9B5FC0","Blue_Green":"#0F9B8E","Chestnut":"#742802","SickGreen":"#9DB92C","Pea":"#A4BF20","RustyOrange":"#CD5909","Stone":"#ADA587","RoseRed":"#BE013C","PaleAqua":"#B8FFEB","DeepOrange":"#DC4D01","Earth":"#A2653E","MossyGreen":"#638B27","GrassyGreen":"#419C03","PaleLimeGreen":"#B1FF65","LightGreyBlue":"#9DBCD4","PaleGrey":"#FDFDFE","Asparagus":"#77AB56","Blueberry":"#464196","PurpleRed":"#990147","PaleLime":"#BEFD73","GreenishTeal":"#32BF84","Caramel":"#AF6F09","DeepMagenta":"#A0025C","LightPeach":"#FFD8B1","MilkChocolate":"#7F4E1E","Ocher":"#BF9B0C","OffGreen":"#6BA353","PurplyPink":"#F075E6","Lightblue":"#7BC8F6","DuskyBlue":"#475F94","Golden":"#F5BF03","LightBeige":"#FFFEB6","ButterYellow":"#FFFD74","DuskyPurple":"#895B7B","FrenchBlue":"#436BAD","UglyYellow":"#D0C101","GreenyYellow":"#C6F808","OrangishRed":"#F43605","ShamrockGreen":"#02C14D","OrangishBrown":"#B25F03","TreeGreen":"#2A7E19","DeepViolet":"#490648","Gunmetal":"#536267","Blue_Purple":"#5A06EF","Cherry":"#CF0234","SandyBrown":"#C4A661","WarmGrey":"#978A84","DarkIndigo":"#1F0954","Midnight":"#03012D","BlueyGreen":"#2BB179","GreyPink":"#C3909B","SoftPurple":"#A66FB5","Blood":"#770001","BrownRed":"#922B05","MediumGrey":"#7D7F7C","Berry":"#990F4B","Poo":"#8F7303","PurpleyPink":"#C83CB9","LightSalmon":"#FEA993","Snot":"#ACBB0D","EasterPurple":"#C071FE","LightYellowGreen":"#CCFD7F","DarkNavyBlue":"#00022E","Drab":"#828344","LightRose":"#FFC5CB","Rouge":"#AB1239","PurplishRed":"#B0054B","SlimeGreen":"#99CC04","BabyPoop":"#937C00","IrishGreen":"#019529","Pink_Purple":"#EF1DE7","DarkNavy":"#000435","GreenyBlue":"#42B395","LightPlum":"#9D5783","PinkishGrey":"#C8ACA9","DirtyOrange":"#C87606","RustRed":"#AA2704","PaleLilac":"#E4CBFF","OrangeyRed":"#FA4224","PrimaryBlue":"#0804F9","KermitGreen":"#5CB200","BrownishPurple":"#76424E","MurkyGreen":"#6C7A0E","Wheat":"#FBDD7E","VeryDarkPurple":"#2A0134","BottleGreen":"#044A05","Watermelon":"#FD4659","DeepSkyBlue":"#0D75F8","FireEngineRed":"#FE0002","YellowOchre":"#CB9D06","PumpkinOrange":"#FB7D07","PaleOlive":"#B9CC81","LightLilac":"#EDC8FF","LightishGreen":"#61E160","CarolinaBlue":"#8AB8FE","Mulberry":"#920A4E","ShockingPink":"#FE02A2","Auburn":"#9A3001","BrightLimeGreen":"#65FE08","Celadon":"#BEFDB7","PinkishBrown":"#B17261","PooBrown":"#885F01","BrightSkyBlue":"#02CCFE","Celery":"#C1FD95","DirtBrown":"#836539","Strawberry":"#FB2943","DarkLime":"#84B701","Copper":"#B66325","MediumBrown":"#7F5112","MutedGreen":"#5FA052","RobinSEgg":"#6DEDFD","BrightAqua":"#0BF9EA","BrightLavender":"#C760FF","Ivory":"#FFFFCB","VeryLightPurple":"#F6CEFC","LightNavy":"#155084","PinkRed":"#F5054F","OliveBrown":"#645403","PoopBrown":"#7A5901","MustardGreen":"#A8B504","OceanGreen":"#3D9973","VeryDarkBlue":"#000133","DustyGreen":"#76A973","LightNavyBlue":"#2E5A88","MintyGreen":"#0BF77D","Adobe":"#BD6C48","Barney":"#AC1DB8","JadeGreen":"#2BAF6A","BrightLightBlue":"#26F7FD","LightLime":"#AEFD6C","DarkKhaki":"#9B8F55","OrangeYellow":"#FFAD01","Ocre":"#C69C04","Maize":"#F4D054","FadedPink":"#DE9DAC","BritishRacingGreen":"#05480D","Sandstone":"#C9AE74","MudBrown":"#60460F","LightSeaGreen":"#98F6B0","AquaMarine":"#2EE8BB","DarkSeaGreen":"#11875D","SoftPink":"#FDB0C0","OrangeyBrown":"#B16002","CherryRed":"#F7022A","BurntYellow":"#D5AB09","BrownishGrey":"#86775F","Camel":"#C69F59","PurplishGrey":"#7A687F","Marine":"#042E60","GreyishPink":"#C88D94","PaleTurquoise":"#A5FBD5","PastelYellow":"#FFFE71","BlueyPurple":"#6241C7","CanaryYellow":"#FFFE40","FadedRed":"#D3494E","Sepia":"#985E2B","Coffee":"#A6814C","BrightMagenta":"#FF08E8","Mocha":"#9D7651","Ecru":"#FEFFCA","Purpleish":"#98568D","Cranberry":"#9E003A","DarkishGreen":"#287C37","BrownOrange":"#B96902","DuskyRose":"#BA6873","Melon":"#FF7855","SicklyGreen":"#94B21C","Silver":"#C5C9C7","PurplyBlue":"#661AEE","PurpleishBlue":"#6140EF","HospitalGreen":"#9BE5AA","ShitBrown":"#7B5804","MidBlue":"#276AB3","Amber":"#FEB308","EasterGreen":"#8CFD7E","SoftBlue":"#6488EA","CeruleanBlue":"#056EEE","GoldenBrown":"#B27A01","BrightTurquoise":"#0FFEF9","RedPink":"#FA2A55","RedPurple":"#820747","GreyishBrown":"#7A6A4F","Vermillion":"#F4320C","Russet":"#A13905","SteelGrey":"#6F828A","LighterPurple":"#A55AF4","BrightViolet":"#AD0AFD","PrussianBlue":"#004577","SlateGreen":"#658D6D","DirtyPink":"#CA7B80","DarkBlueGreen":"#005249","Pine":"#2B5D34","DarkGold":"#B59410","Bluish":"#2976BB","DarkishBlue":"#014182","DullRed":"#BB3F3F","PinkyRed":"#FC2647","Bronze":"#A87900","PaleTeal":"#82CBB2","MilitaryGreen":"#667C3E","BarbiePink":"#FE46A5","BubblegumPink":"#FE83CC","PeaSoupGreen":"#94A617","DarkMustard":"#A88905","Shit":"#7F5F00","MediumPurple":"#9E43A2","VeryDarkGreen":"#062E03","Dirt":"#8A6E45","DuskyPink":"#CC7A8B","RedViolet":"#9E0168","LemonYellow":"#FDFF38","Pistachio":"#C0FA8B","DullYellow":"#EEDC5B","DarkLimeGreen":"#7EBD01","DenimBlue":"#3B5B92","TealBlue":"#01889F","LightishBlue":"#3D7AFD","PurpleyBlue":"#5F34E7","LightIndigo":"#6D5ACF","SwampGreen":"#748500","BrownGreen":"#706C11","DarkMaroon":"#3C0008","HotPurple":"#CB00F5","DarkForestGreen":"#002D04","FadedBlue":"#658CBB","DrabGreen":"#749551","LightLimeGreen":"#B9FF66","SnotGreen":"#9DC100","Yellowish":"#FAEE66","LightBlueGreen":"#7EFBB3","Bordeaux":"#7B002C","LightMauve":"#C292A1","Ocean":"#017B92","Marigold":"#FCC006","MuddyGreen":"#657432","DullOrange":"#D8863B","Steel":"#738595","ElectricPurple":"#AA23FF","FluorescentGreen":"#08FF08","YellowishBrown":"#9B7A01","Blush":"#F29E8E","SoftGreen":"#6FC276","BrightOrange":"#FF5B00","Lemon":"#FDFF52","PurpleGrey":"#866F85","AcidGreen":"#8FFE09","PaleLavender":"#EECFFE","VioletBlue":"#510AC9","LightForestGreen":"#4F9153","BurntRed":"#9F2305","KhakiGreen":"#728639","Cerise":"#DE0C62","FadedPurple":"#916E99","Apricot":"#FFB16D","DarkOliveGreen":"#3C4D03","GreyBrown":"#7F7053","GreenGrey":"#77926F","TrueBlue":"#010FCC","PaleViolet":"#CEAEFA","PeriwinkleBlue":"#8F99FB","LightSkyBlue":"#C6FCFF","Blurple":"#5539CC","GreenBrown":"#544E03","Bluegreen":"#017A79","BrightTeal":"#01F9C6","BrownishYellow":"#C9B003","PeaSoup":"#929901","Forest":"#0B5509","BarneyPurple":"#A00498","Ultramarine":"#2000B1","Purplish":"#94568C","PukeYellow":"#C2BE0E","BluishGrey":"#748B97","DarkPeriwinkle":"#665FD1","DarkLilac":"#9C6DA5","Reddish":"#C44240","LightMaroon":"#A24857","DustyPurple":"#825F87","TerraCotta":"#C9643B","Avocado":"#90B134","MarineBlue":"#01386A","TealGreen":"#25A36F","SlateGrey":"#59656D","LighterGreen":"#75FD63","ElectricGreen":"#21FC0D","DustyBlue":"#5A86AD","GoldenYellow":"#FEC615","BrightYellow":"#FFFD01","LightLavender":"#DFC5FE","Umber":"#B26400","Poop":"#7F5E00","DarkPeach":"#DE7E5D","JungleGreen":"#048243","Eggshell":"#FFFFD4","Denim":"#3B638C","YellowBrown":"#B79400","DullPurple":"#84597E","ChocolateBrown":"#411900","WineRed":"#7B0323","NeonBlue":"#04D9FF","DirtyGreen":"#667E2C","LightTan":"#FBEEAC","IceBlue":"#D7FFFE","CadetBlue":"#4E7496","DarkMauve":"#874C62","VeryLightBlue":"#D5FFFF","GreyPurple":"#826D8C","PastelPink":"#FFBACD","VeryLightGreen":"#D1FFBD","DarkSkyBlue":"#448EE4","Evergreen":"#05472A","DullPink":"#D5869D","Aubergine":"#3D0734","Mahogany":"#4A0100","ReddishOrange":"#F8481C","DeepGreen":"#02590F","VomitGreen":"#89A203","PurplePink":"#E03FD8","DustyPink":"#D58A94","FadedGreen":"#7BB274","CamoGreen":"#526525","PinkyPurple":"#C94CBE","PinkPurple":"#DB4BDA","BrownishRed":"#9E3623","DarkRose":"#B5485D","Mud":"#735C12","Brownish":"#9C6D57","EmeraldGreen":"#028F1E","PaleBrown":"#B1916E","DullBlue":"#49759C","BurntUmber":"#A0450E","MediumGreen":"#39AD48","Clay":"#B66A50","LightAqua":"#8CFFDB","LightOliveGreen":"#A4BE5C","BrownishOrange":"#CB7723","DarkAqua":"#05696B","PurplishPink":"#CE5DAE","DarkSalmon":"#C85A53","GreenishGrey":"#96AE8D","Jade":"#1FA774","UglyGreen":"#7A9703","DarkBeige":"#AC9362","Emerald":"#01A049","PaleRed":"#D9544D","LightMagenta":"#FA5FF7","Sky":"#82CAFC","LightCyan":"#ACFFFC","YellowOrange":"#FCB001","ReddishPurple":"#910951","ReddishPink":"#FE2C54","Orchid":"#C875C4","DirtyYellow":"#CDC50A","OrangeRed":"#FD411E","DeepRed":"#9A0200","OrangeBrown":"#BE6400","CobaltBlue":"#030AA7","NeonPink":"#FE019A","RosePink":"#F7879A","GreyishPurple":"#887191","Raspberry":"#B00149","AquaGreen":"#12E193","SalmonPink":"#FE7B7C","Tangerine":"#FF9408","BrownishGreen":"#6A6E09","RedBrown":"#8B2E16","GreenishBrown":"#696112","Pumpkin":"#E17701","PineGreen":"#0A481E","Charcoal":"#343837","BabyPink":"#FFB7CE","Cornflower":"#6A79F7","BlueViolet":"#5D06E9","Chocolate":"#3D1C02","GreyishGreen":"#82A67D","Scarlet":"#BE0119","GreenYellow":"#C9FF27","DarkOlive":"#373E02","Sienna":"#A9561E","PastelPurple":"#CAA0FF","Terracotta":"#CA6641","AquaBlue":"#02D8E9","SageGreen":"#88B378","BloodRed":"#980002","DeepPink":"#CB0162","Grass":"#5CAC2D","Moss":"#769958","PastelBlue":"#A2BFFE","BluishGreen":"#10A674","GreenBlue":"#06B48B","DarkTan":"#AF884A","GreenishBlue":"#0B8B87","PaleOrange":"#FFA756","Vomit":"#A2A415","ForrestGreen":"#154406","DarkLavender":"#856798","DarkViolet":"#34013F","PurpleBlue":"#632DE9","DarkCyan":"#0A888A","OliveDrab":"#6F7632","Pinkish":"#D46A7E","Cobalt":"#1E488F","NeonPurple":"#BC13FE","LightTurquoise":"#7EF4CC","AppleGreen":"#76CD26","DullGreen":"#74A662","Wine":"#80013F","PowderBlue":"#B1D1FC","OffWhite":"#FFFFE4","ElectricBlue":"#0652FF","DarkTurquoise":"#045C5A","BluePurple":"#5729CE","Azure":"#069AF3","BrightRed":"#FF000D","CornflowerBlue":"#5170D7","LightOlive":"#ACBF69","Grape":"#6C3461","GreyishBlue":"#5E819D","PurplishBlue":"#601EF9","YellowishGreen":"#B0DD16","GreenishYellow":"#CDFD02","MediumBlue":"#2C6FBB","DustyRose":"#C0737A","LightViolet":"#D6B4FC","MidnightBlue":"#020035","BluishPurple":"#703BE7","RedOrange":"#FD3C06","DarkMagenta":"#960056","Greenish":"#40A368","OceanBlue":"#03719C","Coral":"#FC5A50","Cream":"#FFFFC2","ReddishBrown":"#7F2B0A","BurntSienna":"#B04E0F","Brick":"#A03623","Sage":"#87AE73","GreyGreen":"#789B73","White":"#FFFFFF","RobinSEggBlue":"#98EFF9","MossGreen":"#658B38","SteelBlue":"#5A7D9A","Eggplant":"#380835","LightYellow":"#FFFE7A","LeafGreen":"#5CA904","LightGrey":"#D8DCD6","Puke":"#A5A502","PinkishPurple":"#D648D7","SeaBlue":"#047495","PalePurple":"#B790D4","SlateBlue":"#5B7C99","BlueGrey":"#607C8E","HunterGreen":"#0B4008","Fuchsia":"#ED0DD9","Crimson":"#8C000F","PaleYellow":"#FFFF84","Ochre":"#BF9005","MustardYellow":"#D2BD0A","LightRed":"#FF474C","Cerulean":"#0485D1","PalePink":"#FFCFDC","DeepBlue":"#040273","Rust":"#A83C09","LightTeal":"#90E4C1","Slate":"#516572","Goldenrod":"#FAC205","DarkYellow":"#D5B60A","DarkGrey":"#363737","ArmyGreen":"#4B5D16","GreyBlue":"#6B8BA4","Seafoam":"#80F9AD","Puce":"#A57E52","SpringGreen":"#A9F971","DarkOrange":"#C65102","Sand":"#E2CA76","PastelGreen":"#B0FF9D","Mint":"#9FFEB0","LightOrange":"#FDAA48","BrightPink":"#FE01B1","Chartreuse":"#C1F80A","DeepPurple":"#36013F","DarkBrown":"#341C02","Taupe":"#B9A281","PeaGreen":"#8EAB12","PukeGreen":"#9AAE07","KellyGreen":"#02AB2E","SeafoamGreen":"#7AF9AB","BlueGreen":"#137E6D","Khaki":"#AAA662","Burgundy":"#610023","DarkTeal":"#014D4E","BrickRed":"#8F1402","RoyalPurple":"#4B006E","Plum":"#580F41","MintGreen":"#8FFF9F","Gold":"#DBB40C","BabyBlue":"#A2CFFE","YellowGreen":"#C0FB2D","BrightPurple":"#BE03FD","DarkRed":"#840000","PaleBlue":"#D0FEFE","GrassGreen":"#3F9B0B","Navy":"#01153E","Aquamarine":"#04D8B2","BurntOrange":"#C04E01","NeonGreen":"#0CFF0C","BrightBlue":"#0165FC","Rose":"#CF6275","LightPink":"#FFD1DF","Mustard":"#CEB301","Indigo":"#380282","Lime":"#AAFF32","SeaGreen":"#53FCA1","Periwinkle":"#8E82FE","DarkPink":"#CB416B","OliveGreen":"#677A04","Peach":"#FFB07C","PaleGreen":"#C7FDB5","LightBrown":"#AD8150","HotPink":"#FF028D","Black":"#000000","Lilac":"#CEA2FD","NavyBlue":"#001146","RoyalBlue":"#0504AA","Beige":"#E6DAA6","Salmon":"#FF796C","Olive":"#6E750E","Maroon":"#650021","BrightGreen":"#01FF07","DarkPurple":"#35063E","Mauve":"#AE7181","ForestGreen":"#06470C","Aqua":"#13EAC9","Cyan":"#00FFFF","Tan":"#D1B26F","DarkBlue":"#00035B","Lavender":"#C79FEF","Turquoise":"#06C2AC","DarkGreen":"#033500","Violet":"#9A0EEA","LightPurple":"#BF77F6","LimeGreen":"#89FE05","Grey":"#929591","SkyBlue":"#75BBFD","Yellow":"#FFFF14","Magenta":"#C20078","LightGreen":"#96F97B","Orange":"#F97306","Teal":"#029386","LightBlue":"#95D0FC","Red":"#E50000","Brown":"#653700","Pink":"#FF81C0","Blue":"#0343DF","Green":"#15B01A","Purple":"#7E1E9C","black":"#000000","blue":"#0000FF","clear":"#00000000","cyan":"#00FFFF","gray":"#808080","grey":"#808080","green":"#00FF00","magenta":"#FF00FF","red":"#FF0000","white":"#FFFFFF","yellow":"#FFEB04","ResourceColorLiquidFuel":"#BFA760","ResourceColorLqdHydrogen":"#99CCFF","ResourceColorLqdMethane":"#00BF8F","ResourceColorOxidizer":"#3399CC","ResourceColorMonoPropellant":"#FFFFCC","ResourceColorXenonGas":"#60A7BF","ResourceColorElectricChargePrimary":"#FFFF33","ResourceColorElectricChargeSecondary":"#303030","ResourceColorOre":"#403020"},"descSum":{"en-us":{"lines":["<b>C-rate:<\/b> {crate}C","<b>Thermal loss:<\/b> {tl}% (T° max: {tmax} K)","<b>Self-discharge:<\/b> {sd}%/day","<b>Durability:<\/b> {cycles} cycles"],"primaryLine":"<#FF0000>Not rechargeable<\/color>","decimalComma":false,"thousandsSep":",","infiniteLine":"<b>Durability:<\/b> infinite","additive":" (additive)"},"es-es":{"lines":["<b>C-rate:<\/b> {crate}C","<b>Pérdida térmica:<\/b> {tl}% (T° máx: {tmax} K)","<b>Autodescarga:<\/b> {sd}%/día","<b>Durabilidad:<\/b> {cycles} ciclos"],"primaryLine":"<#FF0000>No recargable<\/color>","decimalComma":false,"thousandsSep":",","infiniteLine":"<b>Durabilidad:<\/b> infinita","additive":" (aditivo)"},"fr-fr":{"lines":["<b>Taux de décharge :<\/b> {crate}C","<b>Perte thermique :<\/b> {tl} % (T° max : {tmax} K)","<b>Autodécharge :<\/b> {sd} %/jour","Durée de vie : {cycles} cycles"],"primaryLine":"<#FF0000>Non rechargeable<\/color>","decimalComma":true,"thousandsSep":" ","infiniteLine":"Durée de vie : infinie","additive":" (additif)"},"it-it":{"lines":["<b>Indice di carica:<\/b> {crate}C","<b>Disp. termica:<\/b> {tl}% (T° max: {tmax} K)","<b>Autoscarica:<\/b> {sd}%/giorno","<b>Vita utile:<\/b> {cycles} cicli"],"primaryLine":"<#FF0000>Non ricaricabile<\/color>","decimalComma":false,"thousandsSep":",","infiniteLine":"<b>Vita utile:<\/b> infinita","additive":" (additivo)"},"ru":{"lines":["<b>С-рейтинг:<\/b> {crate}C","<b>Теплопотери:<\/b> {tl}% (макс. T°: {tmax} K)","<b>Саморазряд:<\/b> {sd}%/сутки","<b>Ресурс:<\/b> {cycles} циклов"],"primaryLine":"<#FF0000>Не перезаряжаемый<\/color>","decimalComma":false,"thousandsSep":",","infiniteLine":"<b>Ресурс:<\/b> бесконечный","additive":" (аддитивный)"},"zh-cn":{"lines":["C 倍率：{crate}C","热损：{tl}%（T° 最高：{tmax} K）","自放电：{sd}%/天","寿命：{cycles} 次循环"],"primaryLine":"<#FF0000>不可充电<\/color>","decimalComma":false,"thousandsSep":",","infiniteLine":"寿命：无限","additive":"（叠加）"}},"warnings":{"en-us":{"fixedOutput":"<#FF0000>Once activated, it cannot be stopped.<\/color>","keepWarm":"<#FF0000>Needs to reach operating temperature before running.<\/color>","cryo":"<#4DC2FF>Requires active cryogenic cooling.<\/color>","selfRunaway":"<#FF0000>Low but non-zero probability of spontaneous runaway.<\/color>","noEva":"<#FF0000>Not EVA-serviceable.<\/color>"},"es-es":{"fixedOutput":"<#FF0000>Una vez activada, no puede detenerse.<\/color>","keepWarm":"<#FF0000>Debe alcanzar la temperatura operativa antes de funcionar.<\/color>","cryo":"<#4DC2FF>Requiere refrigeración criogénica activa.<\/color>","selfRunaway":"<#FF0000>Pequeña, pero real, probabilidad de fuga térmica espontánea.<\/color>","noEva":"<#FF0000>No apta para mantenimiento en EVA.<\/color>"},"fr-fr":{"fixedOutput":"<#FF0000>Une fois activée, elle ne peut plus être arrêtée.<\/color>","keepWarm":"<#FF0000>Doit atteindre la température opérationnelle avant de fonctionner.<\/color>","cryo":"<#4DC2FF>Nécessite un refroidissement cryogénique actif.<\/color>","selfRunaway":"<#FF0000>Probabilité faible mais non nulle d'auto-emballement spontané.<\/color>","noEva":"<#FF0000>Ne peut pas être remplacée en EVA.<\/color>"},"it-it":{"fixedOutput":"<#FF0000>Una volta attivata non può essere spenta.<\/color>","keepWarm":"<#FF0000>Deve raggiungere la temperatura operativa prima del funzionamento.<\/color>","cryo":"<#4DC2FF>Richiede raffreddamento criogenico attivo.<\/color>","selfRunaway":"<#FF0000>Probabilità bassa ma non nulla di runaway spontaneo.<\/color>","noEva":"<#FF0000>Non può essere sostituita in EVA.<\/color>"},"ru":{"fixedOutput":"<#FF0000>После активации не может быть отключен.<\/color>","keepWarm":"<#FF0000>Требуется достичь рабочей температуры перед эксплуатацией.<\/color>","cryo":"<#4DC2FF>Требуется активное криогенное охлаждение.<\/color>","selfRunaway":"<#FF0000>Существует малая, но не нулевая вероятность спонтанного теплового разгона.<\/color>","noEva":"<#FF0000>Не может быть обслужен в полете.<\/color>"},"zh-cn":{"fixedOutput":"<#FF0000>一旦激活无法停止。<\/color>","keepWarm":"<#FF0000>运行前须达到工作温度。<\/color>","cryo":"<#4DC2FF>需要主动低温冷却。<\/color>","selfRunaway":"<#FF0000>存在低但非零的自发失控概率。<\/color>","noEva":"<#FF0000>不可进行 EVA 维护。<\/color>"}},"partIcons":[{"name":"batteryPack","title":"Z-100 Rechargeable Battery Pack","source":"stock"},{"name":"batteryBankMini","title":"Z-200 Rechargeable Battery Bank","source":"stock"},{"name":"ksp_r_largeBatteryPack","title":"Z-400 Rechargeable Battery","source":"stock"},{"name":"batteryBank","title":"Z-1k Rechargeable Battery Bank","source":"stock"},{"name":"batteryBankLarge","title":"Z-4K Rechargeable Battery Bank","source":"stock"},{"name":"RB.AgZn","title":"Silver Batteries","source":"RealBattery"},{"name":"RB.Graphene","title":"Graphene-Silicon Supercells","source":"RealBattery"},{"name":"RB.HoCell","title":"Long-lived Isotopic Cells","source":"RealBattery"},{"name":"RB.LiIon","title":"Lithium-Ion Batteries","source":"RealBattery"},{"name":"RB.LiPoly","title":"Lithium-Polymer Batteries","source":"RealBattery"},{"name":"RB.MgSb","title":"Liquid Metal Batteries","source":"RealBattery"},{"name":"RB.NiCd","title":"Nickel Batteries","source":"RealBattery"},{"name":"RB.Nuke","title":"Metastable Isotopic Cells","source":"RealBattery"},{"name":"RB.QET","title":"Quantum Teleportation Cells","source":"RealBattery"},{"name":"RB.SMES","title":"Superconducting Magnetic Cells","source":"RealBattery"},{"name":"RB.SSB","title":"Solid-State Batteries","source":"RealBattery"},{"name":"RB.VRFB","title":"Redox Flow Batteries","source":"RealBattery"},{"name":"RB.Zebra","title":"Molten-salt Batteries","source":"RealBattery"}]};
+const $ = id => document.getElementById(id);
+const F = DATA.fits, STD = DATA.standards, SP = DATA.spareParts;
+const CHEMS = Object.fromEntries(DATA.chemistries.map(c => [c.id, c]));
+const STORE_KEY = "rbBalancer.v1";
+
+// ------------------------------------------------------------ numbers and units
+function fmt(v, sig = 4) {
+  if (v === null || v === undefined || !isFinite(v)) return "—";
+  if (v === 0) return "0";
+  const r = Number(v.toPrecision(sig));
+  if (Math.abs(r) >= 1e-4 && Math.abs(r) < 1e7) return String(r);
+  return r.toExponential(sig - 1);
+}
+function parseRange(s) {
+  if (s === undefined || s === null) return null;
+  s = String(s).trim().replace(/,(?=\d{3}\b)/g, "").replace(/\s+/g, " ");
+  if (!s) return null;
+  const n = "(-?\\d*\\.?\\d+(?:e-?\\d+)?)";
+  let m = s.match(new RegExp("^" + n + "$", "i"));
+  if (m) return [Number(m[1]), Number(m[1])];
+  m = s.match(new RegExp("^" + n + "\\s*[-–—~]\\s*" + n + "$", "i"));
+  if (m) return [Number(m[1]), Number(m[2])];
+  return "bad";
+}
+const geo = r => (r && r[0] > 0 && r[1] > 0) ? Math.sqrt(r[0] * r[1]) : (r ? (r[0] + r[1]) / 2 : null);
+
+// unit -> base conversion; base units: Wh/kg, Wh/L, W/kg, $/kWh, C, fraction per month, cycles, %, K
+const UNITS = {
+  whkg: {"Wh/kg": v => v, "kJ/kg": v => v / 3.6, "MJ/kg": v => v * 1000 / 3.6},
+  whl: {"Wh/L": v => v, "kJ/L": v => v / 3.6, "MJ/L": v => v * 1000 / 3.6},
+  wkg: {"W/kg": v => v, "kW/kg": v => v * 1000},
+  price: {"$/kWh": v => v, "Wh/$": v => 1000 / v},
+  crate: {"C": v => v, "h to empty": v => 1 / v, "min to empty": v => 60 / v},
+  sd: {"%/month": v => v / 100, "%/day": v => v * 30.4375 / 100, "%/year": v => v / 12 / 100},
+  cycles: {"cycles": v => v},
+  eff: {"%": v => v, "fraction": v => v * 100},
+  ceff: {"%": v => v, "fraction": v => v * 100},
+  tover: {"°C": v => v + 273.15, "K": v => v, "°F": v => (v - 32) * 5 / 9 + 273.15},
+  trun: {"°C": v => v + 273.15, "K": v => v, "°F": v => (v - 32) * 5 / 9 + 273.15},
+};
+const FROM = {
+  whkg: {"Wh/kg": v => v, "kJ/kg": v => v * 3.6, "MJ/kg": v => v * 3.6 / 1000},
+  whl: {"Wh/L": v => v, "kJ/L": v => v * 3.6, "MJ/L": v => v * 3.6 / 1000},
+  wkg: {"W/kg": v => v, "kW/kg": v => v / 1000},
+  price: {"$/kWh": v => v, "Wh/$": v => 1000 / v},
+  crate: {"C": v => v, "h to empty": v => 1 / v, "min to empty": v => 60 / v},
+  sd: {"%/month": v => v * 100, "%/day": v => v * 100 / 30.4375, "%/year": v => v * 1200},
+  cycles: {"cycles": v => v}, eff: {"%": v => v, "fraction": v => v / 100}, ceff: {"%": v => v, "fraction": v => v / 100},
+  tover: {"°C": v => v - 273.15, "K": v => v, "°F": v => (v - 273.15) * 9 / 5 + 32},
+  trun: {"°C": v => v - 273.15, "K": v => v, "°F": v => (v - 273.15) * 9 / 5 + 32},
+};
+const TEMP_TO = {"K": v => v, "°C": v => v + 273.15, "°F": v => (v - 32) * 5 / 9 + 273.15};
+const TEMP_FROM = {"K": v => v, "°C": v => v - 273.15, "°F": v => (v - 273.15) * 9 / 5 + 32};
+
+// Common cell sizes (cylinders: diameter x length; 9V: box). Volume in cm³.
+const CELL_SIZES = [
+  {id: "18650", g: "Lithium cylindrical", d: 18, h: 65}, {id: "21700", g: "Lithium cylindrical", d: 21, h: 70},
+  {id: "14500", g: "Lithium cylindrical", d: 14, h: 50}, {id: "26650", g: "Lithium cylindrical", d: 26, h: 65},
+  {id: "32700", g: "Lithium cylindrical", d: 32, h: 70}, {id: "4680", g: "Lithium cylindrical", d: 46, h: 80},
+  {id: "AAA", g: "Consumer", d: 10.5, h: 44.5}, {id: "AA", g: "Consumer", d: 14.5, h: 50.5},
+  {id: "C", g: "Consumer", d: 26.2, h: 50}, {id: "D", g: "Consumer", d: 34.2, h: 61.5},
+  {id: "9V", g: "Consumer", box: [48.5, 26.5, 17.5]}, {id: "CR2032", g: "Consumer", d: 20, h: 3.2},
+].map(c => ({...c, cm3: c.box ? c.box[0] * c.box[1] * c.box[2] / 1000 : Math.PI * (c.d / 2) ** 2 * c.h / 1000}));
+
+const REAL_FIELDS = [
+  {k: "whkg", label: "Specific energy", tip: "Energy per mass. Also called gravimetric energy density. Wikipedia: 'Specific energy'."},
+  {k: "whl", label: "Energy density", tip: "Energy per volume. Also called volumetric energy density."},
+  {k: "wkg", label: "Specific power (peak)", tip: "Peak power per mass. Drives the EC buffer. If empty, it is estimated from the C-rate."},
+  {k: "price", label: "Price", tip: "Cost of the stored energy. Converted at 1 $ = 0.5 funds per kWh."},
+  {k: "crate", label: "Continuous C-rate", tip: "Recommended CONTINUOUS discharge rate, not the peak. 1C = full discharge in 1 hour; you can also give the discharge time in hours or minutes. Balanced for gameplay: use the value you want in game."},
+  {k: "sd", label: "Self-discharge", tip: "Charge lost while idle. Applied in game per day of the home world."},
+  {k: "cycles", label: "Cycle durability", tip: "Full charge-discharge cycles before end of life (at 100% depth of discharge where given)."},
+  {k: "eff", label: "Round-trip efficiency", tip: "Energy out / energy in over a full cycle. Drives ThermalLoss (the share of power turned into heat)."},
+  {k: "ceff", label: "Charge efficiency (peak)", tip: "Peak of the charge efficiency curve. Empty = the default chemistry's peak."},
+  {k: "tover", label: "Overheat temperature", tip: "Temperature above which the battery degrades and shuts down."},
+  {k: "trun", label: "Thermal runaway", tip: "Temperature of thermal runaway. Empty = overheat + the standard gap."},
+];
+
+// Other unit selects: value in unit -> common base, and back.
+const SIMPLE_UNITS = {
+  cellMU: {g: v => v, kg: v => v * 1000}, cellVolU: {cm3: v => v, L: v => v * 1000},
+  toptU: TEMP_TO, rbcU: {pct: v => v, frac: v => v * 100},
+};
+const SIMPLE_FROM = {
+  cellMU: {g: v => v, kg: v => v / 1000}, cellVolU: {cm3: v => v, L: v => v / 1000},
+  toptU: TEMP_FROM, rbcU: {pct: v => v, frac: v => v / 100},
+};
+const UNIT_INPUT = {cellMU: "cellM", cellVolU: "cellVol", toptU: "topt", rbcU: "rbc", cellCapU: "cellCap"};
+
+// Rewrite the text of a field from one unit to another, keeping a range a range.
+function convertField(input, from, to) {
+  const r = parseRange(input.value);
+  if (!r || r === "bad" || from === to) return;
+  const one = v => { const x = to(from(v)); return isFinite(x) ? fmt(x, 6) : null; };
+  const a = one(r[0]), b = one(r[1]);
+  if (a === null || b === null) return;
+  input.value = r[0] === r[1] ? a : (Number(a) <= Number(b) ? `${a}-${b}` : `${b}-${a}`);
+}
+function onUnitChange(sel) {
+  const prev = sel.dataset.prev, now = sel.value;
+  sel.dataset.prev = now;
+  if (!prev || prev === now) return;
+  if (sel.id.startsWith("u_")) {
+    const k = sel.id.slice(2);
+    convertField($("in_" + k), UNITS[k][prev], FROM[k][now]);
+  } else if (sel.id === "cellCapU") {
+    // mAh/Ah need the voltage to become energy.
+    const vr = parseRange(val("cellV")), volt = (vr && vr !== "bad") ? geo(vr) : Number($("cellV").placeholder) || 3.6;
+    const toWh = {mAh: v => v * volt / 1000, Ah: v => v * volt, Wh: v => v, kJ: v => v / 3.6, J: v => v / 3600};
+    const fromWh = {mAh: v => v * 1000 / volt, Ah: v => v / volt, Wh: v => v, kJ: v => v * 3.6, J: v => v * 3600};
+    convertField($("cellCap"), toWh[prev], fromWh[now]);
+  } else if (SIMPLE_UNITS[sel.id]) {
+    convertField($(UNIT_INPUT[sel.id]), SIMPLE_UNITS[sel.id][prev], SIMPLE_FROM[sel.id][now]);
+  }
+}
+
+// ------------------------------------------------------------ defaults from a template chemistry
+function realOf(c) {
+  // Anchor values where known, otherwise the configs inverted through the fitted laws.
+  const a = DATA.anchors[c.id] || {};
+  const f = c.fields, g = c.game, inv = (y, fit) => Math.pow(y / fit.a, 1 / fit.b);
+  const curve = c.curve || [];
+  return {
+    whkg: geo(a.whkg) ?? (g.whkg ? inv(g.whkg, F.whkg) : null),
+    whl: geo(a.whl) ?? inv(g.whl, F.whl),
+    wkg: geo(a.wkg) ?? (g.wkgPeak ? g.wkgPeak / F.wkgPeak.k : null),
+    price: geo(a.usdkwh) ?? (g.fundsPerKWh ? g.fundsPerKWh / F.fundsPerUsd : null),
+    crate: c.Crate,
+    sd: geo(a.sdMonth) !== null && a.sdMonth ? geo(a.sdMonth) / 100 : Number(f.SelfDischargeRate || 0) / F.selfDischarge.k,
+    cycles: geo(a.cycles) ?? Number(f.CycleDurability || 1) / F.cycles.k,
+    eff: geo(a.eff) ?? Math.max(0, (1 - Number(f.ThermalLoss || 0) / F.thermalLoss.k) * 100),
+    ceff: curve.length ? Math.max(...curve.map(k => k[1])) * 100 : 90,
+    tover: Number(f.TempOverheat || 450),
+    trun: Number(f.TempRunaway || 550),
+    volt: a.volt || 3.6,
+  };
+}
+
+// ------------------------------------------------------------ colors (B9PartSwitch formats)
+function parseColor(v) {
+  v = (v || "").trim();
+  if (!v) return null;
+  if (/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v)) {
+    let h = v.slice(1);
+    if (h.length <= 4) h = h.split("").map(c => c + c).join("");
+    return "#" + h;
+  }
+  const f = v.split(/[\s,]+/).filter(Boolean).map(Number);
+  if ((f.length === 3 || f.length === 4) && f.every(x => !isNaN(x) && x >= 0 && x <= 1))
+    return "#" + f.map(x => Math.round(x * 255).toString(16).padStart(2, "0")).join("");
+  return DATA.colors[v] || null;
+}
+
+// ------------------------------------------------------------ state helpers
+const val = id => { const e = $(id); return e ? (e.type === "checkbox" ? e.checked : e.value) : undefined; };
+const KNOBS = {};          // key -> {op, v}
+let evaLevel = STD.EVAminLevel;
+let rexRows = [];
+let curveDirty = false;
+let activeTab = 0;
+
+// ------------------------------------------------------------ the model
+function compute() {
+  const tpl = CHEMS[val("tpl")] || CHEMS.Li_ion;
+  const def = realOf(tpl);
+  const notes = [], est = new Set();
+  const real = {};
+  for (const fld of REAL_FIELDS) {
+    const raw = parseRange(val("in_" + fld.k));
+    const unit = val("u_" + fld.k);
+    if (raw === "bad") { notes.push(["w", `${fld.label}: "${val("in_" + fld.k)}" is not a number or a range.`]); }
+    if (raw && raw !== "bad") {
+      const conv = UNITS[fld.k][unit];
+      const r = [conv(raw[0]), conv(raw[1])];
+      real[fld.k] = (fld.k === "price" && unit === "Wh/$") ? geo([r[1], r[0]]) : geo(r);
+    } else {
+      real[fld.k] = null;
+    }
+  }
+  // Cell datasheet overrides the two densities.
+  if (val("cellOn")) {
+    const cap = parseRange(val("cellCap")), m = parseRange(val("cellM"));
+    const size = CELL_SIZES.find(c => c.id === val("cellSize"));
+    const vol = size ? [size.cm3, size.cm3] : parseRange(val("cellVol"));
+    const vRaw = parseRange(val("cellV"));
+    const volt = (vRaw && vRaw !== "bad") ? geo(vRaw) : def.volt;
+    if (cap && cap !== "bad" && m && m !== "bad") {
+      const c = geo(cap), u = val("cellCapU");
+      const wh = u === "Wh" ? c : u === "kJ" ? c / 3.6 : u === "J" ? c / 3600 : (u === "Ah" ? c * volt : c * volt / 1000);
+      const kg = val("cellMU") === "kg" ? geo(m) : geo(m) / 1000;
+      real.whkg = wh / kg;
+      let txt = `Cell: ${fmt(wh, 3)} Wh at ${fmt(volt, 3)} V → ${fmt(real.whkg, 3)} Wh/kg`;
+      if (vol && vol !== "bad") {
+        const L = (!size && val("cellVolU") === "L") ? geo(vol) : geo(vol) / 1000;
+        real.whl = wh / L;
+        txt += `, ${fmt(real.whl, 3)} Wh/L`;
+      }
+      $("cellOut").textContent = txt + " (overrides the fields below).";
+    } else {
+      $("cellOut").textContent = "Enter capacity and mass (and volume) to derive the densities.";
+    }
+  } else $("cellOut").textContent = "";
+
+  const used = {};
+  for (const k of Object.keys(def)) {
+    used[k] = real[k] ?? def[k];
+    if (real[k] === null || real[k] === undefined) est.add(k);
+  }
+  const primary = val("primary");
+
+  // Balancing (proposed values), then knobs; dependent values use adjusted inputs.
+  const P = {}, V = {}, why = {};
+  const knob = (k, p) => { if (val("roundOn") && ROUND[k]) p = ROUND[k](p); P[k] = p; const kn = KNOBS[k]; let v = p;
+    if (kn && kn.v !== "" && !isNaN(Number(kn.v))) { const x = Number(kn.v);
+      v = kn.op === "×" ? p * x : kn.op === "+" ? p + x : x; }
+    V[k] = v; return v; };
+
+  const whkgG = F.whkg.a * Math.pow(used.whkg, F.whkg.b);
+  const whlG = F.whl.a * Math.pow(used.whl, F.whl.b);
+  const sc = knob("sc", whlG / 1000);
+  why.sc = `${fmt(F.whl.a)} × ${fmt(used.whl, 3)}^${fmt(F.whl.b)} Wh/L ÷ 1000`;
+  const mass = knob("mass", sc / whkgG);
+  why.mass = `SC ÷ ${fmt(whkgG, 3)} Wh/kg in game (${fmt(F.whkg.a)} × ${fmt(used.whkg, 3)}^${fmt(F.whkg.b)})`;
+  const crate = knob("crate", used.crate);
+  why.crate = est.has("crate") ? `default from ${tpl.title}` : "direct input";
+  let ecP, ecEst = false;
+  if (real.wkg) { ecP = F.wkgPeak.k * real.wkg * mass; why.ec = `${fmt(F.wkgPeak.k)} × ${fmt(real.wkg, 3)} W/kg × tankMass`; }
+  else { ecP = sc * crate * F.peakToContinuous.k; ecEst = true; why.ec = `estimated: SC × C-rate × ${fmt(F.peakToContinuous.k, 3)} (typical peak/continuous)`; }
+  const ec = knob("ec", ecP);
+  const fundsKWh = used.price * F.fundsPerUsd;
+  const cost = knob("cost", fundsKWh * sc);
+  why.cost = `${fmt(used.price, 3)} $/kWh × ${F.fundsPerUsd} = ${fmt(fundsKWh, 3)} √/kWh × SC`;
+  const sd = knob("sd", F.selfDischarge.k * used.sd);
+  why.sd = `${fmt(F.selfDischarge.k)} × ${fmt(used.sd * 100, 3)} %/month, per game day`;
+  const cycles = knob("cycles", primary ? 1 : Math.max(1, Math.round(F.cycles.k * used.cycles)));
+  why.cycles = primary ? "primary cell" : `${fmt(F.cycles.k)} × ${fmt(used.cycles, 3)}`;
+  const tl = knob("tl", F.thermalLoss.k * (1 - used.eff / 100));
+  why.tl = `${fmt(F.thermalLoss.k)} × (1 − ${fmt(used.eff, 3)}%)`;
+  const tover = knob("tover", Math.round(used.tover));
+  why.tover = "overheat, in K";
+  const trunP = real.trun ? Math.round(real.trun) : tover + STD.RunawayGap;
+  const trun = knob("trun", trunP);
+  why.trun = real.trun ? "runaway, in K" : `overheat + ${STD.RunawayGap} K`;
+  const spC = (cost / sc) / SP.unitCost, spM = (mass / sc) / SP.density;
+  const sp = knob("sp", Math.sqrt(spC * spM));
+  why.sp = `√(cost parity ${fmt(spC, 3)} × mass parity ${fmt(spM, 3)})`;
+
+  // Charge curve.
+  let curve;
+  const peak = Math.min(1, used.ceff / 100);
+  if (primary) curve = [[0, 0], [1, 0]];
+  else if (val("curvePreset") === "custom" && curveDirty) curve = parseCurve(val("curveText")) || [[0, peak], [1, peak]];
+  else curve = DATA.curvePresets[val("curvePreset")].map(([x, f]) => [x, Number((f * peak).toFixed(3))]);
+
+  // Warnings.
+  const id = val("cid").trim();
+  if (!id) notes.push(["w", "ChemistryID is empty: the configs use a placeholder."]);
+  else if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(id)) notes.push(["w", "ChemistryID must start with a letter and contain only letters, digits and underscores."]);
+  else if (CHEMS[id] || DATA.chemistries.some(c => c.tank === id)) notes.push(["w", `ChemistryID "${id}" already exists in RealBattery.`]);
+  const rngKg = F.whkg.range, rngL = F.whl.range;
+  if (used.whkg < rngKg[0] || used.whkg > rngKg[1]) notes.push(["w", `Specific energy ${fmt(used.whkg, 3)} Wh/kg is outside the anchors (${fmt(rngKg[0], 3)}–${fmt(rngKg[1], 3)}): the law is extrapolated.`]);
+  if (used.whl < rngL[0] || used.whl > rngL[1]) notes.push(["w", `Energy density ${fmt(used.whl, 3)} Wh/L is outside the anchors (${fmt(rngL[0], 3)}–${fmt(rngL[1], 3)}): the law is extrapolated.`]);
+  if (ecEst) notes.push(["i", "EC estimated from the C-rate (no specific power given)."]);
+  if (sc * crate > ec) notes.push(["w", `Continuous power ${fmt(sc * crate, 3)} kW/L exceeds the peak power (EC) ${fmt(ec, 3)} kW/L.`]);
+  if (trun <= tover) notes.push(["w", "TempRunaway must be above TempOverheat."]);
+  if (val("kwOn")) { const lo = Number(val("kwLo") || STD.TempKeepWarmLo), hi = Number(val("kwHi") || STD.TempKeepWarmHi);
+    if (!(lo < hi)) notes.push(["w", "TempKeepWarmLo must be below TempKeepWarmHi."]); }
+  for (const i of [1, 2]) if (val("col" + i).trim() && !parseColor(val("col" + i))) notes.push(["w", `${i === 1 ? "Primary" : "Secondary"} color is not a valid B9PartSwitch color.`]);
+  const defs = ["whkg", "whl", "price", "crate", "sd", "cycles", "eff"].filter(k => est.has(k)).map(k => REAL_FIELDS.find(f => f.k === k).label.toLowerCase());
+  if (defs.length) notes.push(["i", `Defaults from ${tpl.title}: ${defs.join(", ")}.`]);
+  if (!real.price && !est.has("price")) {}
+  if (!notes.some(n => n[0] === "w")) notes.push(["ok", "No problems found."]);
+
+  return {tpl, def, used, est, P, V, why, curve, primary, notes, whkgG, whlG, fundsKWh, ecEst};
+}
+
+function parseCurve(t) {
+  const keys = [];
+  for (const line of (t || "").split(/\n/)) {
+    const m = line.replace(/key\s*=/, "").trim().split(/[\s,]+/).filter(Boolean).map(Number);
+    if (m.length >= 2 && m.every(x => !isNaN(x))) keys.push([m[0], m[1]]);
+  }
+  return keys.length ? keys.sort((a, b) => a[0] - b[0]) : null;
+}
+
+// ------------------------------------------------------------ rounding to the precision of the RB configs
+function sig2(v) { return v ? Number(v.toPrecision(2)) : v; }
+function halfStep(v) {
+  // 1 significant digit, or 2 with a 5 as second digit (0.15, 0.25, 75, 4500).
+  if (!v || v <= 0) return v;
+  const e = Math.floor(Math.log10(v)), u = Math.pow(10, e - 1) * 5;
+  return Number((Math.round(v / u) * u).toPrecision(2));
+}
+const ROUND = {
+  sc: sig2, ec: sig2, cost: sig2, mass: sig2, cycles: v => Math.max(1, halfStep(v)),
+  sd: halfStep, tl: halfStep, sp: v => Math.max(1, Math.round(v)),
+  tover: v => Math.round(v / 10) * 10, trun: v => Math.round(v / 10) * 10,
+};
+
+// ------------------------------------------------------------ cfg text
+const IND = "    ";
+function block(name, lines, depth = 0) {
+  const pad = IND.repeat(depth);
+  return [pad + name, pad + "{", ...lines.map(l => l === "" ? "" : IND + l.replace(/\n/g, "\n" + IND)), pad + "}"].join("\n");
+}
+function kv(k, v, w = 0) { return (w ? k.padEnd(w) : k) + " = " + v; }
+
+function gameplay() {
+  return {
+    HighEClevel: null, LowEClevel: STD.LowEClevel,
+    EvaRefurbishEnabled: val("evaRef"),
+    EVAminLevel: evaLevel,
+    TempOptimal: (() => { const r = parseRange(val("topt")); return r && r !== "bad" ? Math.round(TEMP_TO[val("toptU")](geo(r))) : STD.TempOptimal; })(),
+    RunawayHeatFactor: (() => { const r = parseRange(val("rhf")); return r && r !== "bad" ? geo(r) : STD.RunawayHeatFactor; })(),
+    FixedOutput: val("fixedOut") ? "true" : "false",
+    BatteryStaged: val("staged") ? "true" : "false",
+    KeepWarmMode: val("kwOn") ? val("kwMode") : "false",
+    TempKeepWarmLo: val("kwOn") && val("kwLo") ? Number(val("kwLo")) : Number(STD.TempKeepWarmLo),
+    TempKeepWarmHi: val("kwOn") && val("kwHi") ? Number(val("kwHi")) : Number(STD.TempKeepWarmHi),
+    SelfRunaway: val("selfRun") ? "true" : "false",
+    RunawayBaseChance: val("selfRun") ? ((Number(val("rbc")) || (val("rbcU") === "pct" ? 1 : 0.01)) / (val("rbcU") === "pct" ? 100 : 1)) : 0.0,
+    LifeDecay: val("lifeDecay") ? "true" : "false",
+    InfiniteCycles: val("infCycles") ? "true" : "false",
+    CrateScale: val("csOn") ? val("csMode") : null,
+    CrateScaleFactor: val("csOn") ? (Number(val("csF")) || STD.CrateScaleFactor) : null,
+  };
+}
+
+function ids() {
+  const id = val("cid").trim() || "MyChemistry";
+  return {id, up: "RB_Upgrade" + id, loc: s => `#LOC_RB_${s}_${id}`, upTitle: `#LOC_RB_Upgrade${id}_title`};
+}
+
+function upgradeInfo() {
+  const tree = val("tree"), attach = val("attach");
+  if (attach) return {attach};
+  let node = null, ctt = null;
+  if (tree === "stock") node = val("stockNode");
+  else if (tree === "ctt") node = val("cttNode");
+  else if (tree === "both") { node = val("stockNode"); ctt = val("cttNode"); }
+  else node = val("customNode").trim() || null;
+  if (!node || node === "start") return {none: true};
+  if (ctt === "start") ctt = null;
+  return {node, ctt: ctt && ctt !== node ? ctt : null};
+}
+
+function descSum(m) {
+  const t = DATA.descSum[val("lang")] || DATA.descSum["en-us"];
+  const num = (v, d) => { let s = String(Number(v.toFixed(d))); return t.decimalComma ? s.replace(".", ",") : s; };
+  const grp = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, t.thousandsSep);
+  const lines = [
+    t.lines[0].replace("{crate}", num(m.V.crate, 3)) + (val("csOn") && val("csMode") === "add" ? (t.additive || "") : ""),
+    t.lines[1].replace("{tl}", num(m.V.tl * 100, 1)).replace("{tmax}", String(Math.round(m.V.tover))),
+    t.lines[2].replace("{sd}", num(m.V.sd * 100, 2)),
+    m.primary ? t.primaryLine : (val("infCycles") && t.infiniteLine) ? t.infiniteLine : t.lines[3].replace("{cycles}", grp(m.V.cycles)),
+  ];
+  return lines.join("\\n");
+}
+
+function cfgChem(m) {
+  const I = ids(), g = gameplay(), W = 19;
+  const L = [
+    kv("ChemistryID", I.id), kv("displayName", I.loc("short")), kv("title", I.loc("title")),
+    kv("descriptionSummary", I.loc("descSum")), kv("descriptionDetail", I.loc("descDet")), "",
+    kv("HighEClevel", m.primary ? "2" : STD.HighEClevel, 11), kv("LowEClevel", g.LowEClevel, 11), kv("Crate", fmt(m.V.crate), 11),
+  ];
+  if (g.CrateScale) L.push(kv("CrateScale", g.CrateScale, 11), kv("CrateScaleFactor", fmt(g.CrateScaleFactor), 11));
+  L.push("",
+    kv("CycleDurability", fmt(m.V.cycles, 6), W), kv("SelfDischargeRate", fmt(m.V.sd), W),
+    kv("EvaRefurbishEnabled", g.EvaRefurbishEnabled, W), kv("EVAminLevel", g.EVAminLevel, W),
+    kv("SparePartsPerKWh", fmt(m.V.sp, 3), W), "",
+    kv("ThermalLoss", fmt(m.V.tl, 3), W), kv("TempOptimal", g.TempOptimal, W),
+    kv("TempOverheat", Math.round(m.V.tover), W), kv("TempRunaway", Math.round(m.V.trun), W),
+    kv("RunawayHeatFactor", fmt(g.RunawayHeatFactor), W), "",
+    kv("FixedOutput", g.FixedOutput, W), kv("BatteryStaged", g.BatteryStaged, W),
+    kv("KeepWarmMode", g.KeepWarmMode, W), kv("TempKeepWarmLo", g.TempKeepWarmLo, W), kv("TempKeepWarmHi", g.TempKeepWarmHi, W),
+    kv("SelfRunaway", g.SelfRunaway, W), kv("RunawayBaseChance", fmt(g.RunawayBaseChance) === "0" ? "0.0" : fmt(g.RunawayBaseChance), W),
+    kv("LifeDecay", g.LifeDecay, W), kv("InfiniteCycles", g.InfiniteCycles, W));
+  if (val("rexOn")) for (const r of rexRows) if (r.name.trim())
+    L.push("", block("RESOURCE_EXTRA", [kv("name", r.name.trim(), 5), kv("ratio", r.ratio || "1", 5), kv("mode", r.mode, 5), kv("type", r.type, 5)]));
+  L.push("", block("ChargeEfficiencyCurve", m.curve.map(([x, y]) => `key = ${x.toFixed(2).replace(/0$/, "")} ${y.toFixed(3).replace(/0+$/, "").replace(/\.$/, ".0")}`)));
+  return block("REALBATTERY_CHEMISTRY", L);
+}
+
+function cfgTank(m) {
+  const I = ids();
+  const L = [kv("name", I.id)];
+  if (val("col1").trim()) L.push(kv("primaryColor", val("col1").trim()));
+  if (val("col2").trim()) L.push(kv("secondaryColor", val("col2").trim()));
+  L.push(kv("tankMass", fmt(m.V.mass)), kv("tankCost", fmt(m.V.cost)), "",
+    block("RESOURCE", [kv("name", "ElectricCharge"), kv("unitsPerVolume", fmt(m.V.ec))]), "",
+    block("RESOURCE", [kv("name", "StoredCharge"), kv("unitsPerVolume", fmt(m.V.sc))]));
+  return block("B9_TANK_TYPE", L);
+}
+
+function cfgSubtype() {
+  const I = ids(), u = upgradeInfo();
+  const L = [kv("name", I.id), kv("title", I.loc("title")), kv("descriptionSummary", I.loc("descSum")),
+    kv("descriptionDetail", I.loc("descDet")), kv("tankType", I.id)];
+  if (u.attach) L.push(kv("upgradeRequired", u.attach));
+  else if (!u.none) L.push(kv("upgradeRequired", I.up));
+  L.push("", block("MODULE", [block("IDENTIFIER", [kv("name", "RealBattery")]), block("DATA", [kv("ChemistryID", I.id)])]));
+  return "// Copy into the battery switch of your own @PART patch.\n" + block("SUBTYPE", L);
+}
+
+function cfgResources(m) {
+  // Modify an existing resource of the part (@RESOURCE) or add a new one (RESOURCE).
+  const res = (name, f, modify) => modify
+    ? block(`@RESOURCE[${name}]`, ["@maxAmount = #$../RBbaseVolume$", `@maxAmount *= ${fmt(f)}`, "@amount = #$../RBbaseVolume$", `@amount *= ${fmt(f)}`])
+    : block("RESOURCE", [kv("name", name), "maxAmount = #$../RBbaseVolume$", `@maxAmount *= ${fmt(f)}`, "amount = #$../RBbaseVolume$", `@amount *= ${fmt(f)}`]);
+  return "// Inside your @PART patch, after setting RBbaseVolume (litres of battery volume).\n" +
+    res("ElectricCharge", m.V.ec, val("resEcMod")) + "\n\n" + res("StoredCharge", m.V.sc, val("resScMod"));
+}
+
+// Entry cost of a RealBattery upgrade on the same node (stock or CTT), else the median of all of them.
+function defaultEntryCost() {
+  const u = upgradeInfo(), node = u.node;
+  const same = DATA.upgrades.find(x => x.techRequired === node || x.techRequiredCTT === node);
+  if (same) return same.entryCost;
+  const all = DATA.upgrades.map(x => x.entryCost).sort((a, b) => a - b);
+  return all[Math.floor(all.length / 2)] || 0;
+}
+
+function iconName() { return val("icon") === "__custom" ? (val("iconCustom").trim() || DATA.meta.defaultPartIcon) : val("icon"); }
+
+function cfgUpgrade() {
+  const I = ids(), u = upgradeInfo();
+  if (u.attach) return `// The subtype unlocks with the existing upgrade ${u.attach}: no PARTUPGRADE needed.`;
+  if (u.none) return "// Tech node 'start' or none: the subtype is available from the start, no PARTUPGRADE needed.";
+  let s = block("PARTUPGRADE", [kv("name", I.up), kv("partIcon", iconName()), kv("techRequired", u.node),
+    kv("entryCost", Math.round(Number(val("entryCost")) || defaultEntryCost())), kv("cost", "0"), "",
+    kv("title", I.upTitle), kv("basicInfo", I.loc("descSum")), kv("description", I.loc("descDet"))]);
+  if (u.ctt) s += "\n\n" + block(`@PARTUPGRADE[${I.up}]:NEEDS[CommunityTechTree]`, [kv("@techRequired", u.ctt)]);
+  return s;
+}
+
+function descDet(title) {
+  const base = (val("desc").trim() || title).replace(/\n/g, " ");
+  if (!val("autoWarn")) return base;
+  const w = DATA.warnings[val("lang")] || DATA.warnings["en-us"], add = [];
+  if (val("fixedOut")) add.push(w.fixedOutput);
+  if (val("kwOn")) add.push(val("kwMode") === "cryo" ? w.cryo : w.keepWarm);
+  if (val("selfRun")) add.push(w.selfRunaway);
+  if (val("evaRef") === "false") add.push(w.noEva);
+  return [base].concat(add.filter(Boolean)).join("\\n");
+}
+
+function cfgLoc(m) {
+  const I = ids(), u = upgradeInfo();
+  const title = val("title").trim() || "My Chemistry";
+  const L = [kv(I.loc("title"), title), kv(I.loc("short"), val("short").trim() || I.id),
+    kv(I.loc("descSum"), descSum(m)), kv(I.loc("descDet"), descDet(title))];
+  if (!u.attach && !u.none) L.push(kv(I.upTitle, val("upTitle").trim() || title));
+  return block("Localization", [block(val("lang"), L)]);
+}
+
+const TABS = [
+  {name: "REALBATTERY_CHEMISTRY", f: cfgChem}, {name: "B9_TANK_TYPE", f: cfgTank},
+  {name: "SUBTYPE", f: cfgSubtype}, {name: "RESOURCE (patch)", f: cfgResources},
+  {name: "PARTUPGRADE", f: cfgUpgrade}, {name: "Localization", f: cfgLoc},
+];
+
+function exportCfg(m) {
+  const parts = [`// ${val("title").trim() || ids().id} — generated by the RealBattery Balancer (RB ${DATA.meta.rbVersion} data)`];
+  if (val("exChem")) parts.push(cfgChem(m));
+  if (val("exTank")) parts.push(cfgTank(m));
+  if (val("exUp")) { const u = upgradeInfo(); if (!u.attach && !u.none) parts.push(cfgUpgrade()); }
+  if (val("exLoc")) parts.push(cfgLoc(m));
+  return parts.join("\n\n") + "\n";
+}
+
+// ------------------------------------------------------------ rendering
+const BAL = [
+  {k: "sc", label: "SC / L", unit: "kWh"}, {k: "mass", label: "tankMass", unit: "t/L"},
+  {k: "crate", label: "Crate", unit: "C"}, {k: "ec", label: "EC / L", unit: "kW"},
+  {k: "cost", label: "tankCost", unit: "√/L"}, {k: "sd", label: "SelfDischargeRate", unit: "/day"},
+  {k: "cycles", label: "CycleDurability", unit: ""}, {k: "tl", label: "ThermalLoss", unit: ""},
+  {k: "tover", label: "TempOverheat", unit: "K"}, {k: "trun", label: "TempRunaway", unit: "K"},
+  {k: "sp", label: "SparePartsPerKWh", unit: ""},
+];
+
+function buildBalRows() {
+  $("balRows").innerHTML = BAL.map(b => `<tr>
+    <td>${b.label}<div class="why" id="why_${b.k}"></div></td>
+    <td class="v" id="v_${b.k}"></td>
+    <td><div class="knob"><select id="op_${b.k}" aria-label="${b.label} operation"><option>×</option><option>+</option><option>=</option></select><input type="text" id="kv_${b.k}" placeholder="1" aria-label="${b.label} adjustment"></div></td>
+    <td><button type="button" class="iconbtn" data-reset="${b.k}" title="Reset to the proposed value">↺</button></td></tr>`).join("");
+  for (const b of BAL) {
+    const sync = () => { KNOBS[b.k] = {op: $("op_" + b.k).value, v: $("kv_" + b.k).value.trim()}; update(); };
+    $("op_" + b.k).addEventListener("change", () => {
+      const op = $("op_" + b.k).value;
+      $("kv_" + b.k).placeholder = op === "×" ? "1" : op === "+" ? "0" : "value";
+      sync();
+    });
+    $("kv_" + b.k).addEventListener("input", sync);
+  }
+  $("balRows").addEventListener("click", e => {
+    const k = e.target.dataset.reset; if (!k) return;
+    $("op_" + k).value = "×"; $("kv_" + k).value = ""; $("kv_" + k).placeholder = "1"; delete KNOBS[k]; update();
+  });
+}
+
+function renderBal(m) {
+  for (const b of BAL) {
+    const v = m.V[b.k], p = m.P[b.k];
+    const adj = Math.abs(v - p) > 1e-12 * Math.max(1, Math.abs(p));
+    const cell = $("v_" + b.k);
+    cell.textContent = `${fmt(v)}${b.unit ? " " + b.unit : ""}`;
+    cell.classList.toggle("adj", adj);
+    cell.title = adj ? `proposed: ${fmt(p)}` : "";
+    const w = $("why_" + b.k);
+    w.textContent = m.why[b.k] || "";
+    w.classList.toggle("est", b.k === "ec" && m.ecEst);
+  }
+  $("warns").innerHTML = m.notes.map(([t, s]) => `<div class="${t === "w" ? "w" : t === "i" ? "i" : "okm"}">${t === "w" ? "⚠ " : t === "ok" ? "✓ " : "ℹ "}${esc(s)}</div>`).join("");
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
+
+function dur(h) {
+  if (!isFinite(h) || h <= 0) return "—";
+  if (h < 1) return `${Math.round(h * 60)} min`;
+  if (h < 48) return `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, "0")} m`;
+  return `${fmt(h / 24, 3)} days`;
+}
+
+function renderCards(m) {
+  const b = DATA.stockBatteries.find(x => x.name === val("part")) || DATA.stockBatteries[0];
+  const V = b.volume, c = CHEMS[val("cmp")];
+  const avgEff = m.curve.reduce((s, k) => s + k[1], 0) / m.curve.length;
+  const mine = {sc: m.V.sc * V, ec: m.V.ec * V, rate: m.V.sc * V * m.V.crate, mass: m.V.mass * V * 1000, cost: m.V.cost * V};
+  const ref = c ? {sc: c.SC * V, ec: c.EC * V, rate: c.SC * V * c.Crate, mass: c.tankMass * V * 1000, cost: c.tankCost * V} : null;
+  const cmp = (k, u, d = 3) => ref ? `${c.short}: ${fmt(ref[k], d)}${u}` : "";
+  const cards = [
+    ["Stored energy", `${fmt(mine.sc, 3)} kWh`, cmp("sc", " kWh")],
+    ["EC buffer", fmt(mine.ec, 3), cmp("ec", "")],
+    ["Discharge rate", `${fmt(mine.rate, 3)} EC/s`, cmp("rate", " EC/s")],
+    ["Mass", `${fmt(mine.mass, 3)} kg`, `stock: ${fmt(b.stockMass * 1000, 3)} kg` + (ref ? ` · ${cmp("mass", " kg")}` : "")],
+    ["Cost", `${fmt(mine.cost, 3)} √`, `stock: ${fmt(b.stockCost, 3)} √` + (ref ? ` · ${cmp("cost", " √")}` : "")],
+    ["Full discharge", dur(1 / m.V.crate), m.primary ? "not rechargeable" : `recharge ≈ ${dur(1 / (m.V.crate * Math.max(avgEff, 0.01)))}`],
+  ];
+  $("cards").innerHTML = cards.map(([k, v, s]) => `<div class="card"><div class="k">${k}</div><div class="val">${v}</div><div class="cmp">${esc(s)}</div></div>`).join("");
+}
+
+const AXES = ["Mass", "Cost", "Capacity", "Power", "Cycles", "Heat"];
+function radarRaw(m) {
+  return {Mass: m.V.sc / m.V.mass, Cost: m.V.cost > 0 ? m.V.sc / m.V.cost : null, Capacity: m.V.sc,
+    Power: m.V.crate * m.V.sc, Cycles: (m.primary || val("infCycles")) ? null : m.V.cycles, Heat: m.V.tl > 0 ? 1 / m.V.tl : null};
+}
+function renderRadar(m) {
+  const rows = DATA.chemistries.map(c => ({raw: c.radar, infinite: c.fields.InfiniteCycles === "true",
+    primary: c.fields.FixedOutput === "true" || Number(c.fields.CycleDurability || 1) <= 1, tl: Number(c.fields.ThermalLoss || 0), id: c.id}));
+  const me = {raw: radarRaw(m), infinite: !!val("infCycles"), primary: m.primary, tl: m.V.tl, id: "__new"};
+  const all = rows.concat([me]);
+  const norm = {};
+  for (const a of AXES) {
+    const vals = all.map(r => r.raw[a]).filter(v => v && v > 0);
+    const lo = Math.log10(Math.min(...vals)), hi = Math.log10(Math.max(...vals)), span = (hi - lo) || 1;
+    for (const r of all) {
+      const v = r.raw[a];
+      let n;
+      if (a === "Cycles" && r.infinite) n = 100; else if (a === "Cycles" && r.primary) n = 10;
+      else if (a === "Heat" && r.tl <= 0) n = 100; else if (!v || v <= 0) n = 10;
+      else n = 10 + 90 * (Math.log10(v) - lo) / span;
+      (norm[r.id] ||= {})[a] = n;
+    }
+  }
+  const cx = 120, cy = 112, R = 80;
+  const ang = i => Math.PI / 2 - 2 * Math.PI * i / AXES.length;
+  const pt = (r, i) => [cx + r * Math.cos(ang(i)), cy - r * Math.sin(ang(i))];
+  const poly = (n, cls) => AXES.map((a, i) => pt(R * n[a] / 100, i).map(x => x.toFixed(1)).join(",")).join(" ");
+  let s = "";
+  for (let k = 1; k <= 5; k++) s += `<polygon points="${AXES.map((a, i) => pt(R * k / 5, i).map(x => x.toFixed(1)).join(",")).join(" ")}" fill="none" stroke="var(--line)"/>`;
+  AXES.forEach((a, i) => { const [x, y] = pt(R + 16, i); s += `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle">${a}</text>`; });
+  const c = CHEMS[val("cmp")];
+  if (c) s += `<polygon points="${poly(norm[c.id])}" fill="var(--ref)" fill-opacity=".12" stroke="var(--ref)" stroke-width="2"/>`;
+  const col = (parseColor(val("col1") || $("col1").placeholder) || "").slice(0, 7) || "var(--new)";
+  s += `<polygon points="${poly(norm.__new)}" fill="${col}" fill-opacity=".18" stroke="${col}" stroke-width="2.5"/>`;
+  $("radar").innerHTML = s;
+  $("radarLegend").innerHTML = `<span style="color:${col}">${esc(val("short").trim() || ids().id)} (new)</span>` + (c ? `<span style="color:var(--ref)">${esc(c.title)}</span>` : "");
+}
+
+function renderCurve(m) {
+  const X = x => 30 + x * 195, Y = y => 145 - y * 130;
+  let s = `<line x1="30" y1="145" x2="225" y2="145" stroke="var(--line)"/><line x1="30" y1="15" x2="30" y2="145" stroke="var(--line)"/>`;
+  for (const g of [0.5, 1]) s += `<line x1="30" y1="${Y(g)}" x2="225" y2="${Y(g)}" stroke="var(--line)" stroke-dasharray="3 3"/><text x="4" y="${Y(g) + 4}">${g}</text>`;
+  s += `<text x="30" y="162">SoC 0</text><text x="205" y="162">1.0</text>`;
+  s += `<polyline points="${m.curve.map(([x, y]) => `${X(x).toFixed(1)},${Y(y).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--new)" stroke-width="2.5"/>`;
+  s += m.curve.map(([x, y], i) => `<circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="9" fill="transparent" data-node="${i}" style="cursor:${m.primary ? "default" : "grab"};touch-action:none"/><circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="4" fill="var(--new)" pointer-events="none"/>`).join("");
+  $("curveSvg").innerHTML = s;
+  $("nodeCount").textContent = m.curve.length;
+  $("nodeBox").classList.toggle("locked", m.primary);
+  if (!(val("curvePreset") === "custom" && curveDirty) && document.activeElement !== $("curveText"))
+    $("curveText").value = m.curve.map(([x, y]) => `key = ${x} ${y}`).join("\n");
+}
+
+// Curve editing: write keys, switch to Custom.
+function setCurve(keys) {
+  curveDirty = true; $("curvePreset").value = "custom";
+  $("curveText").value = keys.map(([x, y]) => `key = ${Number(x.toFixed(3))} ${Number(y.toFixed(3))}`).join("\n");
+  update();
+}
+function curveAt(keys, x) {
+  for (let i = 1; i < keys.length; i++) if (x <= keys[i][0]) {
+    const [x0, y0] = keys[i - 1], [x1, y1] = keys[i];
+    return x1 === x0 ? y1 : y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+  }
+  return keys[keys.length - 1][1];
+}
+let drag = null;
+function svgPoint(e) {
+  const svg = $("curveSvg"), pt = svg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function renderTabs() {
+  $("tabs").innerHTML = TABS.map((t, i) => `<button type="button" class="${i === activeTab ? "on" : ""}" data-tab="${i}">${t.name}</button>`).join("");
+}
+
+let last = null;
+function update() {
+  // Visibility of dependent controls.
+  $("cellBox").classList.toggle("locked", !val("cellOn"));
+  $("kwBox").classList.toggle("locked", !val("kwOn"));
+  $("csBox").classList.toggle("locked", !val("csOn"));
+  $("rexBox").classList.toggle("locked", !val("rexOn"));
+  $("rbcBox").classList.toggle("locked", !val("selfRun"));
+  const tree = val("tree"), attach = !!val("attach");
+  $("stockNodeBox").hidden = attach || !(tree === "stock" || tree === "both");
+  $("cttNodeBox").hidden = attach || !(tree === "ctt" || tree === "both");
+  $("customNodeBox").hidden = attach || tree !== "custom";
+  for (const id of ["costBox", "upTitleBox", "iconBox"]) $(id).hidden = attach;
+  $("iconCustom").hidden = val("icon") !== "__custom";
+  $("upTitle").placeholder = val("title").trim() || "Upgrade title";
+  { const u = upgradeInfo(); $("entryCost").placeholder = u.node ? String(defaultEntryCost()) : ""; }
+  $("cidHint").textContent = val("cid").trim() ? `Keys: #LOC_RB_*_${val("cid").trim()}` : "";
+  for (const i of [1, 2]) {
+    const v = val("col" + i), c = parseColor(v || $("col" + i).placeholder);
+    $("chip" + i).style.background = c || "transparent";
+    $("cw" + i).textContent = v.trim() && !parseColor(v) ? "Not a valid B9PartSwitch color (names are case sensitive)." : "";
+  }
+  // Placeholders from the template chemistry, in the selected unit.
+  const def = realOf(CHEMS[val("tpl")] || CHEMS.Li_ion);
+  for (const f of REAL_FIELDS) {
+    const u = val("u_" + f.k), d = def[f.k];
+    $("in_" + f.k).placeholder = d === null || d === undefined ? "" : fmt(FROM[f.k][u](d), 3);
+  }
+  $("cellV").placeholder = fmt(def.volt, 3);
+  $("cellVolBox").hidden = val("cellSize") !== "custom";
+  $("topt").placeholder = fmt(TEMP_FROM[val("toptU")](STD.TempOptimal), 4);
+  $("rhf").placeholder = String(STD.RunawayHeatFactor);
+  $("kwLo").placeholder = STD.TempKeepWarmLo; $("kwHi").placeholder = STD.TempKeepWarmHi;
+  $("csF").placeholder = STD.CrateScaleFactor;
+  $("evaLv").textContent = evaLevel;
+  $("evaBox").classList.toggle("locked", val("evaRef") === "false");
+
+  const m = compute();
+  last = m;
+  renderBal(m); renderCards(m); renderRadar(m); renderCurve(m);
+  $("code").textContent = TABS[activeTab].f(m);
+  $("resOpts").hidden = activeTab !== 3;
+  $("dlBtn").textContent = `Download ${ids().id}.cfg`;
+  save();
+}
+
+// ------------------------------------------------------------ RESOURCE_EXTRA rows
+function renderRex() {
+  $("rexRows").innerHTML = rexRows.map((r, i) => `<div class="extra-row">
+    <input type="text" list="resList" value="${esc(r.name)}" data-rex="${i}" data-f="name" aria-label="Resource">
+    <input type="text" value="${esc(r.ratio)}" data-rex="${i}" data-f="ratio" placeholder="1" aria-label="Ratio">
+    <select data-rex="${i}" data-f="mode" aria-label="Mode"><option${r.mode === "discharge" ? " selected" : ""}>discharge</option><option${r.mode === "charge" ? " selected" : ""}>charge</option></select>
+    <select data-rex="${i}" data-f="type" aria-label="Type"><option${r.type === "input" ? " selected" : ""}>input</option><option${r.type === "output" ? " selected" : ""}>output</option></select>
+    <button type="button" class="iconbtn" data-rexdel="${i}" title="Remove">✕</button></div>`).join("");
+}
+
+// ------------------------------------------------------------ persistence
+function snapshot() {
+  const s = {};
+  document.querySelectorAll("[data-k]").forEach(e => { s[e.id] = e.type === "checkbox" ? e.checked : e.value; });
+  REAL_FIELDS.forEach(f => { s["in_" + f.k] = val("in_" + f.k); s["u_" + f.k] = val("u_" + f.k); });
+  s._knobs = KNOBS; s._eva = evaLevel; s._rex = rexRows; s._curveDirty = curveDirty;
+  return s;
+}
+function restore(s) {
+  if (!s) return;
+  for (const [k, v] of Object.entries(s)) {
+    if (k.startsWith("_")) continue;
+    const e = $(k); if (!e) continue;
+    if (e.type === "checkbox") e.checked = !!v; else e.value = v;
+  }
+  Object.keys(KNOBS).forEach(k => delete KNOBS[k]);
+  Object.assign(KNOBS, s._knobs || {});
+  for (const b of BAL) { const kn = KNOBS[b.k]; $("op_" + b.k).value = kn ? kn.op : "×"; $("kv_" + b.k).value = kn ? kn.v : ""; }
+  evaLevel = s._eva ?? STD.EVAminLevel; rexRows = s._rex || []; curveDirty = !!s._curveDirty;
+  renderRex();
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot())); } catch (e) {} }
+function toast(t) { const e = $("toast"); e.textContent = t; e.classList.add("on"); setTimeout(() => e.classList.remove("on"), 1600); }
+function b64e(s) { return btoa(unescape(encodeURIComponent(s))); }
+function b64d(s) { return decodeURIComponent(escape(atob(s))); }
+
+// ------------------------------------------------------------ setup
+function opt(v, t, sel) { return `<option value="${esc(v)}"${sel ? " selected" : ""}>${esc(t)}</option>`; }
+function init() {
+  // Selects filled from the data.
+  $("lang").innerHTML = Object.keys(DATA.descSum).map(l => opt(l, l, l === "en-us")).join("");
+  const chemOpts = sel => DATA.chemistries.map(c => opt(c.id, c.title, c.id === sel)).join("");
+  $("tpl").innerHTML = chemOpts("Li_ion");
+  $("cmp").innerHTML = opt("", "— none —") + chemOpts("Li_ion");
+  $("part").innerHTML = DATA.stockBatteries.map(b => opt(b.name, `${b.title} (${fmt(b.volume, 4)} L)`)).join("");
+  const nodes = (list, sel) => {
+    let html = "", tier = null;
+    for (const n of list) {
+      if (n.tier !== tier) { if (tier !== null) html += "</optgroup>"; tier = n.tier; html += `<optgroup label="Tier ${n.tier} · ${fmt(n.tierCost, 5)} science">`; }
+      html += opt(n.id, n.id === "start" ? `${n.title} (no upgrade)` : n.title, n.id === sel);
+    }
+    return html + "</optgroup>";
+  };
+  $("stockNode").innerHTML = nodes(DATA.techTrees.stock, "advElectrics");
+  $("cttNode").innerHTML = nodes(DATA.techTrees.ctt, "highPowerElectricalSystems");
+  $("attach").innerHTML = opt("", "— create a new upgrade —") + DATA.upgrades.map(u => opt(u.name, u.title)).join("");
+  const icons = DATA.partIcons;
+  const group = (src, label) => `<optgroup label="${label}">` + icons.filter(p => p.source === src)
+    .map(p => opt(p.name, p.title)).join("") + "</optgroup>";
+  $("icon").innerHTML = group("stock", "Stock") + group("RealBattery", "RealBattery") + `<optgroup label=" ">${opt("__custom", "Custom…")}</optgroup>`;
+  $("cellSize").innerHTML = ["Lithium cylindrical", "Consumer"].map(g => `<optgroup label="${g}">` + CELL_SIZES.filter(c => c.g === g)
+    .map(c => opt(c.id, `${c.id} (${c.box ? c.box.join(" × ") : "Ø" + c.d + " × " + c.h} mm, ${fmt(c.cm3, 3)} cm³)`, c.id === "18650")).join("") + "</optgroup>").join("")
+    + `<optgroup label=" ">${opt("custom", "Custom…")}</optgroup>`;
+  $("icon").value = DATA.meta.defaultPartIcon;
+  for (const id of ["toptU"]) $(id).innerHTML = ["K", "°C", "°F"].map(u => opt(u, u)).join("");
+
+  // Real-world fields.
+  $("realFields").innerHTML = REAL_FIELDS.map(f => `<div><label for="in_${f.k}">${f.label} <span class="tip" title="${esc(f.tip)}">?</span></label>
+    <div class="field"><input type="text" id="in_${f.k}" inputmode="decimal">${Object.keys(UNITS[f.k]).length > 1
+      ? `<select id="u_${f.k}" aria-label="${f.label} unit">${Object.keys(UNITS[f.k]).map(u => opt(u, u)).join("")}</select>`
+      : `<select id="u_${f.k}" hidden>${opt(Object.keys(UNITS[f.k])[0], "")}</select><span style="align-self:center;padding:0 4px">${Object.keys(UNITS[f.k])[0]}</span>`}</div></div>`).join("");
+  $("u_sd").value = "%/month"; $("u_tover").value = "°C"; $("u_trun").value = "°C";
+
+  buildBalRows();
+  renderTabs();
+
+  // Restore: share link first, then the saved draft.
+  let state = null;
+  if (location.hash.length > 1) { try { state = JSON.parse(b64d(location.hash.slice(1))); } catch (e) {} }
+  if (!state) { try { state = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) {} }
+  restore(state);
+
+  // Events.
+  document.addEventListener("input", e => {
+    if (e.target.dataset.rex !== undefined) { rexRows[+e.target.dataset.rex][e.target.dataset.f] = e.target.value; update(); return; }
+    if (e.target.id === "curveText") { curveDirty = true; $("curvePreset").value = "custom"; }
+    if (e.target.matches("input,select,textarea") && !e.target.id.startsWith("kv_")) update();
+  });
+  document.querySelectorAll("select[id^=u_], #cellCapU, #cellMU, #cellVolU, #toptU, #rbcU").forEach(s => { s.dataset.prev = s.value; });
+  document.addEventListener("change", e => {
+    if (e.target.matches("select[id^=u_], #cellCapU, #cellMU, #cellVolU, #toptU, #rbcU")) onUnitChange(e.target);
+    if (e.target.dataset.rex !== undefined) { rexRows[+e.target.dataset.rex][e.target.dataset.f] = e.target.value; update(); return; }
+    if (e.target.id === "curvePreset") curveDirty = false;
+    if (e.target.id === "pick1" || e.target.id === "pick2") { $("col" + e.target.id.slice(-1)).value = e.target.value.toUpperCase(); }
+    if (!e.target.id.startsWith("op_")) update();
+  });
+  $("evaBox").addEventListener("click", e => {
+    const st = Number(e.target.dataset.step); if (!st) return;
+    evaLevel = Math.max(0, Math.min(5, evaLevel + st)); update();
+  });
+  $("rexAdd").addEventListener("click", () => { rexRows.push({name: "", ratio: "", mode: "discharge", type: "input"}); renderRex(); update(); });
+  $("rexRows").addEventListener("click", e => { const i = e.target.dataset.rexdel; if (i === undefined) return; rexRows.splice(+i, 1); renderRex(); update(); });
+  $("curveSvg").addEventListener("pointerdown", e => {
+    const i = e.target.dataset.node; if (i === undefined || last.primary) return;
+    drag = {i: +i, keys: last.curve.map(k => k.slice())};
+    e.target.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  $("curveSvg").addEventListener("pointermove", e => {
+    if (!drag) return;
+    const p = svgPoint(e), k = drag.keys, i = drag.i;
+    const y = Math.max(0, Math.min(1, (145 - p.y) / 130));
+    let x = k[i][0];
+    if (i > 0 && i < k.length - 1) x = Math.max(k[i - 1][0] + 0.01, Math.min(k[i + 1][0] - 0.01, (p.x - 30) / 195));
+    k[i] = [Number(x.toFixed(2)), Number(y.toFixed(3))];
+    setCurve(k);
+  });
+  const endDrag = () => { drag = null; };
+  $("curveSvg").addEventListener("pointerup", endDrag);
+  $("curveSvg").addEventListener("pointercancel", endDrag);
+  $("nodeBox").addEventListener("click", e => {
+    const st = Number(e.target.dataset.nodes); if (!st || last.primary) return;
+    const n = Math.max(2, Math.min(6, last.curve.length + st));
+    if (n === last.curve.length) return;
+    const keys = Array.from({length: n}, (_, j) => { const x = j / (n - 1); return [x, curveAt(last.curve, x)]; });
+    setCurve(keys);
+  });
+  $("tabs").addEventListener("click", e => { const i = e.target.dataset.tab; if (i === undefined) return; activeTab = +i; renderTabs(); update(); });
+  $("copyBtn").addEventListener("click", () => copyText($("code").textContent, "Block copied"));
+  $("dlBtn").addEventListener("click", () => download(`${ids().id}.cfg`, exportCfg(last), "text/plain"));
+  $("expJson").addEventListener("click", () => download(`${ids().id}.balancer.json`, JSON.stringify(snapshot(), null, 1), "application/json"));
+  $("impJson").addEventListener("click", () => $("impFile").click());
+  $("impFile").addEventListener("change", async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { restore(JSON.parse(await f.text())); update(); toast("Project imported"); } catch (err) { toast("Not a valid project file"); }
+    e.target.value = "";
+  });
+  $("shareBtn").addEventListener("click", () => {
+    const url = location.href.split("#")[0] + "#" + b64e(JSON.stringify(snapshot()));
+    copyText(url, "Share link copied");
+  });
+  $("resetAll").addEventListener("click", () => {
+    if (!confirm("Clear every field and adjustment?")) return;
+    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+    location.hash = ""; location.reload();
+  });
+
+  // Footer.
+  const fz = F;
+  $("foot").innerHTML = `Data generated ${DATA.meta.generated} from RealBattery ${DATA.meta.rbVersion} configs · anchors: ${esc(DATA.meta.anchorSource)}<br>
+    <details><summary>Coefficients</summary>
+    <code>Wh/kg game = ${fz.whkg.a} · x^${fz.whkg.b}</code> · <code>Wh/L game = ${fz.whl.a} · x^${fz.whl.b}</code> ·
+    <code>peak W/kg = ${fz.wkgPeak.k} · x</code> · <code>ThermalLoss = ${fz.thermalLoss.k} · (1 − round-trip eff.)</code> ·
+    <code>SelfDischargeRate/day = ${fz.selfDischarge.k} · fraction/month</code> · <code>cycles = ${fz.cycles.k} · x</code> ·
+    <code>peak/continuous = ${fz.peakToContinuous.k}</code> · <code>1 $ = ${fz.fundsPerUsd} √</code> ·
+    <code>SpareParts: ${SP.unitCost} √, ${SP.density} t per unit</code></details>`;
+  update();
+}
+
+function applyTheme(t) {
+  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+}
+(function () {
+  let t = "auto";
+  try { t = localStorage.getItem("rbBalancer.theme") || "auto"; } catch (e) {}
+  $("theme").value = t; applyTheme(t);
+  $("theme").addEventListener("change", e => {
+    e.stopPropagation(); applyTheme(e.target.value);
+    try { localStorage.setItem("rbBalancer.theme", e.target.value); } catch (err) {}
+  });
+})();
+
+function copyText(t, msg) {
+  const done = () => toast(msg);
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, () => fallback());
+  else fallback();
+  function fallback() { const a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select();
+    try { document.execCommand("copy"); done(); } catch (e) { toast("Copy failed"); } a.remove(); }
+}
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], {type}));
+  a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+init();
+</script>
+</body>
+</html>
